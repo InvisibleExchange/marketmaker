@@ -1,0 +1,27 @@
+{
+  "name": "invisible-marketmaker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@starkware-industries/starkware-crypto-utils": "^0.0.2",
+    "axios": "^1.1.2",
+    "big-integer": "^1.6.51",
+    "dotenv": "^16.0.3",
+    "eslint": "8.30.0",
+    "ethers": "^5.7.2",
+    "ffi-napi": "^4.0.3",
+    "firebase": "^9.8.1",
+    "ref-array-napi": "^1.2.2",
+    "ref-napi": "^3.0.3",
+    "ref-struct-napi": "^1.1.1",
+    "starknet": "^4.5.0",
+    "websocket": "^1.0.34",
+    "ws": "^8.11.0"
+  }
+}
