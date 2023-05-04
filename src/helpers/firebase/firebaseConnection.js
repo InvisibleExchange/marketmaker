@@ -151,19 +151,19 @@ async function storePrivKey(userId, privKey, isPosition, privateSeed) {
 
 async function removePrivKey(userId, privKey, isPosition, privateSeed) {
   let docRef;
+  // TODO
+  // let encryptedPk = bigInt(privKey).xor(privateSeed).toString();
 
-  let encryptedPk = bigInt(privKey).xor(privateSeed).toString();
+  // if (isPosition) {
+  //   docRef = doc(db, `users/${userId}/positionPrivKeys`, encryptedPk);
+  // } else {
+  //   docRef = doc(db, `users/${userId}/privKeys`, encryptedPk);
+  // }
 
-  if (isPosition) {
-    docRef = doc(db, `users/${userId}/positionPrivKeys`, encryptedPk);
-  } else {
-    docRef = doc(db, `users/${userId}/privKeys`, encryptedPk);
-  }
+  // await deleteDoc(docRef);
 
-  await deleteDoc(docRef);
-
-  let docRef2 = doc(db, `users/${userId}/deprecatedKeys`, encryptedPk);
-  await setDoc(docRef2, {});
+  // let docRef2 = doc(db, `users/${userId}/deprecatedKeys`, encryptedPk);
+  // await setDoc(docRef2, {});
 }
 
 async function storeOrderId(

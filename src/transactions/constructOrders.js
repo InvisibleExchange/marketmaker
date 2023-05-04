@@ -564,7 +564,8 @@ async function sendAmendOrder(
   isPerp,
   marketId,
   newPrice,
-  newExpirationTime
+  newExpirationTime,
+  ACTIVE_ORDERS
 ) {
   let ts = new Date().getTime() / 1000; // number of seconds since epoch
   let expirationTimestamp = Number.parseInt(ts.toString()) + newExpirationTime;
@@ -608,7 +609,8 @@ async function sendAmendOrder(
   } else {
     let ord = user.orders.filter((o) => o.order_id == orderId)[0];
     if (!ord) {
-      throw new Error("Order not found");
+      console.log("Order not found");
+      return;
     }
 
     if (order_side == "Buy") {
@@ -682,6 +684,10 @@ async function sendAmendOrder(
       let msg =
         "Amend order failed with error: \n" + order_response.error_message;
       console.log(msg);
+
+      ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
+        marketId.toString() + order_side
+      ].filter((o) => o.id != orderId);
     }
   });
 }

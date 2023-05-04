@@ -304,8 +304,13 @@ function handleSwapResult(
     order.qty_left -= swap_response.swap_note.amount;
 
     if (!swap_response.new_pfr_note) {
-      ACTIVE_ORDERS[marketId + order.order_side] = ACTIVE_ORDERS[
-        marketId + order.order_side
+      let side =
+        order.token_spent == SPOT_MARKET_IDS_2_TOKENS[marketId].base
+          ? "Sell"
+          : "Buy";
+
+      ACTIVE_ORDERS[marketId.toString() + side] = ACTIVE_ORDERS[
+        marketId.toString() + side
       ].filter((o) => o.id != orderId);
 
       user.orders.splice(idx, 1);
@@ -314,6 +319,11 @@ function handleSwapResult(
     }
   }
   user.filledAmounts[orderId] = swap_response.new_amount_filled;
+
+  console.log("swap note: ", swap_response.swap_note);
+
+  console.log("base balance: ", user.getAvailableAmount(54321));
+  console.log("quote balance: ", user.getAvailableAmount(55555));
 }
 
 /**

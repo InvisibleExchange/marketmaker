@@ -17,6 +17,7 @@ const {
   handleLiquidityUpdate,
   handleSwapResult,
   handlePerpSwapResult,
+  DUST_AMOUNT_PER_ASSET,
 } = require("./helpers/utils");
 
 const {
@@ -24,6 +25,7 @@ const {
   cancelOrder,
   sendSplitOrder,
   sendAmendOrder,
+  sendCancelOrder,
 } = require("./transactions/constructOrders");
 
 const setupPriceFeeds = require("./helpers/mmPriceFeeds");
@@ -196,11 +198,11 @@ async function indicateLiquidity(marketIds = activeMarkets) {
     let buySplits =
       usdQuoteBalance && usdQuoteBalance < 1000
         ? 1
-        : mmConfig.numOrdersIndicated || 4;
+        : mmConfig.numOrdersIndicated || 2;
     let sellSplits =
       usdBaseBalance && usdBaseBalance < 1000
         ? 1
-        : mmConfig.numOrdersIndicated || 4;
+        : mmConfig.numOrdersIndicated || 2;
 
     if (usdQuoteBalance && usdQuoteBalance < 10 * buySplits)
       buySplits = Math.floor(usdQuoteBalance / 10);
@@ -230,7 +232,11 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         );
       }
 
+      console.log("buySplits: ", buySplits, "buyOrdersLen: ", buyOrdersLen);
       for (let i = buyOrdersLen; i < buySplits; i++) {
+        console.log("quoteBalance: ", quoteBalance);
+        if (quoteBalance < DUST_AMOUNT_PER_ASSET[quoteAsset]) continue;
+
         const buyPrice =
           midPrice *
           (1 -
@@ -241,7 +247,9 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         await sendSplitOrder(
           marketMaker,
           quoteAsset,
-          totalQuoteBalance / buySplits
+          quoteBalance /
+            10 ** DECIMALS_PER_ASSET[quoteAsset] /
+            (buySplits - buyOrdersLen)
         );
         await sendSpotOrder(
           marketMaker,
@@ -250,7 +258,9 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           baseAsset,
           quoteAsset,
           null,
-          totalQuoteBalance / buySplits,
+          quoteBalance /
+            10 ** DECIMALS_PER_ASSET[quoteAsset] /
+            (buySplits - buyOrdersLen),
           buyPrice,
           0.07,
           0,
@@ -283,21 +293,33 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         );
       }
 
+      console.log("sellSplits: ", sellSplits, "sellOrdersLen: ", sellOrdersLen);
       for (let i = sellOrdersLen; i < sellSplits; i++) {
+        console.log("baseBalance: ", baseBalance);
+        if (baseBalance <= DUST_AMOUNT_PER_ASSET[baseAsset]) continue;
+
         const sellPrice =
           midPrice *
           (1 +
             mmConfig.minSpread +
             (mmConfig.slippageRate * maxSellSize * i) / sellSplits);
 
-        await sendSplitOrder(marketMaker, baseAsset, maxSellSize / sellSplits);
+        await sendSplitOrder(
+          marketMaker,
+          baseAsset,
+          baseBalance /
+            10 ** DECIMALS_PER_ASSET[baseAsset] /
+            (sellSplits - sellOrdersLen)
+        );
         await sendSpotOrder(
           marketMaker,
           "Sell",
           MM_CONFIG.EXPIRATION_TIME,
           baseAsset,
           quoteAsset,
-          maxSellSize / sellSplits,
+          baseBalance /
+            10 ** DECIMALS_PER_ASSET[baseAsset] /
+            (sellSplits - sellOrdersLen),
           null,
           sellPrice,
           0.07,
@@ -401,8 +423,9 @@ function cancelLiquidity(marketId) {
   for (order of marketMaker.orders) {
     if (order.base_asset == baseAsset) {
       sendCancelOrder(
+        marketMaker,
         order.order_id,
-        order.order_side === "Buy" || order.order_side === 0,
+        order.order_side,
         false,
         marketId
       );
@@ -486,8 +509,6 @@ async function afterFill(amountFilled, marketId) {
     }, time * 1000);
   }
 }
-
-//
 
 // * HELPER FUNCTIONS ==========================================================================================================
 
@@ -730,6 +751,15 @@ const updateAccountState = async () => {
     );
 
     marketMaker = user_;
+
+    // cancel open orders
+    for (let marketId of Object.values(SPOT_MARKET_IDS)) {
+      if (!activeMarkets.includes(marketId.toString())) continue;
+
+      if (marketMaker) {
+        cancelLiquidity(marketId);
+      }
+    }
   } catch (error) {
     console.log("login error", error);
     throw error;
@@ -749,11 +779,19 @@ async function main() {
   // Strart listening to updates from the server
   listenToWebSocket();
 
-  // brodcast orders to provide liquidity
-  await indicateLiquidity();
-  setInterval(async () => {
-    await indicateLiquidity();
-  }, 6000);
-}
+  // sleep for a second to make sure we have the latest liquidity
+  await new Promise((r) => setTimeout(r, 1000));
 
+  console.log(marketMaker.noteData[55555]?.map((n) => [n.index, n.hash]));
+  console.log(marketMaker.noteData[54321]?.map((n) => [n.index, n.hash]));
+
+  console.log(marketMaker.getAvailableAmount(55555));
+  console.log(marketMaker.getAvailableAmount(54321));
+
+  // brodcast orders to provide liquidity
+  // await indicateLiquidity();
+  // setInterval(async () => {
+  //   await indicateLiquidity();
+  // }, 30000);
+}
 main();

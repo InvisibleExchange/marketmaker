@@ -396,20 +396,23 @@ module.exports = class User {
       // ? Generate the dest spent and dest received addresses and blindings
       privKeys = notesIn.map((x) => x.privKey);
       let ytS = this.getDestSpentBlinding(privKeys);
-      let { KoR, koR, ytR } = this.getDestReceivedAddresses(synthetic_token);
-      this.notePrivKeys[KoR.getX().toString()] = koR;
 
-      // ? generate the refund note
-      let refundNote =
-        refundAmount > DUST_AMOUNT_PER_ASSET[collateral_token]
-          ? new Note(
-              KoR,
-              collateral_token,
-              refundAmount,
-              ytR,
-              notesIn[0].note.index
-            )
-          : null;
+      let refundNote;
+      if (refundAmount > DUST_AMOUNT_PER_ASSET[collateral_token]) {
+        let { KoR, koR, ytR } = this.getDestReceivedAddresses(synthetic_token);
+        this.notePrivKeys[KoR.getX().toString()] = koR;
+
+        // ? generate the refund note
+        refundNote = new Note(
+          KoR,
+          collateral_token,
+          refundAmount,
+          ytR,
+          notesIn[0].note.index
+        );
+
+        storePrivKey(this.userId, koR, false, this.privateSeed);
+      }
 
       let { positionPrivKey, positionAddress } =
         this.getPositionAddress(synthetic_token);
@@ -427,7 +430,6 @@ module.exports = class User {
 
       storeUserData(this.userId, this.noteCounts, this.positionCounts);
 
-      storePrivKey(this.userId, koR, false, this.privateSeed);
       storePrivKey(this.userId, positionPrivKey, true, this.privateSeed);
     } else if (position_effect_type == "Close") {
       let { KoR, koR, ytR } = this.getDestReceivedAddresses(collateral_token);
@@ -534,20 +536,33 @@ module.exports = class User {
     let privKeys = notesIn.map((x) => x.privKey);
     let ytS = this.getDestSpentBlinding(privKeys);
     let { KoR, koR, ytR } = this.getDestReceivedAddresses(token_received);
-    let {
-      KoR: KoR2,
-      koR: koR2,
-      ytR: ytR2,
-    } = this.getDestReceivedAddresses(token_spent);
+
     let privKeySum = privKeys.reduce((a, b) => a + b, 0n);
     this.notePrivKeys[KoR.getX().toString()] = koR;
-    this.notePrivKeys[KoR2.getX().toString()] = koR2;
 
-    // ? generate the refund note
-    let refundNote =
-      refundAmount > DUST_AMOUNT_PER_ASSET[token_spent]
-        ? new Note(KoR2, token_spent, refundAmount, ytR2, notesIn[0].note.index)
-        : null;
+    let refundNote;
+    if (refundAmount > DUST_AMOUNT_PER_ASSET[token_spent]) {
+      let {
+        KoR: KoR2,
+        koR: koR2,
+        ytR: ytR2,
+      } = this.getDestReceivedAddresses(token_spent);
+      this.notePrivKeys[KoR2.getX().toString()] = koR2;
+
+      // ? generate the refund note
+      refundNote = new Note(
+        KoR2,
+        token_spent,
+        refundAmount,
+        ytR2,
+        notesIn[0].note.index
+      );
+
+      console.log("privKey ", koR2.toString());
+      console.log("addr: ", KoR2.getX().toString());
+
+      storePrivKey(this.userId, koR2, false, this.privateSeed);
+    }
 
     let limitOrder = new LimitOrder(
       expiration_timestamp,
@@ -567,8 +582,10 @@ module.exports = class User {
 
     storeUserData(this.userId, this.noteCounts, this.positionCounts);
 
+    console.log("privKey ", koR.toString());
+    console.log("addr: ", KoR.getX().toString());
+
     storePrivKey(this.userId, koR, false, this.privateSeed);
-    storePrivKey(this.userId, koR2, false, this.privateSeed);
 
     return { limitOrder, pfrKey: privKeySum };
   }
