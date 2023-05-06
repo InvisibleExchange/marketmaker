@@ -2,6 +2,8 @@ const { sendDeposit } = require("./src/transactions/constructOrders");
 const User = require("./src/users/Invisibl3User");
 const { getActiveOrders } = require("./src/helpers/utils");
 
+const fs = require("fs");
+
 async function main() {
   let MM_CONFIG;
   if (process.env.MM_CONFIG) {

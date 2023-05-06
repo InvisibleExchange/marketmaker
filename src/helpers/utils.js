@@ -2,8 +2,8 @@ const axios = require("axios");
 const User = require("../users/Invisibl3User").default;
 const { Note, trimHash } = require("../users/Notes");
 
-const SERVER_URL = "localhost";
-// const SERVER_URL = "54.212.28.196";
+// const SERVER_URL = "localhost";
+const SERVER_URL = "54.212.28.196";
 
 const SYMBOLS_TO_IDS = {
   BTC: 12345,

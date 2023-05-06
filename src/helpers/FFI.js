@@ -1,4 +1,4 @@
-const ffi = require("ffi-napi");
+const ffi = require("../../node-ffi-napi/lib/ffi");
 const ref = require("ref-napi");
 const ArrayType = require("ref-array-napi");
 const StructType = require("ref-struct-napi");
