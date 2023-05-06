@@ -3,9 +3,15 @@ const User = require("./src/users/Invisibl3User");
 const { getActiveOrders } = require("./src/helpers/utils");
 
 async function main() {
-  let marketMaker = User.fromPrivKey(
-    "0x01a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1"
-  );
+  let MM_CONFIG;
+  if (process.env.MM_CONFIG) {
+    MM_CONFIG = JSON.parse(process.env.MM_CONFIG);
+  } else {
+    const mmConfigFile = fs.readFileSync("config.json", "utf8");
+    MM_CONFIG = JSON.parse(mmConfigFile);
+  }
+
+  let marketMaker = User.fromPrivKey(MM_CONFIG.privKey);
 
   let { emptyPrivKeys, emptyPositionPrivKeys } = await marketMaker.login();
 
@@ -22,10 +28,10 @@ async function main() {
     emptyPositionPrivKeys
   );
 
-  // await sendDeposit(marketMaker, 123, 5, 54321, 123456789);
+  await sendDeposit(marketMaker, 123, 5, 54321, 123456789);
   await sendDeposit(marketMaker, 234, 10000, 55555, 123456789);
 
-  // console.log(marketMaker.getAvailableAmount(54321));
+  console.log(marketMaker.getAvailableAmount(54321));
   console.log(marketMaker.getAvailableAmount(55555));
 }
 
