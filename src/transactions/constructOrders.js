@@ -19,6 +19,7 @@ const {
   handleNoteSplit,
   DUST_AMOUNT_PER_ASSET,
   SPOT_MARKET_IDS,
+  PERP_MARKET_IDS,
 } = require("../helpers/utils");
 const {
   _getBankruptcyPrice,
@@ -154,7 +155,7 @@ async function sendSpotOrder(
           order_side
         );
 
-        await storeOrderId(
+        storeOrderId(
           user.userId,
           order_response.order_id,
           pfrKey,
@@ -263,12 +264,13 @@ async function sendPerpOrder(
   position_effect_type,
   positionAddress,
   syntheticToken,
-  syntheticAmount,
+  syntheticAmount_,
   price,
   initial_margin,
   feeLimit,
   slippage,
-  isMarket
+  isMarket,
+  ACTIVE_ORDERS
 ) {
   let syntheticDecimals = DECIMALS_PER_ASSET[syntheticToken];
   let priceDecimals = PRICE_DECIMALS_PER_ASSET[syntheticToken];
@@ -276,7 +278,9 @@ async function sendPerpOrder(
   let decimalMultiplier =
     syntheticDecimals + priceDecimals - COLLATERAL_TOKEN_DECIMALS;
 
-  syntheticAmount = syntheticAmount * 10 ** syntheticDecimals;
+  let syntheticAmount = Number.parseInt(
+    syntheticAmount_ * 10 ** syntheticDecimals
+  );
   let scaledPrice = price * 10 ** priceDecimals;
   scaledPrice = isMarket
     ? order_side == "Long"
@@ -338,12 +342,21 @@ async function sendPerpOrder(
   orderJson.user_id = trimHash(user.userId, 64).toString();
   orderJson.is_market = isMarket;
 
+  // console.log("Sending order: ", orderJson);
+
   await axios
     .post(`${EXPRESS_APP_URL}/submit_perpetual_order`, orderJson)
     .then((res) => {
       let order_response = res.data.response;
 
       if (order_response.successful) {
+        console.log(
+          "Order successful: ",
+          order_response.order_id,
+          "  ",
+          order_side
+        );
+
         storeOrderId(
           user.userId,
           order_response.order_id,
@@ -399,6 +412,29 @@ async function sendPerpOrder(
           perpOrder.order_id = order_response.order_id;
 
           user.perpetualOrders.push(perpOrder);
+
+          let side = order_side == "Long" ? "Buy" : "Sell";
+          if (
+            ACTIVE_ORDERS[
+              PERP_MARKET_IDS[syntheticToken].toString() + side.toString()
+            ]
+          ) {
+            ACTIVE_ORDERS[
+              PERP_MARKET_IDS[syntheticToken].toString() + side.toString()
+            ].push({
+              id: order_response.order_id,
+              syntheticAmount: syntheticAmount_,
+            });
+          } else {
+            ACTIVE_ORDERS[
+              PERP_MARKET_IDS[syntheticToken].toString() + side.toString()
+            ] = [
+              {
+                id: order_response.order_id,
+                syntheticAmount: syntheticAmount_,
+              },
+            ];
+          }
         }
         user.awaittingOrder = false;
       } else {
@@ -575,7 +611,8 @@ async function sendAmendOrder(
   if (isPerp) {
     let ord = user.perpetualOrders.filter((o) => o.order_id == orderId)[0];
     if (!ord) {
-      throw new Error("Order not found");
+      console.log("Order not found");
+      return;
     }
 
     let newCollateralAmount = getQuoteQty(
@@ -657,7 +694,7 @@ async function sendAmendOrder(
     is_perp: isPerp,
   };
 
-  console.log("amendReq: ", orderId, newPrice);
+  // console.log("amendReq: ", orderId, newPrice);
 
   axios.post(`${EXPRESS_APP_URL}/amend_order`, amendReq).then((res) => {
     let order_response = res.data.response;

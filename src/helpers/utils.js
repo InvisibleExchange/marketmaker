@@ -319,11 +319,6 @@ function handleSwapResult(
     }
   }
   user.filledAmounts[orderId] = swap_response.new_amount_filled;
-
-  console.log("swap note: ", swap_response.swap_note);
-
-  console.log("base balance: ", user.getAvailableAmount(54321));
-  console.log("quote balance: ", user.getAvailableAmount(55555));
 }
 
 /**
@@ -341,7 +336,13 @@ function handleSwapResult(
  *       fee_taken: u64,
  *    }
  */
-function handlePerpSwapResult(user, orderId, swap_response) {
+function handlePerpSwapResult(
+  user,
+  orderId,
+  swap_response,
+  marketId,
+  ACTIVE_ORDERS
+) {
   //
 
   // ? Save position data (if not null)
@@ -429,6 +430,15 @@ function handlePerpSwapResult(user, orderId, swap_response) {
       order.qty_left - swap_response.qty - swap_response.fee_taken;
 
     if (order.qty_left < DUST_AMOUNT_PER_ASSET[swap_response.synthetic_token]) {
+      // ? Remove the order from ACTIVE_ORDERS
+      ACTIVE_ORDERS[marketId.toString() + "Buy"] = ACTIVE_ORDERS[
+        marketId.toString() + "Buy"
+      ].filter((o) => o.id != orderId);
+      ACTIVE_ORDERS[marketId.toString() + "Sell"] = ACTIVE_ORDERS[
+        marketId.toString() + "Sell"
+      ].filter((o) => o.id != orderId);
+
+      // ? remove the order from users orders
       user.perpetualOrders.splice(idx, 1);
     } else {
       user.perpetualOrders[idx] = order;

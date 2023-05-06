@@ -94,7 +94,7 @@ function checkPerpOrderValidity(
     !expirationTime ||
     !syntheticToken ||
     !syntheticAmount ||
-    feeLimit == null
+    feeLimit === null
   ) {
     console.log("Please fill in all fields");
     throw "Unfilled fields";
@@ -107,15 +107,13 @@ function checkPerpOrderValidity(
 
   if (posEffectType == "Open") {
     if (!collateralToken || !initialMargin) {
-      console.log("Please fill in all fields");
-      throw "Unfilled fields";
+      throw "Unfilled fields2";
     }
 
     if (initialMargin > user.getAvailableAmount(collateralToken)) {
       throw "Insufficient balance";
     }
   } else {
-    console.log(user.positionData);
     if (!user.positionData[syntheticToken]) {
       console.log("Position does not exist. Try opening a position first");
       throw "order invalid";

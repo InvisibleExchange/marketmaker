@@ -184,6 +184,16 @@ function getCurrentLeverage(indexPrice, size, margin) {
   return currentLeverage;
 }
 
+function getSizeFromLeverage(indexPrice, margin, leverage) {
+  if (indexPrice == 0) {
+    return 0;
+  }
+
+  const size = (Number(margin) * Number(leverage)) / Number(indexPrice);
+
+  return size;
+}
+
 function getMinViableMargin(position) {
   const maxLeverage = get_max_leverage(
     Number(position.synthetic_token),
@@ -268,6 +278,7 @@ module.exports = {
   calulateLiqPriceInDecreaseSize,
   calulateLiqPriceInFlipSide,
   getCurrentLeverage,
+  getSizeFromLeverage,
   getMinViableMargin,
   checkViableSizeAfterFlip,
   checkViableSizeAfterIncrease,

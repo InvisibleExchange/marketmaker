@@ -349,6 +349,17 @@ module.exports = class User {
       noteDataNew[token] = newArr;
     }
 
+    console.log(
+      "noteData",
+      newNoteData[55555]?.map((n) => n.index),
+      newNoteData[54321]?.map((n) => n.index)
+    );
+    console.log(
+      "noteDataNew",
+      noteDataNew[55555]?.map((n) => n.index),
+      noteDataNew[54321]?.map((n) => n.index)
+    );
+
     this.noteData = noteDataNew;
   }
 
@@ -460,6 +471,7 @@ module.exports = class User {
         throw "No open position to close";
       }
     } else {
+
       // ? Get the position priv Key for this position
       if (this.positionData[synthetic_token].length > 0) {
         for (let pos of this.positionData[synthetic_token]) {
@@ -470,12 +482,14 @@ module.exports = class User {
         }
         positionPrivKey = this.positionPrivKeys[positionAddress];
       }
+
     }
 
     let privKeySum;
     if (privKeys) {
       privKeySum = privKeys.reduce((a, b) => a + b, 0n);
     }
+
 
     let perpOrder = new PerpOrder(
       expiration_timestamp,
@@ -489,6 +503,7 @@ module.exports = class User {
       open_order_fields,
       close_order_fields
     );
+
 
     let _signature = perpOrder.signOrder(privKeys, positionPrivKey);
 
@@ -558,9 +573,6 @@ module.exports = class User {
         notesIn[0].note.index
       );
 
-      console.log("privKey ", koR2.toString());
-      console.log("addr: ", KoR2.getX().toString());
-
       storePrivKey(this.userId, koR2, false, this.privateSeed);
     }
 
@@ -581,9 +593,6 @@ module.exports = class User {
     let _sig = limitOrder.signOrder(privKeys);
 
     storeUserData(this.userId, this.noteCounts, this.positionCounts);
-
-    console.log("privKey ", koR.toString());
-    console.log("addr: ", KoR.getX().toString());
 
     storePrivKey(this.userId, koR, false, this.privateSeed);
 
