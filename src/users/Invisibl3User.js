@@ -172,6 +172,7 @@ module.exports = class User {
     let positionDataNew = {};
     for (let [token, arr] of Object.entries(positionData)) {
       let newArr = [];
+
       for (let pos of arr) {
         // Check if a position with the same index is already in the newArr
         if (!newArr.find((p) => p.index == pos.index)) {
@@ -471,7 +472,6 @@ module.exports = class User {
         throw "No open position to close";
       }
     } else {
-
       // ? Get the position priv Key for this position
       if (this.positionData[synthetic_token].length > 0) {
         for (let pos of this.positionData[synthetic_token]) {
@@ -482,14 +482,12 @@ module.exports = class User {
         }
         positionPrivKey = this.positionPrivKeys[positionAddress];
       }
-
     }
 
     let privKeySum;
     if (privKeys) {
       privKeySum = privKeys.reduce((a, b) => a + b, 0n);
     }
-
 
     let perpOrder = new PerpOrder(
       expiration_timestamp,
@@ -503,7 +501,6 @@ module.exports = class User {
       open_order_fields,
       close_order_fields
     );
-
 
     let _signature = perpOrder.signOrder(privKeys, positionPrivKey);
 

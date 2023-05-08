@@ -748,7 +748,7 @@ const initPositions = async () => {
         midPrice,
         margin,
         0.07,
-        0.5,
+        1,
         true,
         ACTIVE_ORDERS
       );
@@ -777,11 +777,18 @@ async function main() {
   // sleep for a second to make sure we have the latest liquidity
   await new Promise((r) => setTimeout(r, 1000));
 
+  console.log(
+    "Starting market making: ",
+    marketMaker.getAvailableAmount(55555),
+    "USDC"
+  );
+  console.log("positions", marketMaker.positionData);
+
   // brodcast orders to provide liquidity
   await indicateLiquidity();
   setInterval(async () => {
     await indicateLiquidity();
-  }, 3000);
+  }, 30_000);
 }
 main();
 

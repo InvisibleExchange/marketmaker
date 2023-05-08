@@ -656,7 +656,16 @@ const listenToWebSocket = () => {
 const updateAccountState = async () => {
   try {
     let user_ = User.fromPrivKey(MM_CONFIG.privKey);
+
     let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
+
+    // if the await statement isn't resolved in 5 seconds throw an error
+
+    let cancelTimeout = false;
+    const timeout = setTimeout(() => {
+      if (cancelTimeout) return;
+      throw new Error("updateAccountState timeout");
+    }, 8000);
 
     let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
       await getActiveOrders(user_.orderIds, user_.perpetualOrderIds);
@@ -670,6 +679,8 @@ const updateAccountState = async () => {
       emptyPrivKeys,
       emptyPositionPrivKeys
     );
+
+    cancelTimeout = true;
 
     marketMaker = user_;
 
@@ -694,6 +705,7 @@ async function main() {
   await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
 
   await updateAccountState();
+
   // Update account state loop every 10 minutes
   setInterval(updateAccountState, 600_000);
 
@@ -706,11 +718,20 @@ async function main() {
   // sleep for a second to make sure we have the latest liquidity
   await new Promise((r) => setTimeout(r, 1000));
 
+  console.log(
+    "Starting market making: ",
+    marketMaker.getAvailableAmount(55555),
+    "USDC",
+    marketMaker.getAvailableAmount(54321),
+    "ETH"
+  );
+  console.log("Starting liquidity provision");
+
   // brodcast orders to provide liquidity
   await indicateLiquidity();
   setInterval(async () => {
     await indicateLiquidity();
-  }, 3000);
+  }, 30_000);
 }
 main();
 
