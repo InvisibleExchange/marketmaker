@@ -235,6 +235,9 @@ async function sendSpotOrder(
         user.awaittingOrder = false;
         throw new Error(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting spot order: ", err);
     });
 }
 
@@ -445,6 +448,9 @@ async function sendPerpOrder(
         user.awaittingOrder = false;
         throw new Error(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting perp order: ", err);
     });
 }
 
@@ -507,77 +513,82 @@ async function sendCancelOrder(user, orderId, orderSide, isPerp, marketId) {
     is_perp: isPerp,
   };
 
-  axios.post(`${EXPRESS_APP_URL}/cancel_order`, cancelReq).then((response) => {
-    let order_response = response.data.response;
+  axios
+    .post(`${EXPRESS_APP_URL}/cancel_order`, cancelReq)
+    .then((response) => {
+      let order_response = response.data.response;
 
-    if (order_response.successful) {
-      let pfrNote = order_response.pfr_note;
-      if (pfrNote) {
-        // This means that the order has been filled partially
-        // so we need don't need to add the notesIn to the user's noteData
-        // instead we add the pfrNote to the user's noteData
+      if (order_response.successful) {
+        let pfrNote = order_response.pfr_note;
+        if (pfrNote) {
+          // This means that the order has been filled partially
+          // so we need don't need to add the notesIn to the user's noteData
+          // instead we add the pfrNote to the user's noteData
 
-        let note = Note.fromGrpcObject(pfrNote);
-        user.noteData[pfrNote.token].push(note);
+          let note = Note.fromGrpcObject(pfrNote);
+          user.noteData[pfrNote.token].push(note);
 
-        if (isPerp) {
-          // loop over the user's perpetual orders and find the order that has been cancelledž
-          user.perpetualOrders = user.perpetualOrders.filter(
-            (o) => o.order_id != orderId
-          );
+          if (isPerp) {
+            // loop over the user's perpetual orders and find the order that has been cancelledž
+            user.perpetualOrders = user.perpetualOrders.filter(
+              (o) => o.order_id != orderId
+            );
+          } else {
+            // loop over the user's spot orders and find the order that has been cancelled
+            user.orders = user.orders.filter((o) => o.order_id != orderId);
+          }
         } else {
-          // loop over the user's spot orders and find the order that has been cancelled
-          user.orders = user.orders.filter((o) => o.order_id != orderId);
+          // This means that the order has not been filled partially yet
+          // so we need to add the notesIn to the user's noteData
+
+          if (isPerp) {
+            for (let i = 0; i < user.perpetualOrders.length; i++) {
+              // loop over the user's perpetual orders and find the order that has been cancelled
+              // if notesIn is not empty (open order) then add the notes to the user's noteData
+
+              let ord = user.perpetualOrders[i];
+              if (ord.order_id == orderId.toString()) {
+                let notes_in = ord.notes_in;
+                if (notes_in && notes_in.length > 0) {
+                  for (let note_ of notes_in) {
+                    let note = Note.fromGrpcObject(note_);
+                    user.noteData[note.token].push(note);
+                  }
+                }
+              }
+            }
+
+            user.perpetualOrders = user.perpetualOrders.filter(
+              (o) => o.order_id != orderId
+            );
+          } else {
+            // loop over the user's spot orders and find the order that has been cancelled
+            // if notesIn is not empty then add the notes to the user's noteData
+
+            for (let i = 0; i < user.orders.length; i++) {
+              let ord = user.orders[i];
+
+              if (ord.order_id == orderId) {
+                let notes_in = ord.notes_in;
+                if (notes_in.length > 0) {
+                  for (let note_ of notes_in) {
+                    let note = Note.fromGrpcObject(note_);
+                    user.noteData[note.token].push(note);
+                  }
+                }
+              }
+            }
+
+            user.orders = user.orders.filter((o) => o.order_id != orderId);
+          }
         }
       } else {
-        // This means that the order has not been filled partially yet
-        // so we need to add the notesIn to the user's noteData
-
-        if (isPerp) {
-          for (let i = 0; i < user.perpetualOrders.length; i++) {
-            // loop over the user's perpetual orders and find the order that has been cancelled
-            // if notesIn is not empty (open order) then add the notes to the user's noteData
-
-            let ord = user.perpetualOrders[i];
-            if (ord.order_id == orderId.toString()) {
-              let notes_in = ord.notes_in;
-              if (notes_in && notes_in.length > 0) {
-                for (let note_ of notes_in) {
-                  let note = Note.fromGrpcObject(note_);
-                  user.noteData[note.token].push(note);
-                }
-              }
-            }
-          }
-
-          user.perpetualOrders = user.perpetualOrders.filter(
-            (o) => o.order_id != orderId
-          );
-        } else {
-          // loop over the user's spot orders and find the order that has been cancelled
-          // if notesIn is not empty then add the notes to the user's noteData
-
-          for (let i = 0; i < user.orders.length; i++) {
-            let ord = user.orders[i];
-
-            if (ord.order_id == orderId) {
-              let notes_in = ord.notes_in;
-              if (notes_in.length > 0) {
-                for (let note_ of notes_in) {
-                  let note = Note.fromGrpcObject(note_);
-                  user.noteData[note.token].push(note);
-                }
-              }
-            }
-          }
-
-          user.orders = user.orders.filter((o) => o.order_id != orderId);
-        }
+        console.log("error canceling order: ", order_response.error_message);
       }
-    } else {
-      console.log("error canceling order: ", order_response.error_message);
-    }
-  });
+    })
+    .catch((err) => {
+      console.log("Error submitting cancel order: ", err);
+    });
 }
 
 // * =====================================================================================================================================
@@ -696,37 +707,42 @@ async function sendAmendOrder(
 
   // console.log("amendReq: ", orderId, newPrice);
 
-  axios.post(`${EXPRESS_APP_URL}/amend_order`, amendReq).then((res) => {
-    let order_response = res.data.response;
+  axios
+    .post(`${EXPRESS_APP_URL}/amend_order`, amendReq)
+    .then((res) => {
+      let order_response = res.data.response;
 
-    if (order_response.successful) {
-      if (isPerp) {
-        for (let i = 0; i < user.perpetualOrders.length; i++) {
-          let ord = user.perpetualOrders[i];
+      if (order_response.successful) {
+        if (isPerp) {
+          for (let i = 0; i < user.perpetualOrders.length; i++) {
+            let ord = user.perpetualOrders[i];
 
-          if (ord.order_id == orderId.toString()) {
-            user.perpetualOrders[i] = order;
+            if (ord.order_id == orderId.toString()) {
+              user.perpetualOrders[i] = order;
+            }
+          }
+        } else {
+          for (let i = 0; i < user.orders.length; i++) {
+            let ord = user.orders[i];
+
+            if (ord.order_id == orderId.toString()) {
+              user.orders[i] = order;
+            }
           }
         }
       } else {
-        for (let i = 0; i < user.orders.length; i++) {
-          let ord = user.orders[i];
+        let msg =
+          "Amend order failed with error: \n" + order_response.error_message;
+        console.log(msg);
 
-          if (ord.order_id == orderId.toString()) {
-            user.orders[i] = order;
-          }
-        }
+        ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
+          marketId.toString() + order_side
+        ].filter((o) => o.id != orderId);
       }
-    } else {
-      let msg =
-        "Amend order failed with error: \n" + order_response.error_message;
-      console.log(msg);
-
-      ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
-        marketId.toString() + order_side
-      ].filter((o) => o.id != orderId);
-    }
-  });
+    })
+    .catch((err) => {
+      console.log("Error submitting amend order: ", err);
+    });
 }
 
 // * =====================================================================================================================================
@@ -768,6 +784,9 @@ async function sendDeposit(user, depositId, amount, token, pubKey) {
         console.log(msg);
         throw new Error(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting deposit order: ", err);
     });
 }
 
@@ -802,6 +821,9 @@ async function sendWithdrawal(user, amount, token, starkKey) {
           withdrawal_response.error_message;
         console.log(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting withdrawal order: ", err);
     });
 }
 
@@ -840,6 +862,9 @@ async function sendSplitOrder(user, token, newAmount) {
           "Note split failed with error: \n" + split_response.error_message;
         console.log(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting split order: ", err);
     });
 }
 
@@ -966,6 +991,9 @@ async function sendChangeMargin(
           marginChangeResponse.error_message;
         console.log(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting margin change order: ", err);
     });
 }
 

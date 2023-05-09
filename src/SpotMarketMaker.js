@@ -665,7 +665,7 @@ const updateAccountState = async () => {
     const timeout = setTimeout(() => {
       if (cancelTimeout) return;
       throw new Error("updateAccountState timeout");
-    }, 8000);
+    }, 10_000);
 
     let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
       await getActiveOrders(user_.orderIds, user_.perpetualOrderIds);
@@ -706,12 +706,12 @@ async function main() {
 
   await updateAccountState();
 
-  // Update account state loop every 10 minutes
-  setInterval(updateAccountState, 600_000);
+  // Update account state loop every 3 minutes
+  setInterval(updateAccountState, 18_000);
 
   // Strart listening to updates from the server
   listenToWebSocket();
-  setInterval(listenToWebSocket, 600_000);
+  setInterval(listenToWebSocket, 180_000);
 
   // setInterval(fillOpenOrders, 300);
 
@@ -727,11 +727,11 @@ async function main() {
   );
   console.log("Starting liquidity provision");
 
-  // brodcast orders to provide liquidity
-  await indicateLiquidity();
-  setInterval(async () => {
-    await indicateLiquidity();
-  }, 30_000);
+  // // brodcast orders to provide liquidity
+  // await indicateLiquidity();
+  // setInterval(async () => {
+  //   await indicateLiquidity();
+  // }, 30_000);
 }
 main();
 
