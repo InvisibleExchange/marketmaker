@@ -670,7 +670,7 @@ const listenToWebSocket = () => {
 const updateAccountState = async () => {
   try {
     let pausedMarkets = [];
-    for (let marketId of Object.values(SPOT_MARKET_IDS)) {
+    for (let marketId of Object.values(PERP_MARKET_IDS)) {
       const mmConfig = MM_CONFIG.pairs[marketId];
       if (mmConfig.active) {
         mmConfig.active = false;
