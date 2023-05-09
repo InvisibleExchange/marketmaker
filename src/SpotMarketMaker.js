@@ -31,6 +31,9 @@ const {
 const setupPriceFeeds = require("./helpers/mmPriceFeeds");
 const { trimHash } = require("./users/Notes");
 
+let W3CWebSocket = require("websocket").w3cwebsocket;
+let client;
+
 const loadMMConfig = () => {
   // Load MM config
   let MM_CONFIG;
@@ -54,6 +57,8 @@ const { MM_CONFIG, activeMarkets } = loadMMConfig();
 
 dotenv.config();
 
+const REFRESH_PERIOD = 600_000; // 10 minutes
+
 // Globals
 const PRICE_FEEDS = {};
 let liquidity = {};
@@ -66,7 +71,7 @@ const setPerpLiquidity = (liq) => {
 };
 
 // Maps marketId to a list of active orders
-const ACTIVE_ORDERS = {};
+let ACTIVE_ORDERS = {};
 let activeOrdersMidPrice = {}; // { marketId: midPrice }
 
 let marketMaker;
@@ -209,18 +214,21 @@ async function indicateLiquidity(marketIds = activeMarkets) {
     if (usdBaseBalance && usdBaseBalance < 10 * sellSplits)
       sellSplits = Math.floor(usdBaseBalance / 10);
 
-    let buyOrdersLen = ACTIVE_ORDERS[marketId + "Buy"]
-      ? ACTIVE_ORDERS[marketId + "Buy"].length
-      : 0;
     if (["b", "d"].includes(side) && maxBuySize > 0) {
-      for (let i = 0; i < buyOrdersLen; i++) {
+      // make a clone of the  ACTIVE_ORDERS[marketId + "Buy"] array
+      // because we will be removing orders from it
+      let activeOrdersCopy = [];
+      if (ACTIVE_ORDERS[marketId + "Buy"]) {
+        activeOrdersCopy = [...ACTIVE_ORDERS[marketId + "Buy"]];
+      }
+      for (let i = 0; i < activeOrdersCopy.length; i++) {
         const buyPrice =
           midPrice *
           (1 -
             mmConfig.minSpread -
             (mmConfig.slippageRate * maxBuySize * i) / buySplits);
 
-        let orderId = ACTIVE_ORDERS[marketId + "Buy"][i].id;
+        let orderId = activeOrdersCopy[i].id;
         sendAmendOrder(
           marketMaker,
           orderId,
@@ -233,7 +241,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         );
       }
 
-      for (let i = buyOrdersLen; i < buySplits; i++) {
+      for (let i = activeOrdersCopy.length; i < buySplits; i++) {
         if (quoteBalance < DUST_AMOUNT_PER_ASSET[quoteAsset]) continue;
 
         const buyPrice =
@@ -248,7 +256,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           quoteAsset,
           quoteBalance /
             10 ** DECIMALS_PER_ASSET[quoteAsset] /
-            (buySplits - buyOrdersLen)
+            (buySplits - activeOrdersCopy.length)
         );
         await sendSpotOrder(
           marketMaker,
@@ -259,7 +267,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           null,
           quoteBalance /
             10 ** DECIMALS_PER_ASSET[quoteAsset] /
-            (buySplits - buyOrdersLen),
+            (buySplits - activeOrdersCopy.length),
           buyPrice,
           0.07,
           0,
@@ -269,18 +277,22 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       }
     }
 
-    let sellOrdersLen = ACTIVE_ORDERS[marketId + "Sell"]
-      ? ACTIVE_ORDERS[marketId + "Sell"].length
-      : 0;
     if (["s", "d"].includes(side) && maxSellSize > 0) {
-      for (let i = 0; i < sellOrdersLen; i++) {
+      // make a clone of the  ACTIVE_ORDERS[marketId + "Sell"] array
+      // because we will be removing orders from it
+      let activeOrdersCopy = [];
+      if (ACTIVE_ORDERS[marketId + "Sell"]) {
+        activeOrdersCopy = [...ACTIVE_ORDERS[marketId + "Sell"]];
+      }
+
+      for (let i = 0; i < activeOrdersCopy.length; i++) {
         const sellPrice =
           midPrice *
           (1 +
             mmConfig.minSpread +
             (mmConfig.slippageRate * maxSellSize * i) / sellSplits);
 
-        let orderId = ACTIVE_ORDERS[marketId + "Sell"][i].id;
+        let orderId = activeOrdersCopy[i].id;
         sendAmendOrder(
           marketMaker,
           orderId,
@@ -293,7 +305,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         );
       }
 
-      for (let i = sellOrdersLen; i < sellSplits; i++) {
+      for (let i = activeOrdersCopy.length; i < sellSplits; i++) {
         if (baseBalance <= DUST_AMOUNT_PER_ASSET[baseAsset]) continue;
 
         const sellPrice =
@@ -307,7 +319,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           baseAsset,
           baseBalance /
             10 ** DECIMALS_PER_ASSET[baseAsset] /
-            (sellSplits - sellOrdersLen)
+            (sellSplits - activeOrdersCopy.length)
         );
         await sendSpotOrder(
           marketMaker,
@@ -317,7 +329,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           quoteAsset,
           baseBalance /
             10 ** DECIMALS_PER_ASSET[baseAsset] /
-            (sellSplits - sellOrdersLen),
+            (sellSplits - activeOrdersCopy.length),
           null,
           sellPrice,
           0.07,
@@ -562,8 +574,7 @@ const getPrice = (token) => {
 // * INITIALIZATION ==========================================================================================================
 
 const listenToWebSocket = () => {
-  let W3CWebSocket = require("websocket").w3cwebsocket;
-  let client = new W3CWebSocket(`ws://${MM_CONFIG.SERVER_URL}:50053`);
+  client = new W3CWebSocket(`ws://${MM_CONFIG.SERVER_URL}:50053`);
 
   client.onopen = function () {
     const ID = trimHash(marketMaker.userId, 64);
@@ -647,13 +658,13 @@ const listenToWebSocket = () => {
   };
 
   client.onclose = function () {
-    setTimeout(() => {
-      listenToWebSocket();
-    }, 5000);
+    // setTimeout(() => {
+    //   listenToWebSocket();
+    // }, 5000);
   };
 };
 
-const updateAccountState = async () => {
+const initAccountState = async () => {
   try {
     let pausedMarkets = [];
     for (let marketId of Object.values(SPOT_MARKET_IDS)) {
@@ -701,6 +712,8 @@ const updateAccountState = async () => {
         cancelLiquidity(marketId);
       }
     }
+
+    ACTIVE_ORDERS = {};
   } catch (error) {
     console.log("login error", error);
     throw error;
@@ -709,23 +722,20 @@ const updateAccountState = async () => {
 
 // * MAIN ====================================================================================================================
 
-async function main() {
+async function run() {
   // Setup price feeds
   await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
 
-  await updateAccountState();
-
-  // Update account state loop every 10 minutes
-  setInterval(updateAccountState, 600_000);
+  // Setup the market maker
+  await initAccountState();
 
   // Strart listening to updates from the server
-  listenToWebSocket();
-  setInterval(listenToWebSocket, 600_000);
+  if (!client || client.readyState !== client.OPEN) {
+    listenToWebSocket();
+  }
 
-  // setInterval(fillOpenOrders, 300);
-
-  // sleep for a second to make sure we have the latest liquidity
-  await new Promise((r) => setTimeout(r, 1000));
+  // Check for fillable orders
+  // let interval1 = setInterval(fillOpenOrders, 300);
 
   console.log(
     "Starting market making: ",
@@ -738,10 +748,29 @@ async function main() {
 
   // brodcast orders to provide liquidity
   await indicateLiquidity();
-  setInterval(async () => {
+  let interval2 = setInterval(async () => {
     await indicateLiquidity();
-  }, 30_000);
+  }, 5000);
+
+  await new Promise((r) => setTimeout(r, REFRESH_PERIOD));
+
+  // clearInterval(intervalId1);
+  clearInterval(interval2);
+
+  return;
 }
+
+async function main() {
+  try {
+    await run();
+  } catch (error) {
+    console.log("error", error);
+  }
+
+  console.log("restarting");
+  await main();
+}
+
 main();
 
 //
@@ -749,3 +778,6 @@ main();
 //
 //
 //
+
+// 2152008321 USDC 1575205755 ETH
+// 3228 012 481 USDC 3 150 411 507 ETH

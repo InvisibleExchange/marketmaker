@@ -350,16 +350,16 @@ module.exports = class User {
       noteDataNew[token] = newArr;
     }
 
-    console.log(
-      "noteData",
-      newNoteData[55555]?.map((n) => n.index),
-      newNoteData[54321]?.map((n) => n.index)
-    );
-    console.log(
-      "noteDataNew",
-      noteDataNew[55555]?.map((n) => n.index),
-      noteDataNew[54321]?.map((n) => n.index)
-    );
+    // console.log(
+    //   "noteData",
+    //   newNoteData[55555]?.map((n) => n.index),
+    //   newNoteData[54321]?.map((n) => n.index)
+    // );
+    // console.log(
+    //   "noteDataNew",
+    //   noteDataNew[55555]?.map((n) => n.index),
+    //   noteDataNew[54321]?.map((n) => n.index)
+    // );
 
     this.noteData = noteDataNew;
   }

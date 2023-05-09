@@ -602,6 +602,7 @@ async function sendCancelOrder(user, orderId, orderSide, isPerp, marketId) {
  * @param marketId market id of the order
  * @param newPrice new price of the order
  * @param newExpirationTime new expiration time in seconds
+ * @returns true if order should be removed, false otherwise
  */
 
 async function sendAmendOrder(
@@ -621,8 +622,14 @@ async function sendAmendOrder(
   let signature;
   if (isPerp) {
     let ord = user.perpetualOrders.filter((o) => o.order_id == orderId)[0];
-    if (!ord) {
-      console.log("Order not found");
+    if (
+      !ord ||
+      (ord.position_effect_type != "Open" && !ord.position) ||
+      (ord.position_effect_type == "Open" && !ord.open_order_fields)
+    ) {
+      ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
+        marketId.toString() + order_side
+      ].filter((o) => o.id != orderId);
       return;
     }
 
@@ -657,7 +664,9 @@ async function sendAmendOrder(
   } else {
     let ord = user.orders.filter((o) => o.order_id == orderId)[0];
     if (!ord) {
-      console.log("Order not found");
+      ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
+        marketId.toString() + order_side
+      ].filter((o) => o.id != orderId);
       return;
     }
 
