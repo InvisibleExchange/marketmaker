@@ -727,11 +727,11 @@ async function main() {
   );
   console.log("Starting liquidity provision");
 
-  // // brodcast orders to provide liquidity
-  // await indicateLiquidity();
-  // setInterval(async () => {
-  //   await indicateLiquidity();
-  // }, 30_000);
+  // brodcast orders to provide liquidity
+  await indicateLiquidity();
+  setInterval(async () => {
+    await indicateLiquidity();
+  }, 30_000);
 }
 main();
 
