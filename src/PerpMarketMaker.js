@@ -669,6 +669,15 @@ const listenToWebSocket = () => {
 
 const updateAccountState = async () => {
   try {
+    let pausedMarkets = [];
+    for (let marketId of Object.values(SPOT_MARKET_IDS)) {
+      const mmConfig = MM_CONFIG.pairs[marketId];
+      if (mmConfig.active) {
+        mmConfig.active = false;
+        pausedMarkets.push(marketId);
+      }
+    }
+
     let user_ = User.fromPrivKey(MM_CONFIG.privKey);
     let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
 
@@ -688,9 +697,7 @@ const updateAccountState = async () => {
     marketMaker = user_;
 
     // cancel open orders
-    for (let marketId of Object.values(PERP_MARKET_IDS)) {
-      if (!activeMarkets.includes(marketId.toString())) continue;
-
+    for (let marketId of pausedMarkets) {
       if (marketMaker) {
         cancelLiquidity(marketId);
       }

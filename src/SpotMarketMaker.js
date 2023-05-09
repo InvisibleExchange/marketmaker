@@ -655,12 +655,20 @@ const listenToWebSocket = () => {
 
 const updateAccountState = async () => {
   try {
+    let pausedMarkets = [];
+    for (let marketId of Object.values(SPOT_MARKET_IDS)) {
+      const mmConfig = MM_CONFIG.pairs[marketId];
+      if (mmConfig.active) {
+        mmConfig.active = false;
+        pausedMarkets.push(marketId);
+      }
+    }
+
     let user_ = User.fromPrivKey(MM_CONFIG.privKey);
 
     let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
 
-    // if the await statement isn't resolved in 5 seconds throw an error
-
+    // if the await statement isn't resolved in 10 seconds throw an error
     let cancelTimeout = false;
     const timeout = setTimeout(() => {
       if (cancelTimeout) return;
@@ -685,8 +693,9 @@ const updateAccountState = async () => {
     marketMaker = user_;
 
     // cancel open orders
-    for (let marketId of Object.values(SPOT_MARKET_IDS)) {
-      if (!activeMarkets.includes(marketId.toString())) continue;
+    for (let marketId of pausedMarkets) {
+      const mmConfig = MM_CONFIG.pairs[marketId];
+      mmConfig.active = true;
 
       if (marketMaker) {
         cancelLiquidity(marketId);
@@ -706,12 +715,12 @@ async function main() {
 
   await updateAccountState();
 
-  // Update account state loop every 3 minutes
-  setInterval(updateAccountState, 18_000);
+  // Update account state loop every 10 minutes
+  setInterval(updateAccountState, 600_000);
 
   // Strart listening to updates from the server
   listenToWebSocket();
-  setInterval(listenToWebSocket, 180_000);
+  setInterval(listenToWebSocket, 600_000);
 
   // setInterval(fillOpenOrders, 300);
 
