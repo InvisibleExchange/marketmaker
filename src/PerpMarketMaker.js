@@ -700,6 +700,9 @@ const updateAccountState = async () => {
     for (let marketId of pausedMarkets) {
       if (marketMaker) {
         cancelLiquidity(marketId);
+
+        const mmConfig = MM_CONFIG.pairs[marketId];
+        mmConfig.active = true;
       }
     }
   } catch (error) {
