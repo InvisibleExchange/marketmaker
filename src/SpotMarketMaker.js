@@ -53,11 +53,16 @@ const loadMMConfig = () => {
 
   return { MM_CONFIG, activeMarkets };
 };
-const { MM_CONFIG, activeMarkets } = loadMMConfig();
+let MM_CONFIG, activeMarkets;
 
 dotenv.config();
 
-const REFRESH_PERIOD = 600_000; // 10 minutes
+// How often do we refresh entire state (to prevent bugs and have a fresh version of the state)
+const REFRESH_PERIOD = 3600_000; // 1 hour
+// How often do we send liquidity indications (orders that make the market)
+const LIQUIDITY_INDICATION_PERIOD = 50_000; // 5 seconds
+// How often do we check if any orders can be filled
+const FILL_ORDERS_PERIOD = 3_000; // 5 seconds
 
 // Globals
 const PRICE_FEEDS = {};
@@ -80,31 +85,35 @@ const isPerp = false;
 //
 async function fillOpenOrders() {
   for (let marketId of Object.values(SPOT_MARKET_IDS)) {
+    if (!activeMarkets.includes(marketId.toString())) continue;
+
     let { base, quote } = SPOT_MARKET_IDS_2_TOKENS[marketId];
 
-    if (
-      !liquidity[base] ||
-      !liquidity[base].bidQueue ||
-      !liquidity[base].askQueue
-    )
-      continue;
-    for (let order of liquidity[base].bidQueue) {
-      let fillable = isOrderFillable(order, "b", base, quote);
+    if (!liquidity[base]) continue;
 
-      if (fillable.fillable) {
-        sendFillRequest(order, fillable.walletId);
-      } else if (!["badprice"].includes(fillable.reason)) {
-        break;
+    if (liquidity[base].bidQueue) {
+      for (let order of liquidity[base].bidQueue) {
+        let fillable = isOrderFillable(order, "b", base, quote);
+
+        if (fillable.fillable) {
+          console.log("FILLING BID");
+          sendFillRequest(order, "b", marketId);
+        } else if (fillable.reason.toString() == "badprice") {
+          break;
+        }
       }
     }
 
-    for (let order of liquidity[base].askQueue) {
-      let fillable = isOrderFillable(order, "s", base, quote);
+    if (liquidity[base].askQueue.reverse()) {
+      for (let order of liquidity[base].askQueue) {
+        let fillable = isOrderFillable(order, "s", base, quote);
 
-      if (fillable.fillable) {
-        sendFillRequest(order, fillable.walletId);
-      } else if (!["badprice"].includes(fillable.reason)) {
-        break;
+        if (fillable.fillable) {
+          console.log("FILLING ASK");
+          sendFillRequest(order, "s", marketId);
+        } else if (fillable.reason.toString() == "badprice") {
+          break;
+        }
       }
     }
   }
@@ -115,23 +124,76 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
   const baseAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
   const quoteAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
 
-  const baseQuantity = otherOrder.amount;
+  const baseQuantity = otherOrder.amount / 10 ** DECIMALS_PER_ASSET[baseAsset];
   const quote = genQuote(baseAsset, otherSide, baseQuantity);
 
-  sendSpotOrder(
-    marketMaker,
-    otherSide === "s" ? "Buy" : "Sell",
-    65,
-    baseAsset,
-    quoteAsset,
-    baseQuantity,
-    quote.quoteQuantity,
-    otherOrder.price,
-    0.07,
-    0.01,
-    true,
-    ACTIVE_ORDERS
-  );
+  const spendAsset = otherSide === "s" ? quoteAsset : baseAsset;
+
+  let availableAmount =
+    marketMaker.getAvailableAmount(spendAsset) /
+    10 ** DECIMALS_PER_ASSET[spendAsset];
+
+  let unfilledAmount =
+    otherSide === "s"
+      ? quote.quoteQuantity - availableAmount
+      : baseQuantity - availableAmount;
+
+  const availableUsdBalance = availableAmount * getPrice(spendAsset);
+  let unfilledUsdAmount = unfilledAmount * getPrice(spendAsset);
+
+  console.log("availableUsdBalance", availableUsdBalance);
+
+  if (availableUsdBalance >= 10 && unfilledUsdAmount >= 10) {
+    console.log("SENDING SPOT ORDER");
+
+    sendSpotOrder(
+      marketMaker,
+      otherSide === "s" ? "Buy" : "Sell",
+      65,
+      baseAsset,
+      quoteAsset,
+      baseQuantity,
+      quote.quoteQuantity,
+      otherOrder.price,
+      0.07,
+      0.01,
+      true,
+      ACTIVE_ORDERS
+    );
+
+    unfilledAmount -= otherSide === "s" ? quote.quoteQuantity : baseQuantity;
+  }
+
+  if (ACTIVE_ORDERS[otherSide === "s" ? marketId + "Buy" : marketId + "Sell"]) {
+    let sortedOrders = ACTIVE_ORDERS[
+      otherSide === "s" ? marketId + "Buy" : marketId + "Sell"
+    ].sort((a, b) => {
+      return otherSide === "b" ? a.price - b.price : b.price - a.price;
+    });
+
+    console.log("sortedOrders", sortedOrders);
+    for (let order of sortedOrders) {
+      unfilledUsdAmount = unfilledAmount * getPrice(spendAsset);
+      if (unfilledUsdAmount < 10) return;
+
+      console.log("AMENDING ORDER");
+
+      // Send amend order
+
+      sendAmendOrder(
+        marketMaker,
+        order.id,
+        otherSide === "s" ? "Buy" : "Sell",
+        isPerp,
+        marketId,
+        quote.quotePrice,
+        MM_CONFIG.EXPIRATION_TIME,
+        ACTIVE_ORDERS
+      );
+
+      unfilledAmount -= order.spendAmount;
+    }
+  }
 }
 
 async function indicateLiquidity(marketIds = activeMarkets) {
@@ -222,11 +284,15 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         activeOrdersCopy = [...ACTIVE_ORDERS[marketId + "Buy"]];
       }
       for (let i = 0; i < activeOrdersCopy.length; i++) {
+        // Todo Remove this after testing
+        let extraTestSpread = 50;
+
         const buyPrice =
           midPrice *
-          (1 -
-            mmConfig.minSpread -
-            (mmConfig.slippageRate * maxBuySize * i) / buySplits);
+            (1 -
+              mmConfig.minSpread -
+              (mmConfig.slippageRate * maxBuySize * i) / buySplits) -
+          extraTestSpread;
 
         let orderId = activeOrdersCopy[i].id;
         sendAmendOrder(
@@ -244,11 +310,15 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let i = activeOrdersCopy.length; i < buySplits; i++) {
         if (quoteBalance < DUST_AMOUNT_PER_ASSET[quoteAsset]) continue;
 
+        // Todo Remove this after testing
+        let extraTestSpread = 50;
+
         const buyPrice =
           midPrice *
-          (1 -
-            mmConfig.minSpread -
-            (mmConfig.slippageRate * maxBuySize * i) / buySplits);
+            (1 -
+              mmConfig.minSpread -
+              (mmConfig.slippageRate * maxBuySize * i) / buySplits) -
+          extraTestSpread;
 
         // PLACE ORDER
         await sendSplitOrder(
@@ -286,11 +356,15 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       }
 
       for (let i = 0; i < activeOrdersCopy.length; i++) {
+        // Todo Remove this after testing
+        let extraTestSpread = 50;
+
         const sellPrice =
           midPrice *
-          (1 +
-            mmConfig.minSpread +
-            (mmConfig.slippageRate * maxSellSize * i) / sellSplits);
+            (1 +
+              mmConfig.minSpread +
+              (mmConfig.slippageRate * maxSellSize * i) / sellSplits) +
+          extraTestSpread;
 
         let orderId = activeOrdersCopy[i].id;
         sendAmendOrder(
@@ -308,11 +382,15 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let i = activeOrdersCopy.length; i < sellSplits; i++) {
         if (baseBalance <= DUST_AMOUNT_PER_ASSET[baseAsset]) continue;
 
+        // Todo Remove this after testing
+        let extraTestSpread = 50;
+
         const sellPrice =
           midPrice *
-          (1 +
-            mmConfig.minSpread +
-            (mmConfig.slippageRate * maxSellSize * i) / sellSplits);
+            (1 +
+              mmConfig.minSpread +
+              (mmConfig.slippageRate * maxSellSize * i) / sellSplits) +
+          extraTestSpread;
 
         await sendSplitOrder(
           marketMaker,
@@ -456,8 +534,7 @@ function isOrderFillable(order, side, baseAsset, quoteAsset) {
   if (!mmConfig.active) return { fillable: false, reason: "inactivemarket" };
 
   const price = order.price;
-  const baseQuantity =
-    order.amount / 10 ** DECIMALS_PER_ASSET[SYMBOLS_TO_IDS[baseAsset]];
+  const baseQuantity = order.amount / 10 ** DECIMALS_PER_ASSET[baseAsset];
 
   if (mmSide !== "d" && mmSide == side) {
     return { fillable: false, reason: "badside" };
@@ -480,19 +557,19 @@ function isOrderFillable(order, side, baseAsset, quoteAsset) {
     return { fillable: false, reason: "badprice" };
   }
 
-  const sellAsset = side === "s" ? quoteAsset : baseAsset;
-  const sellDecimals =
-    side === "s"
-      ? DECIMALS_PER_ASSET[quoteAsset]
-      : DECIMALS_PER_ASSET[baseAsset];
-  const sellQuantity = side === "s" ? quote.quoteQuantity : baseQuantity;
-  const neededBalanceBN = sellQuantity * 10 ** sellDecimals;
+  // const sellAsset = side === "s" ? quoteAsset : baseAsset;
+  // const sellDecimals =
+  //   side === "s"
+  //     ? DECIMALS_PER_ASSET[quoteAsset]
+  //     : DECIMALS_PER_ASSET[baseAsset];
+  // const sellQuantity = side === "s" ? quote.quoteQuantity : baseQuantity;
+  // const neededBalanceBN = sellQuantity * 10 ** sellDecimals;
 
-  let availableAmount = marketMaker.getAvailableAmount(sellAsset);
+  // let availableAmount = marketMaker.getAvailableAmount(sellAsset);
 
-  if (availableAmount < neededBalanceBN) {
-    return { fillable: false, reason: "badbalance" };
-  }
+  // if (availableAmount < neededBalanceBN) {
+  //   return { fillable: false, reason: "badbalance" };
+  // }
 
   return { fillable: true, reason: null };
 }
@@ -502,7 +579,7 @@ function genQuote(baseAsset, side, baseQuantity) {
   if (!["b", "s"].includes(side)) throw new Error("badside");
   if (baseQuantity <= 0) throw new Error("badquantity");
 
-  validatePriceFeed(marketId);
+  validatePriceFeed(baseAsset);
 
   const mmConfig = MM_CONFIG.pairs[SPOT_MARKET_IDS[baseAsset]];
   const mmSide = mmConfig.side || "d";
@@ -515,14 +592,24 @@ function genQuote(baseAsset, side, baseQuantity) {
     : PRICE_FEEDS[mmConfig.priceFeedPrimary];
   if (!primaryPrice) throw new Error("badprice");
 
+  // TODO:  remove after testing
+  const extraTestSpread = 10;
+
   const SPREAD = mmConfig.minSpread + baseQuantity * mmConfig.slippageRate;
+
+  let quotePrice;
   let quoteQuantity;
   if (side === "b") {
-    quoteQuantity = baseQuantity * primaryPrice * (1 + SPREAD) * (1 + 0.0007);
+    quotePrice = Number(
+      ((primaryPrice - extraTestSpread) * (1 + SPREAD + 0.0007)).toPrecision(6)
+    );
+    quoteQuantity = baseQuantity * quotePrice;
   } else if (side === "s") {
-    quoteQuantity = (baseQuantity - (1 + 0.0007)) * primaryPrice * (1 - SPREAD);
+    quotePrice = Number(
+      ((primaryPrice + extraTestSpread) * (1 - SPREAD - 0.0007)).toPrecision(6)
+    );
+    quoteQuantity = baseQuantity * quotePrice;
   }
-  const quotePrice = Number((quoteQuantity / baseQuantity).toPrecision(6));
 
   if (quotePrice < 0) throw new Error("Amount is inadequate to pay fee");
   if (isNaN(quotePrice)) throw new Error("Internal Error. No price generated.");
@@ -723,6 +810,12 @@ const initAccountState = async () => {
 // * MAIN ====================================================================================================================
 
 async function run() {
+  let config = loadMMConfig();
+  MM_CONFIG = config.MM_CONFIG;
+  activeMarkets = config.activeMarkets;
+
+  console.log("Active markets: ", activeMarkets);
+
   // Setup price feeds
   await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
 
@@ -735,7 +828,7 @@ async function run() {
   }
 
   // Check for fillable orders
-  // let interval1 = setInterval(fillOpenOrders, 300);
+  let interval1 = setInterval(fillOpenOrders, FILL_ORDERS_PERIOD);
 
   console.log(
     "Starting market making: ",
@@ -750,11 +843,11 @@ async function run() {
   await indicateLiquidity();
   let interval2 = setInterval(async () => {
     await indicateLiquidity();
-  }, 5000);
+  }, LIQUIDITY_INDICATION_PERIOD);
 
   await new Promise((r) => setTimeout(r, REFRESH_PERIOD));
 
-  // clearInterval(intervalId1);
+  clearInterval(interval1);
   clearInterval(interval2);
 
   return;
@@ -778,6 +871,3 @@ main();
 //
 //
 //
-
-// 2152008321 USDC 1575205755 ETH
-// 3228 012 481 USDC 3 150 411 507 ETH

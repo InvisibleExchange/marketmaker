@@ -57,11 +57,11 @@ const loadMMConfig = () => {
 
   return { MM_CONFIG, activeMarkets };
 };
-const { MM_CONFIG, activeMarkets } = loadMMConfig();
+let MM_CONFIG, activeMarkets;
 
 dotenv.config();
 
-const REFRESH_PERIOD = 600_000; // 10 minutes
+const REFRESH_PERIOD = 3600_000; // 1 hour
 
 // Globals
 const PRICE_FEEDS = {};
@@ -800,6 +800,10 @@ const initPositions = async () => {
 // * MAIN ====================================================================================================================
 
 async function run() {
+  let config = loadMMConfig();
+  MM_CONFIG = config.MM_CONFIG;
+  activeMarkets = config.activeMarkets;
+
   // Setup price feeds
   await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
 

@@ -212,6 +212,7 @@ async function sendSpotOrder(
             ].push({
               id: order_response.order_id,
               spendAmount: spendAmount,
+              price,
             });
           } else {
             ACTIVE_ORDERS[
@@ -220,6 +221,7 @@ async function sendSpotOrder(
               {
                 id: order_response.order_id,
                 spendAmount: spendAmount,
+                price,
               },
             ];
           }
@@ -617,6 +619,19 @@ async function sendAmendOrder(
 ) {
   let ts = new Date().getTime() / 1000; // number of seconds since epoch
   let expirationTimestamp = Number.parseInt(ts.toString()) + newExpirationTime;
+
+  newPrice = Number(newPrice);
+
+  console.log(order_side);
+  if (
+    !(isPerp === true || isPerp === false) ||
+    !marketId ||
+    !orderId ||
+    !newPrice ||
+    !newExpirationTime ||
+    (order_side !== "Buy" && order_side !== "Sell")
+  )
+    return;
 
   let order;
   let signature;
