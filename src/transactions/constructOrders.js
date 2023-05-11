@@ -429,6 +429,7 @@ async function sendPerpOrder(
             ].push({
               id: order_response.order_id,
               syntheticAmount: syntheticAmount_,
+              price,
             });
           } else {
             ACTIVE_ORDERS[
@@ -437,6 +438,7 @@ async function sendPerpOrder(
               {
                 id: order_response.order_id,
                 syntheticAmount: syntheticAmount_,
+                price,
               },
             ];
           }
@@ -604,6 +606,7 @@ async function sendCancelOrder(user, orderId, orderSide, isPerp, marketId) {
  * @param marketId market id of the order
  * @param newPrice new price of the order
  * @param newExpirationTime new expiration time in seconds
+ * @param match_only true if order should be matched only, false if matched and amended
  * @returns true if order should be removed, false otherwise
  */
 
@@ -615,6 +618,7 @@ async function sendAmendOrder(
   marketId,
   newPrice,
   newExpirationTime,
+  match_only,
   ACTIVE_ORDERS
 ) {
   let ts = new Date().getTime() / 1000; // number of seconds since epoch
@@ -622,7 +626,6 @@ async function sendAmendOrder(
 
   newPrice = Number(newPrice);
 
-  console.log(order_side);
   if (
     !(isPerp === true || isPerp === false) ||
     !marketId ||
@@ -727,6 +730,7 @@ async function sendAmendOrder(
     signature: { r: signature[0].toString(), s: signature[1].toString() },
     user_id: trimHash(user.userId, 64).toString(),
     is_perp: isPerp,
+    match_only,
   };
 
   // console.log("amendReq: ", orderId, newPrice);

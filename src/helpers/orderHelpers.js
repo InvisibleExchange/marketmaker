@@ -131,17 +131,11 @@ function getQuoteQty(qty, price_, baseAsset, quoteAsset) {
   let quoteDecimals = DECIMALS_PER_ASSET[quoteAsset];
   let priceDecimals = PRICE_DECIMALS_PER_ASSET[baseAsset];
 
-  console.log(baseDecimals, quoteDecimals, priceDecimals);
-
   let price = Number.parseInt(price_ * 10 ** priceDecimals);
 
   let mutliplier = 10 ** (baseDecimals + priceDecimals - quoteDecimals);
 
-  console.log(qty, price, mutliplier);
-
   let res = (qty * price) / mutliplier;
-
-  console.log(res);
   return Number.parseInt(res);
 }
 

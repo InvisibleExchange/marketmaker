@@ -22,7 +22,6 @@ const {
 
 const {
   sendSpotOrder,
-  cancelOrder,
   sendSplitOrder,
   sendAmendOrder,
   sendCancelOrder,
@@ -60,9 +59,9 @@ dotenv.config();
 // How often do we refresh entire state (to prevent bugs and have a fresh version of the state)
 const REFRESH_PERIOD = 3600_000; // 1 hour
 // How often do we send liquidity indications (orders that make the market)
-const LIQUIDITY_INDICATION_PERIOD = 50_000; // 5 seconds
+const LIQUIDITY_INDICATION_PERIOD = 5_000; // 5 seconds
 // How often do we check if any orders can be filled
-const FILL_ORDERS_PERIOD = 3_000; // 5 seconds
+const FILL_ORDERS_PERIOD = 1_000; // 5 seconds
 
 // Globals
 const PRICE_FEEDS = {};
@@ -96,7 +95,6 @@ async function fillOpenOrders() {
         let fillable = isOrderFillable(order, "b", base, quote);
 
         if (fillable.fillable) {
-          console.log("FILLING BID");
           sendFillRequest(order, "b", marketId);
         } else if (fillable.reason.toString() == "badprice") {
           break;
@@ -109,7 +107,6 @@ async function fillOpenOrders() {
         let fillable = isOrderFillable(order, "s", base, quote);
 
         if (fillable.fillable) {
-          console.log("FILLING ASK");
           sendFillRequest(order, "s", marketId);
         } else if (fillable.reason.toString() == "badprice") {
           break;
@@ -133,27 +130,20 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
     marketMaker.getAvailableAmount(spendAsset) /
     10 ** DECIMALS_PER_ASSET[spendAsset];
 
-  let unfilledAmount =
-    otherSide === "s"
-      ? quote.quoteQuantity - availableAmount
-      : baseQuantity - availableAmount;
+  let unfilledAmount = otherSide === "s" ? quote.quoteQuantity : baseQuantity;
 
   const availableUsdBalance = availableAmount * getPrice(spendAsset);
   let unfilledUsdAmount = unfilledAmount * getPrice(spendAsset);
 
-  console.log("availableUsdBalance", availableUsdBalance);
-
   if (availableUsdBalance >= 10 && unfilledUsdAmount >= 10) {
-    console.log("SENDING SPOT ORDER");
-
     sendSpotOrder(
       marketMaker,
       otherSide === "s" ? "Buy" : "Sell",
-      65,
+      MM_CONFIG.EXPIRATION_TIME,
       baseAsset,
       quoteAsset,
-      baseQuantity,
-      quote.quoteQuantity,
+      availableAmount,
+      availableAmount,
       otherOrder.price,
       0.07,
       0.01,
@@ -161,7 +151,7 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
       ACTIVE_ORDERS
     );
 
-    unfilledAmount -= otherSide === "s" ? quote.quoteQuantity : baseQuantity;
+    unfilledAmount -= availableAmount;
   }
 
   if (ACTIVE_ORDERS[otherSide === "s" ? marketId + "Buy" : marketId + "Sell"]) {
@@ -171,34 +161,36 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
       return otherSide === "b" ? a.price - b.price : b.price - a.price;
     });
 
-    console.log("sortedOrders", sortedOrders);
     for (let order of sortedOrders) {
-      unfilledUsdAmount = unfilledAmount * getPrice(spendAsset);
-      if (unfilledUsdAmount < 10) return;
-
-      console.log("AMENDING ORDER");
+      if (
+        unfilledAmount <
+        DUST_AMOUNT_PER_ASSET[spendAsset] / 10 ** DECIMALS_PER_ASSET[spendAsset]
+      )
+        return;
 
       // Send amend order
-
       sendAmendOrder(
         marketMaker,
         order.id,
         otherSide === "s" ? "Buy" : "Sell",
         isPerp,
         marketId,
-        quote.quotePrice,
+        otherSide === "s"
+          ? otherOrder.price * (1 + 0.0001)
+          : otherOrder.price * (1 - 0.0001),
         MM_CONFIG.EXPIRATION_TIME,
+        true, // match_only
         ACTIVE_ORDERS
       );
 
-      unfilledAmount -= order.spendAmount;
+      unfilledAmount -=
+        order.spendAmount / 10 ** DECIMALS_PER_ASSET[spendAsset];
     }
   }
 }
 
 async function indicateLiquidity(marketIds = activeMarkets) {
   for (const marketId of marketIds) {
-    if (!activeMarkets.includes(marketId)) continue;
 
     const mmConfig = MM_CONFIG.pairs[marketId];
     if (!mmConfig || !mmConfig.active) continue;
@@ -303,6 +295,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           marketId,
           buyPrice,
           MM_CONFIG.EXPIRATION_TIME,
+          false, // match_only
           ACTIVE_ORDERS
         );
       }
@@ -375,6 +368,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           marketId,
           sellPrice,
           MM_CONFIG.EXPIRATION_TIME,
+          false, // match_only
           ACTIVE_ORDERS
         );
       }
@@ -556,20 +550,6 @@ function isOrderFillable(order, side, baseAsset, quoteAsset) {
   ) {
     return { fillable: false, reason: "badprice" };
   }
-
-  // const sellAsset = side === "s" ? quoteAsset : baseAsset;
-  // const sellDecimals =
-  //   side === "s"
-  //     ? DECIMALS_PER_ASSET[quoteAsset]
-  //     : DECIMALS_PER_ASSET[baseAsset];
-  // const sellQuantity = side === "s" ? quote.quoteQuantity : baseQuantity;
-  // const neededBalanceBN = sellQuantity * 10 ** sellDecimals;
-
-  // let availableAmount = marketMaker.getAvailableAmount(sellAsset);
-
-  // if (availableAmount < neededBalanceBN) {
-  //   return { fillable: false, reason: "badbalance" };
-  // }
 
   return { fillable: true, reason: null };
 }
@@ -753,15 +733,6 @@ const listenToWebSocket = () => {
 
 const initAccountState = async () => {
   try {
-    let pausedMarkets = [];
-    for (let marketId of Object.values(SPOT_MARKET_IDS)) {
-      const mmConfig = MM_CONFIG.pairs[marketId];
-      if (mmConfig.active) {
-        mmConfig.active = false;
-        pausedMarkets.push(marketId);
-      }
-    }
-
     let user_ = User.fromPrivKey(MM_CONFIG.privKey);
 
     let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
@@ -791,9 +762,9 @@ const initAccountState = async () => {
     marketMaker = user_;
 
     // cancel open orders
-    for (let marketId of pausedMarkets) {
+    for (let marketId of Object.values(SPOT_MARKET_IDS)) {
       const mmConfig = MM_CONFIG.pairs[marketId];
-      mmConfig.active = true;
+      if (!mmConfig || !mmConfig.active) continue;
 
       if (marketMaker) {
         cancelLiquidity(marketId);
@@ -813,8 +784,6 @@ async function run() {
   let config = loadMMConfig();
   MM_CONFIG = config.MM_CONFIG;
   activeMarkets = config.activeMarkets;
-
-  console.log("Active markets: ", activeMarkets);
 
   // Setup price feeds
   await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
@@ -837,7 +806,6 @@ async function run() {
     marketMaker.getAvailableAmount(54321),
     "ETH"
   );
-  console.log("Starting liquidity provision");
 
   // brodcast orders to provide liquidity
   await indicateLiquidity();
@@ -849,8 +817,6 @@ async function run() {
 
   clearInterval(interval1);
   clearInterval(interval2);
-
-  return;
 }
 
 async function main() {
