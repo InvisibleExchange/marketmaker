@@ -191,7 +191,6 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
 
 async function indicateLiquidity(marketIds = activeMarkets) {
   for (const marketId of marketIds) {
-
     const mmConfig = MM_CONFIG.pairs[marketId];
     if (!mmConfig || !mmConfig.active) continue;
 
@@ -277,7 +276,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       }
       for (let i = 0; i < activeOrdersCopy.length; i++) {
         // Todo Remove this after testing
-        let extraTestSpread = 50;
+        let extraTestSpread = 0;
 
         const buyPrice =
           midPrice *
@@ -304,7 +303,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         if (quoteBalance < DUST_AMOUNT_PER_ASSET[quoteAsset]) continue;
 
         // Todo Remove this after testing
-        let extraTestSpread = 50;
+        let extraTestSpread = 0;
 
         const buyPrice =
           midPrice *
@@ -350,7 +349,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
 
       for (let i = 0; i < activeOrdersCopy.length; i++) {
         // Todo Remove this after testing
-        let extraTestSpread = 50;
+        let extraTestSpread = 0;
 
         const sellPrice =
           midPrice *
@@ -377,7 +376,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         if (baseBalance <= DUST_AMOUNT_PER_ASSET[baseAsset]) continue;
 
         // Todo Remove this after testing
-        let extraTestSpread = 50;
+        let extraTestSpread = 0;
 
         const sellPrice =
           midPrice *
@@ -573,7 +572,7 @@ function genQuote(baseAsset, side, baseQuantity) {
   if (!primaryPrice) throw new Error("badprice");
 
   // TODO:  remove after testing
-  const extraTestSpread = 10;
+  const extraTestSpread = 0;
 
   const SPREAD = mmConfig.minSpread + baseQuantity * mmConfig.slippageRate;
 
@@ -739,9 +738,9 @@ const initAccountState = async () => {
 
     // if the await statement isn't resolved in 10 seconds throw an error
     let cancelTimeout = false;
-    const timeout = setTimeout(() => {
+    const timeout = setTimeout(async () => {
       if (cancelTimeout) return;
-      throw new Error("updateAccountState timeout");
+      return await initAccountState();
     }, 10_000);
 
     let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
