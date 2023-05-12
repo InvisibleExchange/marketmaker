@@ -9,7 +9,31 @@ const UNISWAP_V3_PROVIDERS = {};
 let uniswap_error_counter = 0;
 let chainlink_error_counter = 0;
 
+const loadMMConfig = () => {
+  // Load MM config
+  let MM_CONFIG;
+  if (process.env.MM_CONFIG) {
+    MM_CONFIG = JSON.parse(process.env.MM_CONFIG);
+  } else {
+    const mmConfigFile = fs.readFileSync("config.json", "utf8");
+    MM_CONFIG = JSON.parse(mmConfigFile);
+  }
+
+  let activeMarkets = [];
+  for (let marketId of Object.keys(MM_CONFIG.pairs)) {
+    if (MM_CONFIG.pairs[marketId].active) {
+      activeMarkets.push(marketId);
+    }
+  }
+
+  return { MM_CONFIG, activeMarkets };
+};
+
 module.exports = async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
+  if (!MM_CONFIG) {
+    MM_CONFIG = loadMMConfig().MM_CONFIG;
+  }
+
   const cryptowatch = [],
     chainlink = [],
     uniswapV3 = [];
