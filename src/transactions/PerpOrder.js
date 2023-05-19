@@ -15,7 +15,6 @@ class PerpOrder {
     open_order_fields,
     close_order_fields
   ) {
-    this.order_id = null;
     this.expiration_timestamp = expiration_timestamp;
     this.position = position ? { ...position } : null;
     this.position_effect_type = position_effect_type;
@@ -37,10 +36,10 @@ class PerpOrder {
 
     switch (this.order_side) {
       case "Long":
-        order_side = 0n;
+        order_side = 1n;
         break;
       case "Short":
-        order_side = 1n;
+        order_side = 0n;
         break;
       default:
         throw "invalid order side (should be binary)";
@@ -57,9 +56,6 @@ class PerpOrder {
       case "Close":
         pos_effect_type_int = 2n;
         break;
-      case "Liquidate":
-        pos_effect_type_int = 3n;
-        break;
       default:
         throw "invalid position effect type (should be 0-3)";
     }
@@ -73,9 +69,6 @@ class PerpOrder {
         position_address = this.position.position_address;
         break;
       case "Close":
-        position_address = this.position.position_address;
-        break;
-      case "Liquidate":
         position_address = this.position.position_address;
         break;
       default:
@@ -152,9 +145,6 @@ class PerpOrder {
       case "Close":
         position_effect_type = 2;
         break;
-      case "Liquidate":
-        position_effect_type = 3;
-        break;
 
       default:
         throw "invalid position effect type";
@@ -163,10 +153,10 @@ class PerpOrder {
     let order_side;
     switch (this.order_side) {
       case "Long":
-        order_side = 0;
+        order_side = 1;
         break;
       case "Short":
-        order_side = 1;
+        order_side = 0;
         break;
 
       default:
@@ -181,7 +171,7 @@ class PerpOrder {
       : null;
 
     if (this.position) {
-      this.position.order_side = this.position.order_side == "Long" ? 0 : 1;
+      this.position.order_side = this.position.order_side == "Long" ? 1 : 0;
     }
 
     return {
@@ -212,14 +202,14 @@ class OpenOrderFields {
     notes_in,
     refund_note,
     position_address,
-    blinding
+    allow_partial_liquidation
   ) {
     this.initial_margin = initial_margin;
     this.collateral_token = collateral_token;
     this.notes_in = notes_in;
     this.refund_note = refund_note;
     this.position_address = position_address;
-    this.blinding = blinding;
+    this.allow_partial_liquidation = allow_partial_liquidation;
   }
 
   hash() {
@@ -232,7 +222,7 @@ class OpenOrderFields {
     hash_inputs.push(this.initial_margin);
     hash_inputs.push(this.collateral_token);
     hash_inputs.push(BigInt(this.position_address));
-    hash_inputs.push(this.blinding);
+    hash_inputs.push(this.allow_partial_liquidation ? 1 : 0);
 
     return computeHashOnElements(hash_inputs);
   }
@@ -244,7 +234,7 @@ class OpenOrderFields {
       notes_in: this.notes_in.map((note) => note.toGrpcObject()),
       refund_note: this.refund_note ? this.refund_note.toGrpcObject() : null,
       position_address: this.position_address,
-      blinding: this.blinding.toString(),
+      allow_partial_liquidations: this.allow_partial_liquidation,
     };
 
     return grpcObject;

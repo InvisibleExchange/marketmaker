@@ -159,43 +159,42 @@ function handleLiquidityUpdate(
   perpLiquidity,
   setPerpLiquidity
 ) {
-  let askQueue = result.ask_liquidity.map((item) => {
-    return {
-      price: item[0],
-      amount: item[1],
-      timestamp: item[2],
-    };
-  });
-  let revAq = [];
-  for (let i = askQueue.length - 1; i >= 0; i--) {
-    revAq.push(askQueue[i]);
+  for (let update of result.liquidity) {
+    let askQueue = update.ask_liquidity.map((item) => {
+      return {
+        price: item[0],
+        amount: item[1],
+        timestamp: item[2],
+      };
+    });
+    let revAq = [];
+    for (let i = askQueue.length - 1; i >= 0; i--) {
+      revAq.push(askQueue[i]);
+    }
+
+    let bidQueue = update.bid_liquidity.map((item) => {
+      return {
+        price: item[0],
+        amount: item[1],
+        timestamp: item[2],
+      };
+    });
+
+    let pairLiquidity = { bidQueue, askQueue: revAq };
+
+    if (update.type === "perpetual") {
+      let token = PERP_MARKET_IDS_2_TOKENS[update.market];
+
+      perpLiquidity[token] = pairLiquidity;
+    } else {
+      let token = SPOT_MARKET_IDS_2_TOKENS[update.market].base;
+
+      liquidity[token] = pairLiquidity;
+    }
   }
 
-  let bidQueue = result.bid_liquidity.map((item) => {
-    return {
-      price: item[0],
-      amount: item[1],
-      timestamp: item[2],
-    };
-  });
-
-  let pairLiquidity = { bidQueue, askQueue: revAq };
-
-  if (result.type === "perpetual") {
-    let token = PERP_MARKET_IDS_2_TOKENS[result.market];
-
-    let liq = perpLiquidity;
-    liq[token] = pairLiquidity;
-
-    setPerpLiquidity(liq);
-  } else {
-    let token = SPOT_MARKET_IDS_2_TOKENS[result.market].base;
-
-    let liq = liquidity;
-    liq[token] = pairLiquidity;
-
-    setLiquidity(liq);
-  }
+  setLiquidity(liquidity);
+  setPerpLiquidity(perpLiquidity);
 }
 
 /**

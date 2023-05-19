@@ -42,10 +42,7 @@ module.exports = async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
     if (!pairConfig.active) {
       continue;
     }
-    // This is needed to make the price feed backwards compatalbe with old constant mode:
-    // "DYDX-USDC": {
-    //      "mode": "constant",
-    //      "initPrice": 20,
+
     if (pairConfig.mode == "constant") {
       const initPrice = pairConfig.initPrice;
       pairConfig["priceFeedPrimary"] = "constant:" + initPrice.toString();
@@ -107,9 +104,11 @@ async function cryptowatchWsSetup(
   // Set initial prices
   const cryptowatchApiKey =
     process.env.CRYPTOWATCH_API_KEY || MM_CONFIG.cryptowatchApiKey;
+
   const cryptowatchMarkets = await fetch(
     "https://api.cryptowat.ch/markets?apikey=" + cryptowatchApiKey
   ).then((r) => r.json());
+
   const cryptowatchMarketPrices = await fetch(
     "https://api.cryptowat.ch/markets/prices?apikey=" + cryptowatchApiKey
   ).then((r) => r.json());

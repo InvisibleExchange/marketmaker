@@ -57,7 +57,6 @@ async function fetchPositionData(addressData) {
     let privKey = BigInt(addressData[i].pk);
 
     let positions = await fetchStoredPosition(addr.getX().toString());
-
     if (!positions || positions.length == 0) {
       emptyPositionPrivKeys.push(privKey);
     } else {

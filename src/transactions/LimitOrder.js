@@ -12,12 +12,10 @@ module.exports = class LimitOrder {
     amount_received,
     fee_limit,
     dest_received_address,
-    dest_spent_blinding,
     dest_received_blinding,
     notes_in,
     refund_note
   ) {
-    this.order_id = null;
     this.expiration_timestamp = expiration_timestamp;
     this.token_spent = token_spent;
     this.token_received = token_received;
@@ -25,14 +23,12 @@ module.exports = class LimitOrder {
     this.amount_received = amount_received;
     this.fee_limit = fee_limit;
     this.dest_received_address = dest_received_address;
-    this.dest_spent_blinding = dest_spent_blinding;
     this.dest_received_blinding = dest_received_blinding;
     // ==================================
     this.notes_in = notes_in;
     this.refund_note = refund_note;
     this.order_hash = this.hashOrder();
     this.signature = null;
-    this.qty_left = amount_received;
   }
 
   hashOrder() {
@@ -49,7 +45,6 @@ module.exports = class LimitOrder {
         this.amount_received,
         this.fee_limit,
         BigInt(this.dest_received_address.getX()),
-        this.dest_spent_blinding,
         this.dest_received_blinding,
       ]);
 
@@ -85,7 +80,6 @@ module.exports = class LimitOrder {
         x: this.dest_received_address.getX().toString(),
         y: this.dest_received_address.getY().toString(),
       },
-      dest_spent_blinding: this.dest_spent_blinding.toString(),
       dest_received_blinding: this.dest_received_blinding.toString(),
       notes_in: this.notes_in.map((note) => note.toGrpcObject()),
       refund_note: this.refund_note ? this.refund_note.toGrpcObject() : null,

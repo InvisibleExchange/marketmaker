@@ -9,6 +9,7 @@ const {
   removePrivKey,
   removeOrderId,
   fetchUserFills,
+  fetchDeprecatedKeys,
 } = require("../helpers/firebase/firebaseConnection");
 
 const {
@@ -25,6 +26,13 @@ const {
   handlePfrNoteData,
 } = require("./Invisibl3UserUtils.js");
 
+const DUST_AMOUNT_PER_ASSET = {
+  12345: 2500, // BTC ~ 5c
+  54321: 25000, // ETH ~ 5c
+  55555: 50000, // USDC ~ 5c
+};
+const COLLATERAL_TOKEN = 55555;
+
 const { Note, trimHash } = require("./Notes.js");
 // const {
 //   newLimitOrder,
@@ -33,6 +41,7 @@ const { Note, trimHash } = require("./Notes.js");
 //   LimitOrderToFfiPointer,
 // } = require("../helpers/FFI");
 const LimitOrder = require("../transactions/LimitOrder");
+const LiquidationOrder = require("../transactions/LiquidationOrder");
 const Deposit = require("../transactions/Deposit");
 const {
   OpenOrderFields,
@@ -40,12 +49,6 @@ const {
   PerpOrder,
 } = require("../transactions/PerpOrder");
 const Withdrawal = require("../transactions/Withdrawal");
-
-const DUST_AMOUNT_PER_ASSET = {
-  12345: 100, // BTC ~ 1c
-  54321: 1000, // ETH ~ 1c
-  55555: 1000, // USDC ~ 0.1c
-};
 
 /* global BigInt */
 
@@ -140,6 +143,15 @@ module.exports = class User {
       console.log
     );
 
+    // let depPKs = await fetchDeprecatedKeys(this.userId, this.privateSeed);
+    // let depKeyPairs =
+    //   depPKs.length > 0 ? depPKs.map((pk) => getKeyPair(pk)) : [];
+
+    // console.log(
+    //   "depKeyPairs",
+    //   depKeyPairs.map((kp) => kp.getPublic().getX().toString())
+    // );
+
     // ? Get Note Data ============================================
 
     let keyPairs =
@@ -172,7 +184,6 @@ module.exports = class User {
     let positionDataNew = {};
     for (let [token, arr] of Object.entries(positionData)) {
       let newArr = [];
-
       for (let pos of arr) {
         // Check if a position with the same index is already in the newArr
         if (!newArr.find((p) => p.index == pos.index)) {
@@ -350,17 +361,6 @@ module.exports = class User {
       noteDataNew[token] = newArr;
     }
 
-    // console.log(
-    //   "noteData",
-    //   newNoteData[55555]?.map((n) => n.index),
-    //   newNoteData[54321]?.map((n) => n.index)
-    // );
-    // console.log(
-    //   "noteDataNew",
-    //   noteDataNew[55555]?.map((n) => n.index),
-    //   noteDataNew[54321]?.map((n) => n.index)
-    // );
-
     this.noteData = noteDataNew;
   }
 
@@ -376,7 +376,8 @@ module.exports = class User {
     synthetic_amount,
     collateral_amount,
     fee_limit,
-    initial_margin
+    initial_margin,
+    allow_partial_liquidation = true
   ) {
     if (!["Open", "Close", "Modify"].includes(position_effect_type)) {
       alert(
@@ -407,14 +408,12 @@ module.exports = class User {
 
       // ? Generate the dest spent and dest received addresses and blindings
       privKeys = notesIn.map((x) => x.privKey);
-      let ytS = this.getDestSpentBlinding(privKeys);
 
       let refundNote;
       if (refundAmount > DUST_AMOUNT_PER_ASSET[collateral_token]) {
         let { KoR, koR, ytR } = this.getDestReceivedAddresses(synthetic_token);
         this.notePrivKeys[KoR.getX().toString()] = koR;
 
-        // ? generate the refund note
         refundNote = new Note(
           KoR,
           collateral_token,
@@ -437,7 +436,7 @@ module.exports = class User {
         notesIn.map((n) => n.note),
         refundNote,
         positionAddress.getX().toString(),
-        ytS
+        allow_partial_liquidation
       );
 
       storeUserData(this.userId, this.noteCounts, this.positionCounts);
@@ -507,24 +506,68 @@ module.exports = class User {
     return { perpOrder, pfrKey: privKeySum };
   }
 
-  makeLiquidationOrder(expiration_timestamp, position) {
+  makeLiquidationOrder(
+    liquidatedPosition,
+    synthetic_amount,
+    collateral_amount,
+    initial_margin,
+    allow_partial_liquidation = true
+  ) {
     // ? Get the position priv Key for this position
-    let order_side = position.order_side == "Long" ? "Short" : "Long";
-    let collateral_amount =
-      position.order_side == "Long" ? 1 : 1_000_000_000_000_000; // want the price to be as low as possible for sell and as high as possible for buy
-    let perpOrder = new PerpOrder(
-      expiration_timestamp,
-      position,
-      "Liquidate",
-      order_side,
-      position.synthetic_token,
-      position.position_size,
-      collateral_amount,
-      0,
-      position.position_size * 0.01,
-      null,
-      null
+    let order_side = liquidatedPosition.order_side == "Long" ? "Short" : "Long";
+
+    // ? Get the notesIn and priv keys for these notes
+    let { notesIn, refundAmount } = this.getNotesInAndRefundAmount(
+      COLLATERAL_TOKEN,
+      initial_margin
     );
+
+    // ? Generate the dest spent and dest received addresses and blindings
+    let privKeys = notesIn.map((x) => x.privKey);
+
+    let refundNote;
+    if (refundAmount > DUST_AMOUNT_PER_ASSET[COLLATERAL_TOKEN]) {
+      let { KoR, koR, ytR } = this.getDestReceivedAddresses(COLLATERAL_TOKEN);
+      this.notePrivKeys[KoR.getX().toString()] = koR;
+
+      refundNote = new Note(
+        KoR,
+        COLLATERAL_TOKEN,
+        refundAmount,
+        ytR,
+        notesIn[0].note.index
+      );
+
+      storePrivKey(this.userId, koR, false, this.privateSeed);
+    }
+
+    let { positionPrivKey, positionAddress } = this.getPositionAddress(
+      liquidatedPosition.synthetic_token
+    );
+    this.positionPrivKeys[positionAddress.getX().toString()] = positionPrivKey;
+
+    let open_order_fields = new OpenOrderFields(
+      initial_margin,
+      COLLATERAL_TOKEN,
+      notesIn.map((n) => n.note),
+      refundNote,
+      positionAddress.getX().toString(),
+      allow_partial_liquidation
+    );
+
+    storeUserData(this.userId, this.noteCounts, this.positionCounts);
+    storePrivKey(this.userId, positionPrivKey, true, this.privateSeed);
+
+    let perpOrder = new LiquidationOrder(
+      liquidatedPosition,
+      order_side,
+      liquidatedPosition.synthetic_token,
+      synthetic_amount,
+      collateral_amount,
+      open_order_fields
+    );
+
+    let _sig = perpOrder.signOrder(privKeys);
 
     return perpOrder;
   }
@@ -546,7 +589,6 @@ module.exports = class User {
     // ? Generate the dest spent and dest received addresses and blindings
 
     let privKeys = notesIn.map((x) => x.privKey);
-    let ytS = this.getDestSpentBlinding(privKeys);
     let { KoR, koR, ytR } = this.getDestReceivedAddresses(token_received);
 
     let privKeySum = privKeys.reduce((a, b) => a + b, 0n);
@@ -561,7 +603,6 @@ module.exports = class User {
       } = this.getDestReceivedAddresses(token_spent);
       this.notePrivKeys[KoR2.getX().toString()] = koR2;
 
-      // ? generate the refund note
       refundNote = new Note(
         KoR2,
         token_spent,
@@ -573,6 +614,8 @@ module.exports = class User {
       storePrivKey(this.userId, koR2, false, this.privateSeed);
     }
 
+    // ? generate the refund note
+
     let limitOrder = new LimitOrder(
       expiration_timestamp,
       token_spent,
@@ -581,7 +624,6 @@ module.exports = class User {
       amount_received,
       fee_limit,
       KoR,
-      ytS,
       ytR,
       notesIn.map((x) => x.note),
       refundNote
@@ -600,7 +642,7 @@ module.exports = class User {
     let depositStarkKey = this.getDepositStarkKey(depositToken);
     let privKey = this._getDepositStarkPrivKey(depositToken);
 
-    // TODO
+    // TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // if (starkKey != depositStarkKey) {
     //   throw new Error("Unknown stark key");
     // }
@@ -800,17 +842,6 @@ module.exports = class User {
     let ytR = this.generateBlinding(KoR);
 
     return { KoR, koR, ytR };
-  }
-
-  getDestSpentBlinding(privKeys) {
-    // & This returns the dest spent address and blinding
-
-    let koS = privKeys.reduce((acc, x) => acc + x, 0n);
-    let KoS = getKeyPair(koS).getPublic();
-
-    let ytS = this.generateBlinding(KoS);
-
-    return ytS;
   }
 
   getNotesInAndRefundAmount(token, spendAmount) {

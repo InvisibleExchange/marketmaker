@@ -680,12 +680,15 @@ const getPrice = (token) => {
 
 // * INITIALIZATION ==========================================================================================================
 
+const CONFIG_CODE = "1234567890";
 const listenToWebSocket = () => {
   client = new W3CWebSocket(`ws://${MM_CONFIG.SERVER_URL}:50053`);
 
   client.onopen = function () {
     const ID = trimHash(marketMaker.userId, 64);
-    client.send(ID.toString());
+    client.send(
+      JSON.stringify({ user_id: ID.toString(), config_code: CONFIG_CODE })
+    );
     console.log("WebSocket Client Connected");
   };
 
@@ -910,10 +913,10 @@ async function run() {
     await indicateLiquidity();
   }, LIQUIDITY_INDICATION_PERIOD);
 
-  await new Promise((r) => setTimeout(r, REFRESH_PERIOD));
+  // await new Promise((r) => setTimeout(r, REFRESH_PERIOD));
 
-  clearInterval(interval1);
-  clearInterval(interval2);
+  // clearInterval(interval1);
+  // clearInterval(interval2);
 }
 
 async function main() {
@@ -921,10 +924,11 @@ async function main() {
     await run();
   } catch (error) {
     console.log("error", error);
+    await run();
   }
 
-  console.log("restarting");
-  await main();
+  // console.log("restarting");
+  // await main();
 }
 
 main();
