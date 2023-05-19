@@ -2,10 +2,15 @@ const {
   DECIMALS_PER_ASSET,
   PRICE_DECIMALS_PER_ASSET,
   COLLATERAL_TOKEN_DECIMALS,
-  get_max_leverage,
 } = require("./utils");
 
 // calculate prices
+
+const LEVERAGE_BOUNDS_PER_ASSET = {
+  12345: [1.5, 30.0], // BTC
+  54321: [15.0, 150.0], // ETH
+};
+const MAX_LEVERAGE = 15;
 
 function _getBankruptcyPrice(
   entryPrice,
@@ -174,6 +179,16 @@ function calulateLiqPriceInFlipSide(position, sizeChange, indexPrice) {
 
 //  Calculate leverage and min viable margin
 
+function getSizeFromLeverage(indexPrice, leverage, margin) {
+  if (indexPrice == 0) {
+    return 0;
+  }
+
+  const size = (Number(margin) * Number(leverage)) / Number(indexPrice);
+
+  return size;
+}
+
 function getCurrentLeverage(indexPrice, size, margin) {
   if (indexPrice == 0) {
     return 0;
@@ -184,18 +199,8 @@ function getCurrentLeverage(indexPrice, size, margin) {
   return currentLeverage;
 }
 
-function getSizeFromLeverage(indexPrice, margin, leverage) {
-  if (indexPrice == 0) {
-    return 0;
-  }
-
-  const size = (Number(margin) * Number(leverage)) / Number(indexPrice);
-
-  return size;
-}
-
 function getMinViableMargin(position) {
-  const maxLeverage = get_max_leverage(
+  const maxLeverage = getMaxLeverage(
     Number(position.synthetic_token),
     Number(position.position_size) /
       10 ** DECIMALS_PER_ASSET[position.synthetic_token]
@@ -217,6 +222,41 @@ function getMinViableMargin(position) {
   return minMargin;
 }
 
+function getMaxLeverage(token, amount) {
+  let [min_bound, max_bound] = LEVERAGE_BOUNDS_PER_ASSET[token];
+
+  let maxLev;
+  if (amount < min_bound) {
+    maxLev = MAX_LEVERAGE;
+  } else if (amount < max_bound) {
+    // b. For trades between $100,000 and $1,000,000, reduce the maximum leverage proportionally, such as 50 * ($100,000/$trade size).
+
+    maxLev = MAX_LEVERAGE * (min_bound / amount);
+  } else {
+    maxLev = 1;
+  }
+
+  return maxLev;
+}
+
+function getNewMaxLeverage(margin, indexPrice, token) {
+  let min_bound = LEVERAGE_BOUNDS_PER_ASSET[token][0];
+
+  let temp = (MAX_LEVERAGE * margin * min_bound) / Number(indexPrice);
+
+  let newMaxSize = Math.sqrt(temp);
+  let newMaxLeverage = getCurrentLeverage(indexPrice, newMaxSize, margin);
+
+  if (newMaxLeverage > MAX_LEVERAGE) {
+    newMaxLeverage = MAX_LEVERAGE;
+    newMaxSize = (MAX_LEVERAGE * margin) / Number(indexPrice);
+  } else if (newMaxLeverage < 1) {
+    newMaxLeverage = 1;
+    newMaxSize = margin / Number(indexPrice);
+  }
+
+  return { newMaxLeverage, newMaxSize };
+}
 // Check vaible sizes
 
 function checkViableSizeAfterIncrease(position, added_size, added_price) {
@@ -225,7 +265,7 @@ function checkViableSizeAfterIncrease(position, added_size, added_price) {
       10 ** DECIMALS_PER_ASSET[position.synthetic_token] +
     Number(added_size);
 
-  const maxLeverage = get_max_leverage(position.synthetic_token, new_size);
+  const maxLeverage = getMaxLeverage(position.synthetic_token, new_size);
 
   let scaledPrice =
     Number(added_price) *
@@ -259,7 +299,7 @@ function checkViableSizeAfterFlip(position, added_size, added_price) {
     Number(position.position_size) /
       10 ** DECIMALS_PER_ASSET[position.synthetic_token];
 
-  const maxLeverage = get_max_leverage(
+  const maxLeverage = getMaxLeverage(
     Number(position.synthetic_token),
     new_size
   );
@@ -278,10 +318,13 @@ module.exports = {
   calulateLiqPriceInDecreaseSize,
   calulateLiqPriceInFlipSide,
   getCurrentLeverage,
-  getSizeFromLeverage,
   getMinViableMargin,
   checkViableSizeAfterFlip,
   checkViableSizeAfterIncrease,
   _getBankruptcyPrice,
   _getLiquidationPrice,
+  getNewMaxLeverage,
+  MAX_LEVERAGE,
+  getSizeFromLeverage,
+  getMaxLeverage,
 };
