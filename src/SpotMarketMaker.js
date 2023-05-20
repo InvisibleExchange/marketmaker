@@ -802,6 +802,15 @@ async function run() {
   let interval1 = setInterval(fillOpenOrders, FILL_ORDERS_PERIOD);
 
   console.log(
+    "note indexes usdc: ",
+    marketMaker.noteData[55555].map((n) => n.index)
+  );
+  console.log(
+    "note indexes eth: ",
+    marketMaker.noteData[54321].map((n) => n.index)
+  );
+
+  console.log(
     "Starting market making: ",
     marketMaker.getAvailableAmount(55555),
     "USDC",
@@ -809,11 +818,11 @@ async function run() {
     "ETH"
   );
 
-  // brodcast orders to provide liquidity
-  await indicateLiquidity();
-  let interval2 = setInterval(async () => {
-    await indicateLiquidity();
-  }, LIQUIDITY_INDICATION_PERIOD);
+  // // brodcast orders to provide liquidity
+  // await indicateLiquidity();
+  // let interval2 = setInterval(async () => {
+  //   await indicateLiquidity();
+  // }, LIQUIDITY_INDICATION_PERIOD);
 
   // await new Promise((r) => setTimeout(r, REFRESH_PERIOD));
 
