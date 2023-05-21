@@ -78,16 +78,6 @@ function perpConsisencyChecks(orderA, orderB, spentCollateral, spentSynthetic) {
 
 // ===================================================================================
 
-// user,
-// order_side,
-// position_effect_type,
-// syntheticToken,
-// syntheticAmount,
-// COLLATERAL_TOKEN,
-// collateralAmount,
-// initial_margin,
-// feeLimit
-
 function checkPerpOrderValidity(
   user,
   orderSide,
@@ -128,6 +118,11 @@ function checkPerpOrderValidity(
       console.log("Position does not exist. Try opening a position first");
       throw "order invalid";
     }
+  }
+
+  if (expirationTime <= 3 || expirationTime > 1000) {
+    console.log("Expiration time must be between 4 and 1000 hours");
+    throw "Exipration time invalid";
   }
 }
 

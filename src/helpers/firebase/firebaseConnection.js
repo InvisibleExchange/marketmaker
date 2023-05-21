@@ -95,6 +95,22 @@ async function fetchStoredPosition(address) {
   return positions;
 }
 
+async function fetchIndividualPosition(address, index) {
+  // returns the position at this address from the db
+
+  const positionData = await getDoc(
+    doc(db, `positions/${address}/indexes`, index.toString())
+  );
+
+  if (!positionData.exists()) {
+    return null;
+  }
+
+  let position = positionData.data();
+
+  return position;
+}
+
 // ---- USER INFO ---- //
 async function registerUser(userId) {
   let userAddressesDoc = doc(db, "users", userId.toString());
@@ -315,6 +331,22 @@ async function fetchUserData(userId, privateSeed) {
   };
 }
 
+async function fetchDeprecatedKeys(userId, privateSeed) {
+  let querySnapshot = await getDocs(
+    collection(db, `users/${userId}/deprecatedKeys`)
+  );
+  let privKeys = [];
+  if (!querySnapshot.empty) {
+    querySnapshot.forEach((doc) => {
+      let decyrptedPk = bigInt(doc.id).xor(privateSeed).value;
+
+      privKeys.push(BigInt(decyrptedPk));
+    });
+  }
+
+  return privKeys;
+}
+
 // ---- DEPOSIT ---- //
 async function storeOnchainDeposit(deposit) {
   let depositDoc = doc(db, "deposits", deposit.depositId.toString());
@@ -515,6 +547,8 @@ async function fetchLatestFills(n, isPerp, token) {
 
 // ================================================================
 
+// ---- POSITIONS ---- //
+
 // ================================================================
 
 module.exports = {
@@ -532,4 +566,6 @@ module.exports = {
   removeOrderId,
   fetchUserFills,
   fetchLatestFills,
+  fetchDeprecatedKeys,
+  fetchIndividualPosition,
 };

@@ -2,13 +2,13 @@ const {
   checkPerpOrderValidity,
   getQtyFromQuote,
   getQuoteQty,
-} = require("../helpers/orderHelpers");
-const { trimHash, Note } = require("../users/Notes");
+} = require("./src/helpers/orderHelpers");
+const { trimHash, Note } = require("./src/users/Notes");
 
 const axios = require("axios");
-const { storeOrderId } = require("../helpers/firebase/firebaseConnection");
+const { storeOrderId } = require("./src/helpers/firebase/firebaseConnection");
 
-const { computeHashOnElements } = require("../helpers/pedersen");
+const { computeHashOnElements } = require("./src/helpers/pedersen");
 
 const {
   SERVER_URL,
@@ -20,18 +20,16 @@ const {
   DUST_AMOUNT_PER_ASSET,
   SPOT_MARKET_IDS,
   PERP_MARKET_IDS,
-} = require("../helpers/utils");
+} = require("./src/helpers/utils");
 const {
   _getBankruptcyPrice,
   _getLiquidationPrice,
-} = require("../helpers/tradePriceCalculations");
+} = require("./src/helpers/tradePriceCalculations");
 
 // const path = require("path");
 // require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const EXPRESS_APP_URL = `http://${SERVER_URL}:4000`; // process.env.EXPRESS_APP_URL;
-
-// TODO: Remove notes only after order is confirmed
 
 /**
  * This constructs a spot swap and sends it to the backend
@@ -142,15 +140,22 @@ async function sendSpotOrder(
 
   user.awaittingOrder = true;
 
+  // console.log("\nSending order to server: ", orderJson);
+
   await axios
     .post(`${EXPRESS_APP_URL}/submit_limit_order`, orderJson)
     .then(async (res) => {
       let order_response = res.data.response;
 
       if (order_response.successful) {
-        console.log("Order successfull: ", order_response.order_id);
+        console.log(
+          "Order successful: ",
+          order_response.order_id,
+          "  ",
+          order_side
+        );
 
-        await storeOrderId(
+        storeOrderId(
           user.userId,
           order_response.order_id,
           pfrKey,
@@ -194,6 +199,7 @@ async function sendSpotOrder(
           // If the order has not been fully filled already and is not a market order
 
           limitOrder.order_id = order_response.order_id;
+
           user.orders.push(limitOrder);
 
           if (
@@ -231,6 +237,9 @@ async function sendSpotOrder(
         user.awaittingOrder = false;
         throw new Error(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting spot order: ", err);
     });
 }
 
@@ -338,13 +347,20 @@ async function sendPerpOrder(
   orderJson.user_id = trimHash(user.userId, 64).toString();
   orderJson.is_market = isMarket;
 
+  // console.log("Sending order: ", orderJson);
+
   await axios
     .post(`${EXPRESS_APP_URL}/submit_perpetual_order`, orderJson)
     .then((res) => {
       let order_response = res.data.response;
 
       if (order_response.successful) {
-        console.log("Order successfull: ", order_response.order_id);
+        console.log(
+          "Order successful: ",
+          order_response.order_id,
+          "  ",
+          order_side
+        );
 
         storeOrderId(
           user.userId,
@@ -433,91 +449,33 @@ async function sendPerpOrder(
           "Failed to submit order with error: \n" +
           order_response.error_message;
         console.log(msg);
-
         user.awaittingOrder = false;
         throw new Error(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting perp order: ", err);
     });
 }
 
-/**
- * This constructs a perpetual swap and sends it to the backend
- * ## Params:
- * @param  position  the position to be modified/closed (null if open)
- * @param  price (null if market order)
- * @param  syntheticToken the token of the position to be opened
- * @param  syntheticAmount the amount of synthetic tokens to be bought/sold
- * @param  initial_margin if the position is being opened (else null)
- * @param  slippage  the slippage limit in percentage (1 = 1%) (null if limit)
- */
-async function sendLiquidationOrder(
-  user,
-  position,
-  price,
-  syntheticToken,
-  syntheticAmount,
-  initial_margin,
-  slippage
-) {
-  let syntheticDecimals = DECIMALS_PER_ASSET[syntheticToken];
-  let priceDecimals = PRICE_DECIMALS_PER_ASSET[syntheticToken];
+async function sendLiquidationOrder(user, expirationTime, position) {
+  if (expirationTime < 4 || expirationTime > 1000)
+    throw new Error("Expiration time Invalid");
 
-  let decimalMultiplier =
-    syntheticDecimals + priceDecimals - COLLATERAL_TOKEN_DECIMALS;
+  let ts = new Date().getTime() / 3600_000; // number of hours since epoch
+  let expirationTimestamp = Number.parseInt(ts.toString()) + expirationTime;
 
-  syntheticAmount = syntheticAmount * 10 ** syntheticDecimals;
-  let scaledPrice = price * 10 ** priceDecimals;
+  let perpOrder = user.makeLiquidationOrder(expirationTimestamp, position);
 
-  let order_side = position.order_side == "Long" ? "Short" : "Long";
-  scaledPrice =
-    order_side == "Long"
-      ? (scaledPrice * (100 + slippage)) / 100
-      : (scaledPrice * (100 - slippage)) / 100;
-  scaledPrice = Number.parseInt(scaledPrice);
-
-  let collateralAmount =
-    (BigInt(syntheticAmount) * BigInt(scaledPrice)) /
-    10n ** BigInt(decimalMultiplier);
-  collateralAmount = Number.parseInt(collateralAmount.toString());
-
-  initial_margin = Number.parseInt(
-    initial_margin * 10 ** COLLATERAL_TOKEN_DECIMALS
-  );
-
-  let liquidationOrder = user.makeLiquidationOrder(
-    position,
-    syntheticAmount,
-    collateralAmount,
-    initial_margin
-  );
-
-  let orderJson = liquidationOrder.toGrpcObject();
+  let orderJson = perpOrder.toGrpcObject();
   orderJson.user_id = trimHash(user.userId, 64).toString();
 
   await axios
-    .post(`${EXPRESS_APP_URL}/submit_liquidation_order`, orderJson)
+    .post(`${EXPRESS_APP_URL}/submit_perpetual_order`, orderJson)
     .then((res) => {
       let order_response = res.data.response;
 
       if (order_response.successful) {
-        // ? Save position data (if not null)
-        let position = order_response.new_position;
-
-        if (position) {
-          this.position.order_side =
-            this.position.order_side == 1 ? "Long" : "Short";
-
-          if (
-            !user.positionData[position.synthetic_token] ||
-            user.positionData[position.synthetic_token].length == 0
-          ) {
-            user.positionData[position.synthetic_token] = [position];
-          } else {
-            user.positionData[position.synthetic_token].push(position);
-          }
-
-          //
-        }
       } else {
         let msg =
           "Failed to submit order with error: \n" +
@@ -531,7 +489,7 @@ async function sendLiquidationOrder(
 // * =====================================================================================================================================
 
 /**
- * Sends a cancell order request to the server
+ * Sends a cancel order request to the server
  * ## Params:
  * @param orderId order id of order to cancel
  * @param orderSide true-Bid, false-Ask
@@ -817,6 +775,7 @@ async function sendAmendOrder(
 
 // * =====================================================================================================================================
 // * =====================================================================================================================================
+// * =====================================================================================================================================
 
 async function sendDeposit(user, depositId, amount, token, pubKey) {
   if (!user || !amount || !token || !depositId || !pubKey) {
@@ -853,6 +812,9 @@ async function sendDeposit(user, depositId, amount, token, pubKey) {
         console.log(msg);
         throw new Error(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting deposit order: ", err);
     });
 }
 
@@ -887,6 +849,9 @@ async function sendWithdrawal(user, amount, token, starkKey) {
           withdrawal_response.error_message;
         console.log(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting withdrawal order: ", err);
     });
 }
 
@@ -899,7 +864,7 @@ async function sendWithdrawal(user, amount, token, starkKey) {
  * @param newAmounts - array of new amounts
  */
 async function sendSplitOrder(user, token, newAmount) {
-  newAmount = newAmount * 10 ** DECIMALS_PER_ASSET[token];
+  newAmount = Number.parseInt(newAmount * 10 ** DECIMALS_PER_ASSET[token]);
 
   let res = user.restructureNotes(token, newAmount);
   if (!res) return;
@@ -925,6 +890,9 @@ async function sendSplitOrder(user, token, newAmount) {
           "Note split failed with error: \n" + split_response.error_message;
         console.log(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting split order: ", err);
     });
 }
 
@@ -1021,24 +989,15 @@ async function sendChangeMargin(
 
             let liquidationPrice = _getLiquidationPrice(
               pos.entry_price,
-              pos.margin,
-              pos.position_size,
-              pos.order_side,
-              pos.synthetic_token,
-              pos.allow_partial_liquidations
+              bankruptcyPrice,
+              pos.order_side
             );
 
             pos.bankruptcy_price = bankruptcyPrice;
             pos.liquidation_price = liquidationPrice;
 
             let hash = computeHashOnElements([
-              pos.order_side == "Long"
-                ? pos.allow_partial_liquidations
-                  ? 1
-                  : 0
-                : pos.allow_partial_liquidations
-                ? 2
-                : 3,
+              pos.order_side == "Long" ? 1 : 0,
               pos.synthetic_token,
               pos.position_size,
               pos.entry_price,
@@ -1060,6 +1019,9 @@ async function sendChangeMargin(
           marginChangeResponse.error_message;
         console.log(msg);
       }
+    })
+    .catch((err) => {
+      console.log("Error submitting margin change order: ", err);
     });
 }
 
@@ -1067,9 +1029,9 @@ module.exports = {
   sendSpotOrder,
   sendPerpOrder,
   sendCancelOrder,
+  sendAmendOrder,
   sendDeposit,
   sendWithdrawal,
-  sendAmendOrder,
   sendSplitOrder,
   sendChangeMargin,
   sendLiquidationOrder,

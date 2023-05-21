@@ -12,6 +12,11 @@ const LEVERAGE_BOUNDS_PER_ASSET = {
 };
 const MAX_LEVERAGE = 15;
 
+const MIN_PARTIAL_LIQUIDATION_SIZE = {
+  12345: 50_000_000,
+  54321: 500_000_000,
+};
+
 function _getBankruptcyPrice(
   entryPrice,
   margin,
@@ -38,44 +43,57 @@ function _getBankruptcyPrice(
   }
 }
 
-function _getLiquidationPrice(entryPrice, bankruptcyPrice, orderSide) {
-  if (bankruptcyPrice == 0) {
-    return 0;
-  }
+function _getLiquidationPrice(
+  entryPrice,
+  margin,
+  position_size,
+  orderSide,
+  syntheticToken,
+  is_partial_liquidation
+) {
+  entryPrice = Number.parseInt(entryPrice);
+  margin = Number.parseInt(margin);
+  position_size = Number.parseInt(position_size);
 
-  // maintnance margin
-  let mm_rate = 3; // 3% of 100
+  let mm_fraction =
+    is_partial_liquidation &&
+    position_size > MIN_PARTIAL_LIQUIDATION_SIZE[syntheticToken]
+      ? 4
+      : 3;
 
-  // liquidation price is 2% above/below the bankruptcy price
-  if (orderSide == "Long" || orderSide == 0) {
-    return (
-      Number(bankruptcyPrice) + Math.floor((mm_rate * Number(entryPrice)) / 100)
-    );
+  const syntheticDecimals = DECIMALS_PER_ASSET[syntheticToken];
+  const syntheticPriceDecimals = PRICE_DECIMALS_PER_ASSET[syntheticToken];
+
+  const decConversion1 =
+    syntheticDecimals + syntheticPriceDecimals - COLLATERAL_TOKEN_DECIMALS;
+  const multiplier1 = 10 ** decConversion1;
+
+  // & price_delta = (margin - mm_fraction * entry_price * size) / ((1 -/+ mm_fraction)*size) ; - for long, + for short
+
+  let d1 = margin * multiplier1;
+  let d2 = (mm_fraction * entryPrice * position_size) / 100;
+
+  if (orderSide == "Long" || orderSide == 1) {
+    if (position_size == 0) {
+      return 0;
+    }
+
+    let price_delta = ((d1 - d2) * 100) / ((100 - mm_fraction) * position_size);
+
+    let liquidation_price = entryPrice - Number.parseInt(price_delta);
+
+    return Math.max(liquidation_price, 0);
   } else {
-    return (
-      Number(bankruptcyPrice) - Math.floor((mm_rate * Number(entryPrice)) / 100)
-    );
+    if (position_size == 0) {
+      return 0;
+    }
+
+    let price_delta = ((d1 - d2) * 100) / ((100 + mm_fraction) * position_size);
+
+    let liquidation_price = entryPrice + Number.parseInt(price_delta);
+
+    return liquidation_price;
   }
-}
-
-function calulateLiqPriceInMarginChangeModal(position, marginChange) {
-  marginChange = marginChange * 10 ** COLLATERAL_TOKEN_DECIMALS;
-
-  let bankruptcyPrice = _getBankruptcyPrice(
-    Number(position.entry_price),
-    Number(position.margin) + marginChange,
-    Number(position.position_size),
-    position.order_side,
-    position.synthetic_token
-  );
-
-  let liqPrice = _getLiquidationPrice(
-    Number(position.entry_price),
-    bankruptcyPrice,
-    position.order_side
-  );
-
-  return Math.max(liqPrice, 0);
 }
 
 function calcAvgEntryInIncreaseSize(position, sizeChange, indexPrice) {
@@ -95,7 +113,22 @@ function calcAvgEntryInIncreaseSize(position, sizeChange, indexPrice) {
   );
 }
 
-// Calculate liquidation prices
+// * Calculate liquidation prices
+
+function calulateLiqPriceInMarginChangeModal(position, marginChange) {
+  marginChange = marginChange * 10 ** COLLATERAL_TOKEN_DECIMALS;
+
+  let liqPrice = _getLiquidationPrice(
+    Number(position.entry_price),
+    Number(position.margin) + marginChange,
+    Number(position.position_size),
+    position.order_side,
+    position.synthetic_token,
+    true
+  );
+
+  return Math.max(liqPrice, 0);
+}
 
 function calulateLiqPriceInIncreaseSize(position, sizeChange, indexPrice) {
   let scaledPrice =
@@ -109,18 +142,13 @@ function calulateLiqPriceInIncreaseSize(position, sizeChange, indexPrice) {
       scaledSize * scaledPrice) /
     (Number(position.position_size) + scaledSize);
 
-  let bankruptcyPrice = _getBankruptcyPrice(
+  let liqPrice = _getLiquidationPrice(
     avgEntryPrice,
     Number(position.margin),
     Number(position.position_size) + scaledSize,
     position.order_side,
-    position.synthetic_token
-  );
-
-  let liqPrice = _getLiquidationPrice(
-    avgEntryPrice,
-    bankruptcyPrice,
-    position.order_side
+    position.synthetic_token,
+    true
   );
 
   return Math.max(liqPrice, 0);
@@ -132,18 +160,13 @@ function calulateLiqPriceInDecreaseSize(position, sizeChange) {
 
   let new_size = Number(position.position_size) - scaledSize;
 
-  let bankruptcyPrice = _getBankruptcyPrice(
+  let liqPrice = _getLiquidationPrice(
     Number(position.entry_price),
     Number(position.margin),
     new_size,
     position.order_side,
-    position.synthetic_token
-  );
-
-  let liqPrice = _getLiquidationPrice(
-    Number(position.entry_price),
-    bankruptcyPrice,
-    position.order_side
+    position.synthetic_token,
+    true
   );
 
   return Math.max(liqPrice, 0);
@@ -160,24 +183,19 @@ function calulateLiqPriceInFlipSide(position, sizeChange, indexPrice) {
 
   let newOrderSide = position.order_side == "Long" ? "Short" : "Long";
 
-  let bankruptcyPrice = _getBankruptcyPrice(
+  let liqPrice = _getLiquidationPrice(
     scaledPrice,
     Number(position.margin),
     new_size,
     newOrderSide,
-    position.synthetic_token
-  );
-
-  let liqPrice = _getLiquidationPrice(
-    scaledPrice,
-    bankruptcyPrice,
-    newOrderSide
+    position.synthetic_token,
+    true
   );
 
   return Math.max(liqPrice, 0);
 }
 
-//  Calculate leverage and min viable margin
+// * Calculate leverage and min viable margin
 
 function getSizeFromLeverage(indexPrice, leverage, margin) {
   if (indexPrice == 0) {
@@ -257,7 +275,7 @@ function getNewMaxLeverage(margin, indexPrice, token) {
 
   return { newMaxLeverage, newMaxSize };
 }
-// Check vaible sizes
+// * Check vaible sizes
 
 function checkViableSizeAfterIncrease(position, added_size, added_price) {
   let new_size =

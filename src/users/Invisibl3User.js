@@ -1,3 +1,5 @@
+const { LiquidationOrder } = require("../transactions/LiquidationOrder");
+
 const bigInt = require("big-integer");
 const { pedersen, computeHashOnElements } = require("../helpers/pedersen");
 const { ec, getKeyPair } = require("starknet").ec;
@@ -41,7 +43,6 @@ const { Note, trimHash } = require("./Notes.js");
 //   LimitOrderToFfiPointer,
 // } = require("../helpers/FFI");
 const LimitOrder = require("../transactions/LimitOrder");
-const LiquidationOrder = require("../transactions/LiquidationOrder");
 const Deposit = require("../transactions/Deposit");
 const {
   OpenOrderFields,
