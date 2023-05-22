@@ -33,13 +33,16 @@ const { trimHash } = require("./src/users/Notes");
 let W3CWebSocket = require("websocket").w3cwebsocket;
 let client;
 
+const path = require("path");
+const configPath = path.join(__dirname, "config.json");
+
 const loadMMConfig = () => {
   // Load MM config
   let MM_CONFIG;
   if (process.env.MM_CONFIG) {
     MM_CONFIG = JSON.parse(process.env.MM_CONFIG);
   } else {
-    const mmConfigFile = fs.readFileSync("config.json", "utf8");
+    const mmConfigFile = fs.readFileSync(configPath, "utf8");
     MM_CONFIG = JSON.parse(mmConfigFile);
   }
 
@@ -266,7 +269,6 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       buySplits = Math.floor(usdQuoteBalance / 10);
     if (usdBaseBalance && usdBaseBalance < 10 * sellSplits)
       sellSplits = Math.floor(usdBaseBalance / 10);
-
 
     if (["b", "d"].includes(side) && maxBuySize > 0) {
       // make a clone of the  ACTIVE_ORDERS[marketId + "Buy"] array

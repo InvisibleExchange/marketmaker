@@ -1,4 +1,3 @@
-const User = require("./src/users/Invisibl3User");
 const fs = require("fs");
 const dotenv = require("dotenv");
 dotenv.config();
@@ -22,6 +21,8 @@ const {
   PERP_MARKET_IDS_2_TOKENS,
 } = require("./src/helpers/utils");
 
+const User = require("./src/users/Invisibl3User");
+
 const {
   sendAmendOrder,
   sendCancelOrder,
@@ -35,13 +36,16 @@ const { getSizeFromLeverage } = require("./src/helpers/tradePriceCalculations");
 let W3CWebSocket = require("websocket").w3cwebsocket;
 let client;
 
+const path = require("path");
+const configPath = path.join(__dirname, "perp_config.json");
+
 const loadMMConfig = () => {
   // Load MM config
   let MM_CONFIG;
   if (process.env.MM_CONFIG) {
     MM_CONFIG = JSON.parse(process.env.MM_CONFIG);
   } else {
-    const mmConfigFile = fs.readFileSync("perp_config.json", "utf8");
+    const mmConfigFile = fs.readFileSync(configPath, "utf8");
     MM_CONFIG = JSON.parse(mmConfigFile);
   }
 
