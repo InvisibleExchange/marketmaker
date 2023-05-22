@@ -29,6 +29,10 @@ const loadMMConfig = () => {
   return { MM_CONFIG, activeMarkets };
 };
 
+
+
+
+
 module.exports = async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
   if (!MM_CONFIG) {
     MM_CONFIG = loadMMConfig().MM_CONFIG;

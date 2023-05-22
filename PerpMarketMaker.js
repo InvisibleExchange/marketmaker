@@ -523,9 +523,11 @@ async function afterFill(amountFilled, marketId) {
   }
 
   // ? increaseSpreadAfterFill size might not be set
-  const increaseSpreadAfterFillMinSize = mmConfig.increaseSpreadAfterFill?.[2]
-    ? mmConfig.increaseSpreadAfterFill[2]
-    : 0;
+  const increaseSpreadAfterFillMinSize =
+    !Array.isArray(mmConfig.increaseSpreadAfterFill) &&
+    mmConfig.increaseSpreadAfterFill[2]
+      ? mmConfig.increaseSpreadAfterFill[2]
+      : 0;
   if (
     mmConfig.increaseSpreadAfterFill &&
     amountFilled > increaseSpreadAfterFillMinSize
@@ -542,9 +544,11 @@ async function afterFill(amountFilled, marketId) {
   }
 
   // ? changeSizeAfterFill size might not be set
-  const changeSizeAfterFillMinSize = mmConfig.changeSizeAfterFill?.[2]
-    ? mmConfig.changeSizeAfterFill[2]
-    : 0;
+  const changeSizeAfterFillMinSize =
+    !Array.isArray(mmConfig.changeSizeAfterFill) &&
+    mmConfig.changeSizeAfterFill[2]
+      ? mmConfig.changeSizeAfterFill[2]
+      : 0;
   if (
     mmConfig.changeSizeAfterFill &&
     amountFilled > changeSizeAfterFillMinSize
