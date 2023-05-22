@@ -524,7 +524,7 @@ async function afterFill(amountFilled, marketId) {
 
   // ? increaseSpreadAfterFill size might not be set
   const increaseSpreadAfterFillMinSize =
-    !Array.isArray(mmConfig.increaseSpreadAfterFill) &&
+    Array.isArray(mmConfig.increaseSpreadAfterFill) &&
     mmConfig.increaseSpreadAfterFill.length > 2
       ? mmConfig.increaseSpreadAfterFill[2]
       : 0;
@@ -545,7 +545,7 @@ async function afterFill(amountFilled, marketId) {
 
   // ? changeSizeAfterFill size might not be set
   const changeSizeAfterFillMinSize =
-    !Array.isArray(mmConfig.changeSizeAfterFill) &&
+    Array.isArray(mmConfig.changeSizeAfterFill) &&
     mmConfig.changeSizeAfterFill.length > 2
       ? mmConfig.changeSizeAfterFill[2]
       : 0;
