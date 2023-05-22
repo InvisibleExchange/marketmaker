@@ -455,7 +455,7 @@ async function afterFill(amountFilled, marketId) {
     let delayAfterFillMinSize;
     if (
       !Array.isArray(mmConfig.delayAfterFill) ||
-      !mmConfig.delayAfterFill[1]
+      !mmConfig.delayAfterFill.length > 1
     ) {
       delayAfterFillMinSize = 0;
     } else {
@@ -481,7 +481,7 @@ async function afterFill(amountFilled, marketId) {
   // ? increaseSpreadAfterFill size might not be set
   const increaseSpreadAfterFillMinSize =
     !Array.isArray(mmConfig.increaseSpreadAfterFill) &&
-    mmConfig.increaseSpreadAfterFill[2]
+    mmConfig.increaseSpreadAfterFill.length > 2
       ? mmConfig.increaseSpreadAfterFill[2]
       : 0;
   if (
@@ -502,7 +502,7 @@ async function afterFill(amountFilled, marketId) {
   // ? changeSizeAfterFill size might not be set
   const changeSizeAfterFillMinSize =
     !Array.isArray(mmConfig.changeSizeAfterFill) &&
-    mmConfig.changeSizeAfterFill[2]
+    mmConfig.changeSizeAfterFill.length > 2
       ? mmConfig.changeSizeAfterFill[2]
       : 0;
   if (

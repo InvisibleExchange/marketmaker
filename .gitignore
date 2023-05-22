@@ -3,5 +3,8 @@ node_modules
 config.json
 perp_config.json
 engine.proto
+
+.env
+
 src/helpers/firebase
 !src/helpers/firebase/firebaseConnection.js
