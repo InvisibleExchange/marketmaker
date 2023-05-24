@@ -825,20 +825,11 @@ async function run() {
     "ETH"
   );
 
-  console.log(
-    "positionData usdc",
-    marketMaker.noteData[55555]?.map((note) => note.index + " - " + note.hash)
-  );
-  console.log(
-    "positionData usdc",
-    marketMaker.noteData[54321]?.map((note) => note.index + " - " + note.hash)
-  );
-
   // brodcast orders to provide liquidity
-  // await indicateLiquidity();
-  // let interval2 = setInterval(async () => {
-  //   await indicateLiquidity();
-  // }, LIQUIDITY_INDICATION_PERIOD);
+  await indicateLiquidity();
+  let interval2 = setInterval(async () => {
+    await indicateLiquidity();
+  }, LIQUIDITY_INDICATION_PERIOD);
 
   // await new Promise((r) => setTimeout(r, REFRESH_PERIOD));
 

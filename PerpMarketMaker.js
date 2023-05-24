@@ -914,10 +914,6 @@ async function run() {
   let interval1 = setInterval(fillOpenOrders, FILL_ORDERS_PERIOD);
 
   console.log("Starting market making: ", marketMaker.positionData);
-  // console.log(
-  //   "Starting market making: ",
-  //   marketMaker.getAvailableAmount(55555)
-  // );
 
   // brodcast orders to provide liquidity
   await indicateLiquidity();
