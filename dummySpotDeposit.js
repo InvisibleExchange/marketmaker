@@ -30,8 +30,8 @@ async function main() {
     emptyPositionPrivKeys
   );
 
-  await sendDeposit(marketMaker, 123, 5, 54321, 123456789);
-  await sendDeposit(marketMaker, 234, 10000, 55555, 123456789);
+  await sendDeposit(marketMaker, 123, 20, 54321, 123456789);
+  await sendDeposit(marketMaker, 234, 40_000, 55555, 123456789);
 
   console.log(marketMaker.getAvailableAmount(54321));
   console.log(marketMaker.getAvailableAmount(55555));

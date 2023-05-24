@@ -30,7 +30,7 @@ async function main() {
     emptyPositionPrivKeys
   );
 
-  await sendDeposit(marketMaker, 234, 10000, 55555, 123456789);
+  await sendDeposit(marketMaker, 234, 30_000, 55555, 123456789);
 
   console.log(marketMaker.getAvailableAmount(55555));
 }
