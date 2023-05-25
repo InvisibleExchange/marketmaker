@@ -837,16 +837,24 @@ async function run() {
   // clearInterval(interval2);
 }
 
+let restartCount = 0;
 async function main() {
   try {
     await run();
   } catch (error) {
+    if (restartCount > 3) {
+      console.log("Too many restarts. Exiting...");
+      process.exit(1);
+    }
+
     console.log("error", error);
+    restartCount++;
     await run();
   }
 
-  // console.log("restarting");
-  // await main();
+  setTimeout(() => {
+    restartCount = 0;
+  }, 360_0000); // 1 hour
 }
 
 main();
