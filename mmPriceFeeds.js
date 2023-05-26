@@ -9,13 +9,16 @@ const UNISWAP_V3_PROVIDERS = {};
 let uniswap_error_counter = 0;
 let chainlink_error_counter = 0;
 
-const loadMMConfig = () => {
+const loadMMConfig = (isPerp) => {
   // Load MM config
   let MM_CONFIG;
   if (process.env.MM_CONFIG) {
     MM_CONFIG = JSON.parse(process.env.MM_CONFIG);
   } else {
-    const mmConfigFile = fs.readFileSync("config.json", "utf8");
+    const mmConfigFile = fs.readFileSync(
+      isPerp ? "perp_config.json" : "config.json",
+      "utf8"
+    );
     MM_CONFIG = JSON.parse(mmConfigFile);
   }
 
@@ -29,15 +32,11 @@ const loadMMConfig = () => {
   return { MM_CONFIG, activeMarkets };
 };
 
-
-
-
-
-module.exports = async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
-  if (!MM_CONFIG) {
-    MM_CONFIG = loadMMConfig().MM_CONFIG;
-  }
-
+module.exports = async function setupPriceFeeds(
+  MM_CONFIG,
+  PRICE_FEEDS,
+  isPerp
+) {
   const cryptowatch = [],
     chainlink = [],
     uniswapV3 = [];
@@ -96,15 +95,20 @@ module.exports = async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
   }
   if (chainlink.length > 0) await chainlinkSetup(chainlink, PRICE_FEEDS);
   if (cryptowatch.length > 0)
-    await cryptowatchWsSetup(cryptowatch, PRICE_FEEDS, MM_CONFIG);
+    await cryptowatchWsSetup(cryptowatch, PRICE_FEEDS, MM_CONFIG, isPerp);
   if (uniswapV3.length > 0) await uniswapV3Setup(uniswapV3, PRICE_FEEDS);
 };
 
 async function cryptowatchWsSetup(
   cryptowatchMarketIds,
   PRICE_FEEDS,
-  MM_CONFIG
+  MM_CONFIG,
+  isPerp
 ) {
+  if (!MM_CONFIG) {
+    MM_CONFIG = loadMMConfig(isPerp).MM_CONFIG;
+  }
+
   // Set initial prices
   const cryptowatchApiKey =
     process.env.CRYPTOWATCH_API_KEY || MM_CONFIG.cryptowatchApiKey;

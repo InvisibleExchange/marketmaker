@@ -795,7 +795,7 @@ async function run() {
   activeMarkets = config.activeMarkets;
 
   // Setup price feeds
-  await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
+  await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS, isPerp);
 
   // Setup the market maker
   await initAccountState();
