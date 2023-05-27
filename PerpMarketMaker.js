@@ -39,6 +39,8 @@ let client;
 const path = require("path");
 const configPath = path.join(__dirname, "perp_config.json");
 
+let errorCounter = 0;
+
 const loadMMConfig = () => {
   // Load MM config
   let MM_CONFIG;
@@ -200,7 +202,10 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
       0.01,
       true,
       ACTIVE_ORDERS
-    );
+    ).catch((err) => {
+      console.log("Error sending perp order: ", err);
+      errorCounter++;
+    });
 
     unfilledAmount -= addableValue;
   }
@@ -233,7 +238,10 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
         MM_CONFIG.EXPIRATION_TIME,
         true, // match_only
         ACTIVE_ORDERS
-      );
+      ).catch((err) => {
+        console.log("Error amending order: ", err);
+        errorCounter++;
+      });
 
       unfilledAmount -=
         order.syntheticAmount / 10 ** DECIMALS_PER_ASSET[syntheticAsset];
@@ -353,7 +361,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           MM_CONFIG.EXPIRATION_TIME,
           false, // match_only
           ACTIVE_ORDERS
-        );
+        ).catch((err) => {
+          console.log("Error amending order: ", err);
+          errorCounter++;
+        });
       }
 
       for (let i = activeOrdersCopy.length; i < numSplits; i++) {
@@ -388,7 +399,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           0,
           false,
           ACTIVE_ORDERS
-        );
+        ).catch((err) => {
+          console.log("Error sending perp order: ", err);
+          errorCounter++;
+        });
       }
     }
 
@@ -421,7 +435,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           MM_CONFIG.EXPIRATION_TIME,
           false, // match_only
           ACTIVE_ORDERS
-        );
+        ).catch((err) => {
+          console.log("Error amending order: ", err);
+          errorCounter++;
+        });
       }
 
       for (let i = activeOrdersCopy.length; i < numSplits; i++) {
@@ -456,7 +473,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           0,
           false,
           ACTIVE_ORDERS
-        );
+        ).catch((err) => {
+          console.log("Error sending perp order: ", err);
+          errorCounter++;
+        });
       }
     }
 
@@ -479,7 +499,10 @@ function cancelLiquidity(marketId) {
         order.order_side,
         isPerp,
         marketId
-      );
+      ).catch((err) => {
+        console.log("Error canceling order: ", err);
+        errorCounter++;
+      });
     }
   }
 }
@@ -886,7 +909,10 @@ const initPositions = async () => {
         1,
         true,
         ACTIVE_ORDERS
-      );
+      ).catch((err) => {
+        console.log("Error sending perp order: ", err);
+        errorCounter++;
+      });
     }
   }
 };
@@ -917,11 +943,16 @@ async function run() {
 
   // brodcast orders to provide liquidity
   await indicateLiquidity();
-  let interval2 = setInterval(async () => {
-    await indicateLiquidity();
-  }, LIQUIDITY_INDICATION_PERIOD);
+  let interval2 = setInterval(indicateLiquidity, LIQUIDITY_INDICATION_PERIOD);
 
-  // await new Promise((r) => setTimeout(r, REFRESH_PERIOD));
+  let interval3 = setInterval(() => {
+    if (errorCounter > 10) {
+      console.log("Too many errors. Restarting...");
+      process.exit(1);
+    }
+
+    errorCounter = 0;
+  }, 4 * LIQUIDITY_INDICATION_PERIOD);
 
   // clearInterval(interval1);
   // clearInterval(interval2);

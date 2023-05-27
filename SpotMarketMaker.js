@@ -36,6 +36,8 @@ let client;
 const path = require("path");
 const configPath = path.join(__dirname, "config.json");
 
+let errorCounter = 0;
+
 const loadMMConfig = () => {
   // Load MM config
   let MM_CONFIG;
@@ -152,7 +154,10 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
       0.01,
       true,
       ACTIVE_ORDERS
-    );
+    ).catch((err) => {
+      console.log("Error sending fill request: ", err);
+      errorCounter++;
+    });
 
     unfilledAmount -= availableAmount;
   }
@@ -184,7 +189,10 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
         MM_CONFIG.EXPIRATION_TIME,
         true, // match_only
         ACTIVE_ORDERS
-      );
+      ).catch((err) => {
+        console.log("Error amending order: ", err);
+        errorCounter++;
+      });
 
       unfilledAmount -=
         order.spendAmount / 10 ** DECIMALS_PER_ASSET[spendAsset];
@@ -299,7 +307,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           MM_CONFIG.EXPIRATION_TIME,
           false, // match_only
           ACTIVE_ORDERS
-        );
+        ).catch((err) => {
+          console.log("Error amending order: ", err);
+          errorCounter++;
+        });
       }
 
       for (let i = activeOrdersCopy.length; i < buySplits; i++) {
@@ -322,7 +333,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           quoteBalance /
             10 ** DECIMALS_PER_ASSET[quoteAsset] /
             (buySplits - activeOrdersCopy.length)
-        );
+        ).catch((err) => {
+          console.log("Error spliting notes: ", err);
+          errorCounter++;
+        });
         await sendSpotOrder(
           marketMaker,
           "Buy",
@@ -338,7 +352,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           0,
           false,
           ACTIVE_ORDERS
-        );
+        ).catch((err) => {
+          console.log("Error sending fill request: ", err);
+          errorCounter++;
+        });
       }
     }
 
@@ -372,7 +389,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           MM_CONFIG.EXPIRATION_TIME,
           false, // match_only
           ACTIVE_ORDERS
-        );
+        ).catch((err) => {
+          console.log("Error amending order: ", err);
+          errorCounter++;
+        });
       }
 
       for (let i = activeOrdersCopy.length; i < sellSplits; i++) {
@@ -394,7 +414,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           baseBalance /
             10 ** DECIMALS_PER_ASSET[baseAsset] /
             (sellSplits - activeOrdersCopy.length)
-        );
+        ).catch((err) => {
+          console.log("Error spliting notes: ", err);
+          errorCounter++;
+        });
         await sendSpotOrder(
           marketMaker,
           "Sell",
@@ -410,7 +433,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           0,
           false,
           ACTIVE_ORDERS
-        );
+        ).catch((err) => {
+          console.log("Error sending fill request: ", err);
+          errorCounter++;
+        });
 
         // PLACE ORDER
       }
@@ -435,7 +461,10 @@ function cancelLiquidity(marketId) {
         order.order_side,
         isPerp,
         marketId
-      );
+      ).catch((err) => {
+        console.log("Error canceling order: ", err);
+        errorCounter++;
+      });
     }
   }
 }
@@ -831,7 +860,14 @@ async function run() {
     await indicateLiquidity();
   }, LIQUIDITY_INDICATION_PERIOD);
 
-  // await new Promise((r) => setTimeout(r, REFRESH_PERIOD));
+  let interval3 = setInterval(() => {
+    if (errorCounter > 10) {
+      console.log("Too many errors. Restarting...");
+      process.exit(1);
+    }
+
+    errorCounter = 0;
+  }, 4 * LIQUIDITY_INDICATION_PERIOD);
 
   // clearInterval(interval1);
   // clearInterval(interval2);
