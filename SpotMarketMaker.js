@@ -65,6 +65,8 @@ dotenv.config();
 const REFRESH_PERIOD = 3600_000; // 1 hour
 // How often do we send liquidity indications (orders that make the market)
 const LIQUIDITY_INDICATION_PERIOD = 5_000; // 5 seconds
+// Cancel all orders and send new ones
+const REFRESH_ORDERS_PERIOD = 120_000; // 2 minutes
 // How often do we check if any orders can be filled
 const FILL_ORDERS_PERIOD = 1_000; // 5 seconds
 
@@ -448,17 +450,19 @@ async function indicateLiquidity(marketIds = activeMarkets) {
   }
 }
 
-function cancelLiquidity(marketId) {
+async function cancelLiquidity(marketId) {
   activeOrdersMidPrice[marketId] = null;
 
   let baseAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
 
   for (order of marketMaker.orders) {
-    if (order.base_asset == baseAsset) {
-      sendCancelOrder(
+    if (order.token_spent == baseAsset || order.token_received == baseAsset) {
+      let isBuyOrder = order.token_received == baseAsset;
+
+      await sendCancelOrder(
         marketMaker,
         order.order_id,
-        order.order_side,
+        isBuyOrder,
         isPerp,
         marketId
       ).catch((err) => {
@@ -805,7 +809,7 @@ const initAccountState = async () => {
       if (!mmConfig || !mmConfig.active) continue;
 
       if (marketMaker) {
-        cancelLiquidity(marketId);
+        await cancelLiquidity(marketId);
       }
     }
 
@@ -837,15 +841,6 @@ async function run() {
   // Check for fillable orders
   let interval1 = setInterval(fillOpenOrders, FILL_ORDERS_PERIOD);
 
-  // console.log(
-  //   "note indexes usdc: ",
-  //   marketMaker.noteData[55555].map((n) => n.index)
-  // );
-  // console.log(
-  //   "note indexes eth: ",
-  //   marketMaker.noteData[54321].map((n) => n.index)
-  // );
-
   console.log(
     "Starting market making: ",
     marketMaker.getAvailableAmount(55555),
@@ -856,9 +851,11 @@ async function run() {
 
   // brodcast orders to provide liquidity
   await indicateLiquidity();
-  let interval2 = setInterval(async () => {
-    await indicateLiquidity();
-  }, LIQUIDITY_INDICATION_PERIOD);
+
+  let interval2 = setInterval(indicateLiquidity, LIQUIDITY_INDICATION_PERIOD);
+  setInterval(async () => {
+    await refreshOrders(interval2);
+  }, REFRESH_ORDERS_PERIOD);
 
   let interval3 = setInterval(() => {
     if (errorCounter > 10) {
@@ -900,3 +897,23 @@ main();
 //
 //
 //
+
+const refreshOrders = async (interval) => {
+  clearInterval(interval);
+
+  // cancel open orders
+  for (let marketId of Object.values(SPOT_MARKET_IDS)) {
+    const mmConfig = MM_CONFIG.pairs[marketId];
+
+    if (!mmConfig || !mmConfig.active) continue;
+
+    if (marketMaker) {
+      console.log("REFRESHING ORDERS...");
+      await cancelLiquidity(marketId);
+    }
+  }
+
+  ACTIVE_ORDERS = {};
+
+  interval = setInterval(indicateLiquidity, LIQUIDITY_INDICATION_PERIOD);
+};

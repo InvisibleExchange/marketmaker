@@ -68,6 +68,8 @@ dotenv.config();
 const REFRESH_PERIOD = 3600_000; // 1 hour
 // How often do we send liquidity indications (orders that make the market)
 const LIQUIDITY_INDICATION_PERIOD = 5_000; // 5 seconds
+// Cancel all orders and send new ones
+const REFRESH_ORDERS_PERIOD = 120_000; // 2 minutes
 // How often do we check if any orders can be filled
 const FILL_ORDERS_PERIOD = 1_000; // 5 seconds
 
@@ -486,14 +488,14 @@ async function indicateLiquidity(marketIds = activeMarkets) {
   }
 }
 
-function cancelLiquidity(marketId) {
+async function cancelLiquidity(marketId) {
   activeOrdersMidPrice[marketId] = null;
 
   let syntheticAsset = PERP_MARKET_IDS_2_TOKENS[marketId];
 
   for (order of marketMaker.perpetualOrders) {
     if (order.synthetic_token == syntheticAsset) {
-      sendCancelOrder(
+      await sendCancelOrder(
         marketMaker,
         order.order_id,
         order.order_side,
@@ -848,7 +850,7 @@ const initAccountState = async () => {
       if (!mmConfig || !mmConfig.active) continue;
 
       if (marketMaker) {
-        cancelLiquidity(marketId);
+        await cancelLiquidity(marketId);
       }
     }
 
@@ -943,9 +945,13 @@ async function run() {
 
   // brodcast orders to provide liquidity
   await indicateLiquidity();
-  let interval2 = setInterval(indicateLiquidity, LIQUIDITY_INDICATION_PERIOD);
 
-  let interval3 = setInterval(() => {
+  let interval2 = setInterval(indicateLiquidity, LIQUIDITY_INDICATION_PERIOD);
+  setInterval(async () => {
+    await refreshOrders(interval2);
+  }, REFRESH_ORDERS_PERIOD);
+
+  setInterval(() => {
     if (errorCounter > 10) {
       console.log("Too many errors. Restarting...");
       process.exit(1);
@@ -985,3 +991,22 @@ main();
 //
 //
 //
+
+const refreshOrders = async (interval) => {
+  clearInterval(interval);
+
+  // cancel open orders
+  for (let marketId of Object.values(PERP_MARKET_IDS)) {
+    const mmConfig = MM_CONFIG.pairs[marketId];
+    if (!mmConfig || !mmConfig.active) continue;
+
+    if (marketMaker) {
+      console.log("REFRESHING ORDERS...");
+      await cancelLiquidity(marketId);
+    }
+  }
+
+  ACTIVE_ORDERS = {};
+
+  interval = setInterval(indicateLiquidity, LIQUIDITY_INDICATION_PERIOD);
+};

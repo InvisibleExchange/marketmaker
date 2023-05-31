@@ -148,7 +148,7 @@ async function sendSpotOrder(
       let order_response = res.data.response;
 
       if (order_response.successful) {
-        console.log("Order successfull: ", order_response.order_id);
+        // console.log("Order successfull: ", order_response.order_id);
 
         await storeOrderId(
           user.userId,
@@ -344,7 +344,7 @@ async function sendPerpOrder(
       let order_response = res.data.response;
 
       if (order_response.successful) {
-        console.log("Order successfull: ", order_response.order_id);
+        // console.log("Order successfull: ", order_response.order_id);
 
         storeOrderId(
           user.userId,
@@ -543,9 +543,9 @@ async function sendCancelOrder(user, orderId, orderSide, isPerp, marketId) {
     throw new Error("Invalid parameters");
   }
 
-  if (orderSide === 1 || orderSide === false) {
+  if (orderSide === 1 || orderSide === false || orderSide == "Short") {
     orderSide = false;
-  } else if (orderSide === 0 || orderSide === true) {
+  } else if (orderSide === 0 || orderSide === true || orderSide == "Long") {
     orderSide = true;
   } else {
     throw new Error("Invalid order side");
@@ -559,7 +559,7 @@ async function sendCancelOrder(user, orderId, orderSide, isPerp, marketId) {
     is_perp: isPerp,
   };
 
-  axios
+  await axios
     .post(`${EXPRESS_APP_URL}/cancel_order`, cancelReq)
     .then((response) => {
       let order_response = response.data.response;
