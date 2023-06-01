@@ -948,7 +948,7 @@ async function run() {
 
   let interval2 = setInterval(indicateLiquidity, LIQUIDITY_INDICATION_PERIOD);
   setInterval(async () => {
-    await refreshOrders(interval2);
+    interval2 = await refreshOrders(interval2);
   }, REFRESH_ORDERS_PERIOD);
 
   setInterval(() => {
@@ -1008,5 +1008,9 @@ const refreshOrders = async (interval) => {
 
   ACTIVE_ORDERS = {};
 
+  // brodcast orders to provide liquidity
+  await indicateLiquidity();
   interval = setInterval(indicateLiquidity, LIQUIDITY_INDICATION_PERIOD);
+
+  return interval;
 };
