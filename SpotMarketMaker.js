@@ -66,7 +66,7 @@ const REFRESH_PERIOD = 3600_000; // 1 hour
 // How often do we send liquidity indications (orders that make the market)
 const LIQUIDITY_INDICATION_PERIOD = 5_000; // 5 seconds
 // Cancel all orders and send new ones
-const REFRESH_ORDERS_PERIOD = 120_000; // 2 minutes
+const REFRESH_ORDERS_PERIOD = 123_000; // 2 minutes
 // How often do we check if any orders can be filled
 const FILL_ORDERS_PERIOD = 1_000; // 5 seconds
 
@@ -856,37 +856,41 @@ async function run() {
     interval2 = await refreshOrders(interval2);
   }, REFRESH_ORDERS_PERIOD);
 
-  let interval3 = setInterval(() => {
+  setInterval(() => {
     if (errorCounter > 10) {
-      console.log("Too many errors. Restarting...");
-      process.exit(1);
+      clearInterval(interval1);
+      clearInterval(interval2);
+      throw new Error("Too many errors. Restarting...");
     }
 
     errorCounter = 0;
   }, 4 * LIQUIDITY_INDICATION_PERIOD);
-
-  // clearInterval(interval1);
-  // clearInterval(interval2);
 }
 
 let restartCount = 0;
 async function main() {
+  setInterval(() => {
+    restartCount = 0;
+  }, 3600_000); // 1 hour
+
+  await safeRun();
+}
+
+async function safeRun() {
   try {
     await run();
   } catch (error) {
-    if (restartCount > 3) {
+    restartCount++;
+    console.log("Error: ", error.message);
+
+    if (restartCount >= 5) {
       console.log("Too many restarts. Exiting...");
+      // TODO: Maybe send a notification to the user that the bot is down
       process.exit(1);
     }
 
-    console.log("error", error);
-    restartCount++;
-    await run();
+    await safeRun();
   }
-
-  setTimeout(() => {
-    restartCount = 0;
-  }, 360_0000); // 1 hour
 }
 
 main();
