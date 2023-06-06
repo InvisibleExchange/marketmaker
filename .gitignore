@@ -8,3 +8,6 @@ engine.proto
 
 src/helpers/firebase
 !src/helpers/firebase/firebaseConnection.js
+
+
+tests

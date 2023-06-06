@@ -919,6 +919,8 @@ async function sendSplitOrder(user, token, newAmount) {
       if (split_response.successful) {
         let zero_idxs = split_response.zero_idxs;
 
+        console.log("note split successfully");
+
         handleNoteSplit(user, zero_idxs, notesIn, [newNote, refundNote]);
       } else {
         let msg =
