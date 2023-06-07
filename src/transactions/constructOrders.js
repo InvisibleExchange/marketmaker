@@ -136,8 +136,6 @@ async function sendSpotOrder(
     feeLimit
   );
 
-  console.log(limitOrder.notes_in[0].index);
-
   let orderJson = limitOrder.toGrpcObject();
   orderJson.user_id = trimHash(user.userId, 64).toString();
   orderJson.is_market = isMarket;
@@ -150,7 +148,6 @@ async function sendSpotOrder(
       let order_response = res.data.response;
 
       if (order_response.successful) {
-        // console.log("Order successfull: ", order_response.order_id);
 
         await storeOrderId(
           user.userId,
@@ -363,17 +360,17 @@ async function sendPerpOrder(
           ? user.filledAmounts[order_response.order_id]
           : 0;
 
-        let notesIn =
-          orderJson.position_effect_type == 0
-            ? perpOrder.open_order_fields.notes_in
-            : [];
-        if (notesIn.length > 0) {
-          for (let note of notesIn) {
-            user.noteData[note.token] = user.noteData[note.token].filter(
-              (n) => n.index != note.index
-            );
-          }
-        }
+        // let notesIn =
+        //   orderJson.position_effect_type == 0
+        //     ? perpOrder.open_order_fields.notes_in
+        //     : [];
+        // if (notesIn.length > 0) {
+        //   for (let note of notesIn) {
+        //     user.noteData[note.token] = user.noteData[note.token].filter(
+        //       (n) => n.index != note.index
+        //     );
+        //   }
+        // }
 
         // ? Add the refund note
 
