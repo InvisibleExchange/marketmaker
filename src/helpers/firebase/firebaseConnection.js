@@ -12,7 +12,7 @@ const {
   query,
   orderBy,
   limit,
-} = require("firebase/firestore");
+} = require("firebase/firestore/lite");
 const bigInt = require("big-integer");
 
 const { Note, trimHash } = require("../../users/Notes.js");

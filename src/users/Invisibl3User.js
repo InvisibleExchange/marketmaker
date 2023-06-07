@@ -853,6 +853,10 @@ module.exports = class User {
     if (!this.noteData[token]) throw new Error("Insufficient funds");
     let noteIn = this.noteData[token].find((n) => n.amount == spendAmount);
     if (noteIn) {
+      this.noteData[token] = this.noteData[token].filter(
+        (n) => n.index != noteIn.index
+      );
+
       const privKey = this.notePrivKeys[BigInt(noteIn.address.getX())];
       return { notesIn: [{ privKey, note: noteIn }], refundAmount: 0 };
     }
@@ -861,7 +865,7 @@ module.exports = class User {
     notes = notes.sort((a, b) => a.amount - b.amount);
 
     for (let i = 0; i < notes.length; i++) {
-      const note = notes[i];
+      const note = notes.pop();
       const privKey = this.notePrivKeys[BigInt(note.address.getX())];
 
       amount += note.amount;
@@ -870,6 +874,8 @@ module.exports = class User {
       // ? Get the refund note
       if (amount >= spendAmount) {
         let refundAmount = amount - Number.parseInt(spendAmount);
+
+        this.noteData[token] = notes;
 
         return { notesIn, refundAmount };
       }

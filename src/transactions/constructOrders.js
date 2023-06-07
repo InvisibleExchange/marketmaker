@@ -136,6 +136,8 @@ async function sendSpotOrder(
     feeLimit
   );
 
+  console.log(limitOrder.notes_in[0].index);
+
   let orderJson = limitOrder.toGrpcObject();
   orderJson.user_id = trimHash(user.userId, 64).toString();
   orderJson.is_market = isMarket;
@@ -165,13 +167,13 @@ async function sendSpotOrder(
           ? user.filledAmounts[order_response.order_id]
           : 0;
 
-        if (limitOrder.notes_in.length > 0) {
-          for (let note of limitOrder.notes_in) {
-            user.noteData[note.token] = user.noteData[note.token].filter(
-              (n) => n.index != note.index
-            );
-          }
-        }
+        // if (limitOrder.notes_in.length > 0) {
+        //   for (let note of limitOrder.notes_in) {
+        //     user.noteData[note.token] = user.noteData[note.token].filter(
+        //       (n) => n.index != note.index
+        //     );
+        //   }
+        // }
 
         // ? Add the refund note
         if (limitOrder.refund_note) {
@@ -835,6 +837,9 @@ async function sendDeposit(user, depositId, amount, token, pubKey) {
 
       if (deposit_response.successful) {
         let zero_idxs = deposit_response.zero_idxs;
+
+        console.log("zero_idxs: ", zero_idxs);
+
         for (let i = 0; i < zero_idxs.length; i++) {
           const idx = zero_idxs[i];
           let note = deposit.notes[i];
