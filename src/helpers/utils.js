@@ -455,11 +455,11 @@ function handlePerpSwapResult(
 function handleNoteSplit(user, zero_idxs, notesIn, notesOut) {
   //
 
-  for (const noteIn of notesIn) {
-    user.noteData[noteIn.token] = user.noteData[noteIn.token].filter(
-      (n) => n.index != noteIn.index
-    );
-  }
+  // for (const noteIn of notesIn) {
+  //   user.noteData[noteIn.token] = user.noteData[noteIn.token].filter(
+  //     (n) => n.index != noteIn.index
+  //   );
+  // }
 
   for (let i = 0; i < zero_idxs.length; i++) {
     let note = notesOut[i];

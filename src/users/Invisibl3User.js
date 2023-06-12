@@ -720,7 +720,8 @@ module.exports = class User {
 
     let { notesIn, refundAmount } = this.getNotesInAndRefundAmount(
       token,
-      newAmount
+      newAmount,
+      true
     );
 
     if (!refundAmount || refundAmount <= 0) return null;
@@ -845,14 +846,23 @@ module.exports = class User {
     return { KoR, koR, ytR };
   }
 
-  getNotesInAndRefundAmount(token, spendAmount) {
+  getNotesInAndRefundAmount(token, spendAmount, isNoteSplit) {
     // ? Get the notes in and refund note
     let notesIn = [];
     let amount = 0;
 
     if (!this.noteData[token]) throw new Error("Insufficient funds");
-    let noteIn = this.noteData[token].find((n) => n.amount == spendAmount);
+
+    let noteIn = this.noteData[token].find(
+      (n) =>
+        n.amount >= spendAmount &&
+        n.amount - spendAmount < DUST_AMOUNT_PER_ASSET[token]
+    );
     if (noteIn) {
+      if (isNoteSplit) {
+        return { notesIn: null, refundAmount: 0 };
+      }
+
       this.noteData[token] = this.noteData[token].filter(
         (n) => n.index != noteIn.index
       );
@@ -864,7 +874,8 @@ module.exports = class User {
     let notes = [...this.noteData[token]];
     notes = notes.sort((a, b) => a.amount - b.amount);
 
-    for (let i = 0; i < notes.length; i++) {
+    let l = notes.length;
+    for (let i = 0; i < l; i++) {
       const note = notes.pop();
       const privKey = this.notePrivKeys[BigInt(note.address.getX())];
 

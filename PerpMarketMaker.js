@@ -387,7 +387,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
               (mmConfig.slippageRate * maxSize * i) / numSplits) -
           extraTestSpread;
 
-        await sendPerpOrder(
+        sendPerpOrder(
           marketMaker,
           "Long",
           MM_CONFIG.EXPIRATION_TIME,
@@ -461,7 +461,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
               (mmConfig.slippageRate * maxSize * i) / numSplits) +
           extraTestSpread;
 
-        await sendPerpOrder(
+        sendPerpOrder(
           marketMaker,
           "Short",
           MM_CONFIG.EXPIRATION_TIME,
@@ -502,7 +502,7 @@ async function cancelLiquidity(marketId) {
         isPerp,
         marketId
       ).catch((err) => {
-        console.log("Error canceling order: ", err);
+        // console.log("Error canceling order: ", err);
         errorCounter++;
       });
     }
@@ -892,7 +892,7 @@ const initPositions = async () => {
       let margin =
         marketMaker.getAvailableAmount(COLLATERAL_TOKEN) / activeMarkets.length;
 
-      if (margin < DUST_AMOUNT_PER_ASSET[syntheticAsset] * 1.1) continue;
+      if (margin < DUST_AMOUNT_PER_ASSET[syntheticAsset]) continue;
 
       margin = margin / 10 ** COLLATERAL_TOKEN_DECIMALS;
 
@@ -903,7 +903,7 @@ const initPositions = async () => {
         "Open",
         null,
         syntheticAsset,
-        (DUST_AMOUNT_PER_ASSET[syntheticAsset] * 1.1) /
+        (DUST_AMOUNT_PER_ASSET[syntheticAsset] * 5) /
           10 ** DECIMALS_PER_ASSET[syntheticAsset],
         midPrice,
         margin,

@@ -339,7 +339,8 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           console.log("Error spliting notes: ", err);
           errorCounter++;
         });
-        await sendSpotOrder(
+
+        sendSpotOrder(
           marketMaker,
           "Buy",
           MM_CONFIG.EXPIRATION_TIME,
@@ -420,7 +421,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           console.log("Error spliting notes: ", err);
           errorCounter++;
         });
-        await sendSpotOrder(
+        sendSpotOrder(
           marketMaker,
           "Sell",
           MM_CONFIG.EXPIRATION_TIME,
@@ -466,7 +467,7 @@ async function cancelLiquidity(marketId) {
         isPerp,
         marketId
       ).catch((err) => {
-        console.log("Error canceling order: ", err);
+        // console.log("Error canceling order: ", err);
         errorCounter++;
       });
     }

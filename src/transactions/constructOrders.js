@@ -148,7 +148,6 @@ async function sendSpotOrder(
       let order_response = res.data.response;
 
       if (order_response.successful) {
-
         await storeOrderId(
           user.userId,
           order_response.order_id,
@@ -835,8 +834,6 @@ async function sendDeposit(user, depositId, amount, token, pubKey) {
       if (deposit_response.successful) {
         let zero_idxs = deposit_response.zero_idxs;
 
-        console.log("zero_idxs: ", zero_idxs);
-
         for (let i = 0; i < zero_idxs.length; i++) {
           const idx = zero_idxs[i];
           let note = deposit.notes[i];
@@ -909,27 +906,22 @@ async function sendSplitOrder(user, token, newAmount) {
 
   let notes_in = notesIn.map((n) => n.toGrpcObject());
 
-  await axios
-    .post(`${EXPRESS_APP_URL}/split_notes`, {
-      notes_in,
-      note_out: newNote.toGrpcObject(),
-      refund_note: refundNote.toGrpcObject(),
-    })
-    .then((res) => {
-      let split_response = res.data.response;
+  res = await axios.post(`${EXPRESS_APP_URL}/split_notes`, {
+    notes_in,
+    note_out: newNote.toGrpcObject(),
+    refund_note: refundNote.toGrpcObject(),
+  });
 
-      if (split_response.successful) {
-        let zero_idxs = split_response.zero_idxs;
+  let split_response = res.data.response;
 
-        console.log("note split successfully");
+  if (split_response.successful) {
+    let zero_idxs = split_response.zero_idxs;
 
-        handleNoteSplit(user, zero_idxs, notesIn, [newNote, refundNote]);
-      } else {
-        let msg =
-          "Note split failed with error: \n" + split_response.error_message;
-        console.log(msg);
-      }
-    });
+    handleNoteSplit(user, zero_idxs, notesIn, [newNote, refundNote]);
+  } else {
+    let msg = "Note split failed with error: \n" + split_response.error_message;
+    console.log(msg);
+  }
 }
 
 // * ======================================================================

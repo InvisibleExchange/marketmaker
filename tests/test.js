@@ -38,16 +38,16 @@ async function sendLimitOrders() {
   let usdcAmount = 1000;
   let price = usdcAmount / ethAmount;
 
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 10; i++) {
     await sendDeposit(marketMaker, 123, ethAmount, 54321, 123456789);
     await sendDeposit(marketMaker, 234, usdcAmount, 55555, 123456789);
   }
 
   // ? Send buy orders ==============================================
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 10; i++) {
     // await sendSplitOrder(marketMaker, 55555, amount);
 
-    sendSpotOrder(
+    await sendSpotOrder(
       marketMaker,
       "Buy",
       1000,
@@ -64,10 +64,10 @@ async function sendLimitOrders() {
   }
 
   // ? Send sell orders =============================================
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 10; i++) {
     // await sendSplitOrder(marketMaker, 54321, amount);
 
-    sendSpotOrder(
+    await sendSpotOrder(
       marketMaker,
       "Sell",
       1000,
@@ -84,6 +84,7 @@ async function sendLimitOrders() {
   }
 }
 
+const { getKeyPair, sign } = require("starknet").ec;
 async function main() {
   // await deposit();
 
