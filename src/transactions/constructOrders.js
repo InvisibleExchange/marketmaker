@@ -1030,11 +1030,11 @@ async function sendChangeMargin(
             let hash = computeHashOnElements([
               pos.order_side == "Long"
                 ? pos.allow_partial_liquidations
-                  ? 1
-                  : 0
+                  ? 3
+                  : 2
                 : pos.allow_partial_liquidations
-                ? 2
-                : 3,
+                ? 1
+                : 0,
               pos.synthetic_token,
               pos.position_size,
               pos.entry_price,

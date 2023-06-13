@@ -466,10 +466,7 @@ async function cancelLiquidity(marketId) {
         isBuyOrder,
         isPerp,
         marketId
-      ).catch((err) => {
-        // console.log("Error canceling order: ", err);
-        errorCounter++;
-      });
+      ).catch((_) => {});
     }
   }
 }
@@ -912,7 +909,6 @@ const refreshOrders = async (interval) => {
     if (!mmConfig || !mmConfig.active) continue;
 
     if (marketMaker) {
-      console.log("REFRESHING ORDERS...");
       await cancelLiquidity(marketId);
     }
   }
