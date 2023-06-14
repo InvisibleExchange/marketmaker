@@ -627,11 +627,10 @@ async function sendCancelOrder(user, orderId, orderSide, isPerp, marketId) {
           }
         }
       } else {
-        console.log("error canceling order: ", order_response.error_message);
       }
     })
     .catch((err) => {
-      console.log("Error submitting cancel order: ", err);
+      // console.log("Error submitting cancel order: ", err);
     });
 }
 
@@ -799,9 +798,9 @@ async function sendAmendOrder(
           }
         }
       } else {
-        let msg =
-          "Amend order failed with error: \n" + order_response.error_message;
-        console.log(msg);
+        // let msg =
+        //   "Amend order failed with error: \n" + order_response.error_message;
+        // console.log(msg);
 
         ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
           marketId.toString() + order_side
@@ -809,7 +808,7 @@ async function sendAmendOrder(
       }
     })
     .catch((err) => {
-      console.log("Error submitting amend order: ", err);
+      // console.log("Error submitting amend order: ", err);
     });
 }
 
