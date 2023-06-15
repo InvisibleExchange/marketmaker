@@ -10,3 +10,8 @@ src/helpers/firebase
 !src/helpers/firebase/firebaseConnection.js
 
 
+
+mm-btc-usd/perp_config.json
+mm-btc-usd/config.json
+mm-eth-usd/perp_config.json
+mm-eth-usd/config.json

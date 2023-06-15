@@ -123,6 +123,8 @@ async function sendSpotOrder(
   feeLimit = Number.parseInt(((feeLimit * receiveAmount) / 100).toString());
 
   if (spendAmount > user.getAvailableAmount(spendToken)) {
+    console.log(spendAmount, user.getAvailableAmount(spendToken));
+
     console.log("Insufficient balance");
     throw new Error("Insufficient balance");
   }
@@ -352,27 +354,12 @@ async function sendPerpOrder(
           user.privateSeed
         );
 
-        // {order_id,expiration_timestamp,qty_left,price,synthetic_token,order_side,position_effect_type,fee_limit,position_address,notes_in,refund_note,initial_margin}
-
         // If this is a taker order it might have been filled fully/partially before the response was received (here)
         let filledAmount = user.filledAmounts[order_response.order_id]
           ? user.filledAmounts[order_response.order_id]
           : 0;
 
-        // let notesIn =
-        //   orderJson.position_effect_type == 0
-        //     ? perpOrder.open_order_fields.notes_in
-        //     : [];
-        // if (notesIn.length > 0) {
-        //   for (let note of notesIn) {
-        //     user.noteData[note.token] = user.noteData[note.token].filter(
-        //       (n) => n.index != note.index
-        //     );
-        //   }
-        // }
-
         // ? Add the refund note
-
         let refundNote =
           orderJson.position_effect_type == 0 &&
           perpOrder.open_order_fields.refund_note
@@ -518,7 +505,7 @@ async function sendLiquidationOrder(
         }
       } else {
         let msg =
-          "Failed to submit order with error: \n" +
+          "Failed to submit liquidation order with error: \n" +
           order_response.error_message;
         console.log(msg);
         throw new Error(msg);
@@ -536,7 +523,14 @@ async function sendLiquidationOrder(
  * @param isPerp
  * @param marketId market id of the order
  */
-async function sendCancelOrder(user, orderId, orderSide, isPerp, marketId) {
+async function sendCancelOrder(
+  user,
+  orderId,
+  orderSide,
+  isPerp,
+  marketId,
+  errorCounter
+) {
   if (!(isPerp === true || isPerp === false) || !marketId || !orderId) {
     throw new Error("Invalid parameters");
   }
@@ -627,6 +621,11 @@ async function sendCancelOrder(user, orderId, orderSide, isPerp, marketId) {
           }
         }
       } else {
+        let msg =
+          "Failed to cancel order with error: \n" +
+          order_response.error_message;
+
+        errorCounter++;
       }
     })
     .catch((err) => {
@@ -658,7 +657,8 @@ async function sendAmendOrder(
   newPrice,
   newExpirationTime,
   match_only,
-  ACTIVE_ORDERS
+  ACTIVE_ORDERS,
+  errorCounter
 ) {
   let ts = new Date().getTime() / 1000; // number of seconds since epoch
   let expirationTimestamp = Number.parseInt(ts.toString()) + newExpirationTime;
@@ -774,42 +774,39 @@ async function sendAmendOrder(
 
   // console.log("amendReq: ", orderId, newPrice);
 
-  axios
-    .post(`${EXPRESS_APP_URL}/amend_order`, amendReq)
-    .then((res) => {
-      let order_response = res.data.response;
+  return axios.post(`${EXPRESS_APP_URL}/amend_order`, amendReq).then((res) => {
+    let order_response = res.data.response;
 
-      if (order_response.successful) {
-        if (isPerp) {
-          for (let i = 0; i < user.perpetualOrders.length; i++) {
-            let ord = user.perpetualOrders[i];
+    if (order_response.successful) {
+      if (isPerp) {
+        for (let i = 0; i < user.perpetualOrders.length; i++) {
+          let ord = user.perpetualOrders[i];
 
-            if (ord.order_id == orderId.toString()) {
-              user.perpetualOrders[i] = order;
-            }
-          }
-        } else {
-          for (let i = 0; i < user.orders.length; i++) {
-            let ord = user.orders[i];
-
-            if (ord.order_id == orderId.toString()) {
-              user.orders[i] = order;
-            }
+          if (ord.order_id == orderId.toString()) {
+            user.perpetualOrders[i] = order;
           }
         }
       } else {
-        // let msg =
-        //   "Amend order failed with error: \n" + order_response.error_message;
-        // console.log(msg);
+        for (let i = 0; i < user.orders.length; i++) {
+          let ord = user.orders[i];
 
-        ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
-          marketId.toString() + order_side
-        ].filter((o) => o.id != orderId);
+          if (ord.order_id == orderId.toString()) {
+            user.orders[i] = order;
+          }
+        }
       }
-    })
-    .catch((err) => {
-      // console.log("Error submitting amend order: ", err);
-    });
+    } else {
+      let msg =
+        "Amend order failed with error: \n" + order_response.error_message;
+      // console.log(msg);
+
+      ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
+        marketId.toString() + order_side
+      ].filter((o) => o.id != orderId);
+
+      errorCounter++;
+    }
+  });
 }
 
 // * =====================================================================================================================================
@@ -884,6 +881,7 @@ async function sendWithdrawal(user, amount, token, starkKey) {
           "Withdrawal failed with error: \n" +
           withdrawal_response.error_message;
         console.log(msg);
+        throw new Error(msg);
       }
     });
 }
@@ -920,6 +918,7 @@ async function sendSplitOrder(user, token, newAmount) {
   } else {
     let msg = "Note split failed with error: \n" + split_response.error_message;
     console.log(msg);
+    throw new Error(msg);
   }
 }
 
@@ -1054,6 +1053,7 @@ async function sendChangeMargin(
           "Failed to submit order with error: \n" +
           marginChangeResponse.error_message;
         console.log(msg);
+        throw new Error(msg);
       }
     });
 }

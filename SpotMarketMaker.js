@@ -1,5 +1,5 @@
 const User = require("./src/users/Invisibl3User");
-const fs = require("fs");
+
 const dotenv = require("dotenv");
 dotenv.config();
 
@@ -33,30 +33,8 @@ const { trimHash } = require("./src/users/Notes");
 let W3CWebSocket = require("websocket").w3cwebsocket;
 let client;
 
-const path = require("path");
-const configPath = path.join(__dirname, "config.json");
-
 let errorCounter = 0;
 
-const loadMMConfig = () => {
-  // Load MM config
-  let MM_CONFIG;
-  if (process.env.MM_CONFIG) {
-    MM_CONFIG = JSON.parse(process.env.MM_CONFIG);
-  } else {
-    const mmConfigFile = fs.readFileSync(configPath, "utf8");
-    MM_CONFIG = JSON.parse(mmConfigFile);
-  }
-
-  let activeMarkets = [];
-  for (let marketId of Object.keys(MM_CONFIG.pairs)) {
-    if (MM_CONFIG.pairs[marketId].active) {
-      activeMarkets.push(marketId);
-    }
-  }
-
-  return { MM_CONFIG, activeMarkets };
-};
 let MM_CONFIG, activeMarkets;
 
 dotenv.config();
@@ -190,7 +168,8 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
           : otherOrder.price * (1 - 0.0001),
         MM_CONFIG.EXPIRATION_TIME,
         true, // match_only
-        ACTIVE_ORDERS
+        ACTIVE_ORDERS,
+        errorCounter
       ).catch((err) => {
         console.log("Error amending order: ", err);
         errorCounter++;
@@ -329,16 +308,22 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           extraTestSpread;
 
         // PLACE ORDER
-        await sendSplitOrder(
-          marketMaker,
-          quoteAsset,
-          quoteBalance /
-            10 ** DECIMALS_PER_ASSET[quoteAsset] /
-            (buySplits - activeOrdersCopy.length)
-        ).catch((err) => {
-          console.log("Error spliting notes: ", err);
+        try {
+          await sendSplitOrder(
+            marketMaker,
+            quoteAsset,
+            quoteBalance /
+              10 ** DECIMALS_PER_ASSET[quoteAsset] /
+              (buySplits - activeOrdersCopy.length)
+          );
+        } catch (error) {
+          console.log(
+            "Error spliting notes: ",
+            // error,
+            "\n=============================================="
+          );
           errorCounter++;
-        });
+        }
 
         sendSpotOrder(
           marketMaker,
@@ -391,11 +376,9 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           sellPrice,
           MM_CONFIG.EXPIRATION_TIME,
           false, // match_only
-          ACTIVE_ORDERS
-        ).catch((err) => {
-          console.log("Error amending order: ", err);
-          errorCounter++;
-        });
+          ACTIVE_ORDERS,
+          errorCounter
+        );
       }
 
       for (let i = activeOrdersCopy.length; i < sellSplits; i++) {
@@ -411,16 +394,23 @@ async function indicateLiquidity(marketIds = activeMarkets) {
               (mmConfig.slippageRate * maxSellSize * i) / sellSplits) +
           extraTestSpread;
 
-        await sendSplitOrder(
-          marketMaker,
-          baseAsset,
-          baseBalance /
-            10 ** DECIMALS_PER_ASSET[baseAsset] /
-            (sellSplits - activeOrdersCopy.length)
-        ).catch((err) => {
-          console.log("Error spliting notes: ", err);
+        try {
+          await sendSplitOrder(
+            marketMaker,
+            baseAsset,
+            baseBalance /
+              10 ** DECIMALS_PER_ASSET[baseAsset] /
+              (sellSplits - activeOrdersCopy.length)
+          );
+        } catch (error) {
+          console.log(
+            "Error spliting notes: ",
+            // error,
+            "\n=============================================="
+          );
           errorCounter++;
-        });
+        }
+
         sendSpotOrder(
           marketMaker,
           "Sell",
@@ -465,7 +455,8 @@ async function cancelLiquidity(marketId) {
         order.order_id,
         isBuyOrder,
         isPerp,
-        marketId
+        marketId,
+        errorCounter
       ).catch((_) => {});
     }
   }
@@ -820,8 +811,7 @@ const initAccountState = async () => {
 
 // * MAIN ====================================================================================================================
 
-async function run() {
-  let config = loadMMConfig();
+async function run(config) {
   MM_CONFIG = config.MM_CONFIG;
   activeMarkets = config.activeMarkets;
 
@@ -844,7 +834,9 @@ async function run() {
     marketMaker.getAvailableAmount(55555),
     "USDC",
     marketMaker.getAvailableAmount(54321),
-    "ETH"
+    "ETH",
+    marketMaker.getAvailableAmount(12345),
+    "BTC"
   );
 
   // brodcast orders to provide liquidity
@@ -866,17 +858,17 @@ async function run() {
 }
 
 let restartCount = 0;
-async function main() {
+module.exports = async function runMarketmaker(config) {
   setInterval(() => {
     restartCount = 0;
   }, 3600_000); // 1 hour
 
-  await safeRun();
-}
+  await safeRun(config);
+};
 
-async function safeRun() {
+async function safeRun(config) {
   try {
-    await run();
+    await run(config);
   } catch (error) {
     restartCount++;
     console.log("Error: ", error.message);
@@ -887,11 +879,9 @@ async function safeRun() {
       process.exit(1);
     }
 
-    await safeRun();
+    await safeRun(config);
   }
 }
-
-main();
 
 //
 //

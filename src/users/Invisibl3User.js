@@ -581,6 +581,7 @@ module.exports = class User {
     amount_received,
     fee_limit
   ) {
+
     // ? Get the notesIn and priv keys for these notes
     let { notesIn, refundAmount } = this.getNotesInAndRefundAmount(
       token_spent,
@@ -724,7 +725,8 @@ module.exports = class User {
       true
     );
 
-    if (!refundAmount || refundAmount <= 0) return null;
+    if (!refundAmount || refundAmount < DUST_AMOUNT_PER_ASSET[token])
+      return null;
 
     let address0 = notesIn[0].note.address;
     let blinding0 = notesIn[0].note.blinding;
@@ -858,6 +860,7 @@ module.exports = class User {
         n.amount >= spendAmount &&
         n.amount - spendAmount < DUST_AMOUNT_PER_ASSET[token]
     );
+
     if (noteIn) {
       if (isNoteSplit) {
         return { notesIn: null, refundAmount: 0 };
@@ -887,6 +890,15 @@ module.exports = class User {
         let refundAmount = amount - Number.parseInt(spendAmount);
 
         this.noteData[token] = notes;
+
+        if (isNoteSplit && refundAmount < DUST_AMOUNT_PER_ASSET[token]) {
+          // ? Cancel the operation and reinsert the notes
+          for (let { note } of notesIn) {
+            this.noteData[token].push(note);
+          }
+
+          return { notesIn: null, refundAmount: 0 };
+        }
 
         return { notesIn, refundAmount };
       }

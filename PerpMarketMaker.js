@@ -190,7 +190,7 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
     addableValue * getPrice(syntheticAsset) >= 10 &&
     unfilledUsdAmount >= 10
   ) {
-    await sendPerpOrder(
+    sendPerpOrder(
       marketMaker,
       otherSide == "s" ? "Long" : "Short",
       MM_CONFIG.EXPIRATION_TIME,
@@ -239,9 +239,10 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
           : otherOrder.price * (1 - 0.0001),
         MM_CONFIG.EXPIRATION_TIME,
         true, // match_only
-        ACTIVE_ORDERS
+        ACTIVE_ORDERS,
+        errorCounter
       ).catch((err) => {
-        console.log("Error amending order: ", err);
+        // console.log("Error amending order: ", err);
         errorCounter++;
       });
 
@@ -362,9 +363,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           buyPrice,
           MM_CONFIG.EXPIRATION_TIME,
           false, // match_only
-          ACTIVE_ORDERS
+          ACTIVE_ORDERS,
+          errorCounter
         ).catch((err) => {
-          console.log("Error amending order: ", err);
+          // console.log("Error amending order: ", err);
           errorCounter++;
         });
       }
@@ -436,9 +438,10 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           sellPrice,
           MM_CONFIG.EXPIRATION_TIME,
           false, // match_only
-          ACTIVE_ORDERS
+          ACTIVE_ORDERS,
+          errorCounter
         ).catch((err) => {
-          console.log("Error amending order: ", err);
+          // console.log("Error amending order: ", err);
           errorCounter++;
         });
       }
@@ -500,8 +503,11 @@ async function cancelLiquidity(marketId) {
         order.order_id,
         order.order_side,
         isPerp,
-        marketId
-      ).catch((_) => {});
+        marketId,
+        errorCounter
+      ).catch((_) => {
+        errorCounter++;
+      });
     }
   }
 }
@@ -918,8 +924,7 @@ const initPositions = async () => {
 
 // * MAIN ====================================================================================================================
 
-async function run() {
-  let config = loadMMConfig();
+async function run(config) {
   MM_CONFIG = config.MM_CONFIG;
   activeMarkets = config.activeMarkets;
 
@@ -960,17 +965,17 @@ async function run() {
 }
 
 let restartCount = 0;
-async function main() {
+module.exports = async function runMarketmaker(config) {
   setInterval(() => {
     restartCount = 0;
   }, 3600_000); // 1 hour
 
-  await safeRun();
-}
+  await safeRun(config);
+};
 
-async function safeRun() {
+async function safeRun(config) {
   try {
-    await run();
+    await run(config);
   } catch (error) {
     restartCount++;
     console.log("Error: ", error.message);
@@ -981,11 +986,9 @@ async function safeRun() {
       process.exit(1);
     }
 
-    await safeRun();
+    await safeRun(config);
   }
 }
-
-main();
 
 //
 //

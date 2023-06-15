@@ -79,7 +79,9 @@ async function cryptowatchWsSetup(
 ) {
   // Set initial prices
   const cryptowatchApiKey =
-    process.env.CRYPTOWATCH_API_KEY || MM_CONFIG.cryptowatchApiKey;
+    process.env.CRYPTOWATCH_API_KEY || MM_CONFIG
+      ? MM_CONFIG.cryptowatchApiKey
+      : "";
 
   const cryptowatchMarkets = await fetch(
     "https://api.cryptowat.ch/markets?apikey=" + cryptowatchApiKey
