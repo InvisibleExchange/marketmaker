@@ -833,13 +833,6 @@ const listenToWebSocket = () => {
 
 const initAccountState = async () => {
   try {
-    // if the await statement isn't resolved in 10 seconds throw an error
-    let cancelTimeout = false;
-    const timeout = setTimeout(async () => {
-      if (cancelTimeout) return;
-      return await initAccountState();
-    }, 10_000);
-
     let user_ = User.fromPrivKey(MM_CONFIG.privKey);
     let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
 
@@ -856,7 +849,6 @@ const initAccountState = async () => {
       emptyPositionPrivKeys
     );
 
-    cancelTimeout = true;
 
     marketMaker = user_;
 
@@ -944,7 +936,8 @@ async function run(config) {
   // Setup price feeds
   await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
 
-  await initAccountState();
+  // Setup the market maker
+  await runWithTimeout(initAccountState, 30000);
 
   // Strart listening to updates from the server
   if (!client || client.readyState !== client.OPEN) {
@@ -1047,3 +1040,17 @@ const refreshOrders = async (fillInterval, brodcastInterval) => {
 
   return { fillInterval, brodcastInterval };
 };
+
+// ===================================================
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function runWithTimeout(asyncFn, timeout) {
+  const timeoutPromise = delay(timeout).then(() => {
+    throw new Error("Timeout");
+  });
+
+  await Promise.race([asyncFn(), timeoutPromise]);
+}
