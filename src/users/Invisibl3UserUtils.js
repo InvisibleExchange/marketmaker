@@ -18,30 +18,38 @@ async function fetchNoteData(keyPairs, privateSeed) {
   let noteData = {};
   let notePrivKeys = {}; // {addr : privKey}
 
+  let count = 0;
   for (let i = 0; i < keyPairs.length; i++) {
     let addr = keyPairs[i].getPublic();
     let privKey = BigInt(keyPairs[i].getPrivate());
 
     let blinding = _generateNewBliding(addr.getX(), privateSeed);
 
-    let notes_ = await fetchStoredNotes(addr.getX().toString(), blinding);
+    fetchStoredNotes(addr.getX().toString(), blinding).then((notes_) => {
+      count++;
 
-    if (!notes_ || notes_.length == 0) {
-      emptyPrivKeys.push(privKey);
-      continue;
-    }
+      if (!notes_ || notes_.length == 0) {
+        emptyPrivKeys.push(privKey);
 
-    if (!!noteData[notes_[0].token]) {
-      noteData[notes_[0].token].push(notes_[0]);
-    } else {
-      noteData[notes_[0].token] = [notes_[0]];
-    }
+        return;
+      }
 
-    for (let j = 1; j < notes_.length; j++) {
-      noteData[notes_[j].token].push(notes_[j]);
-    }
+      if (noteData[notes_[0].token]) {
+        noteData[notes_[0].token].push(notes_[0]);
+      } else {
+        noteData[notes_[0].token] = [notes_[0]];
+      }
 
-    notePrivKeys[BigInt(addr.getX())] = privKey;
+      for (let j = 1; j < notes_.length; j++) {
+        noteData[notes_[j].token].push(notes_[j]);
+      }
+
+      notePrivKeys[BigInt(addr.getX())] = privKey;
+    });
+  }
+
+  while (count < keyPairs.length) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   return { emptyPrivKeys, noteData, notePrivKeys };
@@ -52,14 +60,19 @@ async function fetchPositionData(addressData) {
   let positionData = {};
   let posPrivKeys = {};
 
+  let count = 0;
   for (let i = 0; i < addressData.length; i++) {
     let addr = addressData[i].address;
     let privKey = BigInt(addressData[i].pk);
 
-    let positions = await fetchStoredPosition(addr.getX().toString());
-    if (!positions || positions.length == 0) {
-      emptyPositionPrivKeys.push(privKey);
-    } else {
+    fetchStoredPosition(addr.getX().toString()).then((positions) => {
+      count++;
+
+      if (!positions || positions.length == 0) {
+        emptyPositionPrivKeys.push(privKey);
+        return;
+      }
+
       if (positionData[positions[0].synthetic_token]) {
         positionData[positions[0].synthetic_token].push(positions[0]);
       } else {
@@ -71,7 +84,11 @@ async function fetchPositionData(addressData) {
       }
 
       posPrivKeys[BigInt(addr.getX())] = privKey;
-    }
+    });
+  }
+
+  while (count < addressData.length) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   return { emptyPositionPrivKeys, positionData, posPrivKeys };

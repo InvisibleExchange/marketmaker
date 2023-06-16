@@ -12,6 +12,6 @@ src/helpers/firebase
 
 
 mm-btc-usd/perp_config.json
-mm-btc-usd/config.json
+mm-btc-usd/spot_config.json
 mm-eth-usd/perp_config.json
-mm-eth-usd/config.json
+mm-eth-usd/spot_config.json

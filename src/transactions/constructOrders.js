@@ -123,10 +123,15 @@ async function sendSpotOrder(
   feeLimit = Number.parseInt(((feeLimit * receiveAmount) / 100).toString());
 
   if (spendAmount > user.getAvailableAmount(spendToken)) {
-    console.log(spendAmount, user.getAvailableAmount(spendToken));
+    if (
+      spendAmount >
+      user.getAvailableAmount(spendToken) + DUST_AMOUNT_PER_ASSET[spendToken]
+    ) {
+      console.log("Insufficient balance");
+      throw new Error("Insufficient balance");
+    }
 
-    console.log("Insufficient balance");
-    throw new Error("Insufficient balance");
+    spendAmount = user.getAvailableAmount(spendToken);
   }
 
   let { limitOrder, pfrKey } = user.makeLimitOrder(
@@ -150,13 +155,13 @@ async function sendSpotOrder(
       let order_response = res.data.response;
 
       if (order_response.successful) {
-        await storeOrderId(
+        storeOrderId(
           user.userId,
           order_response.order_id,
           pfrKey,
           false,
           user.privateSeed
-        );
+        ).then(() => {});
 
         // {base_asset,expiration_timestamp,fee_limit,notes_in,order_id,order_side,price,qty_left,quote_asset,refund_note}
 
@@ -623,7 +628,10 @@ async function sendCancelOrder(
       } else {
         let msg =
           "Failed to cancel order with error: \n" +
-          order_response.error_message;
+          order_response.error_message +
+          " id: " +
+          orderId;
+        // console.log(msg);
 
         errorCounter++;
       }
@@ -771,8 +779,6 @@ async function sendAmendOrder(
     is_perp: isPerp,
     match_only,
   };
-
-  // console.log("amendReq: ", orderId, newPrice);
 
   return axios.post(`${EXPRESS_APP_URL}/amend_order`, amendReq).then((res) => {
     let order_response = res.data.response;

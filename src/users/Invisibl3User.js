@@ -255,15 +255,16 @@ module.exports = class User {
         (order.position_effect_type != 2 ||
           order.position_effect_type != "Close");
     }
+
     if (noActiveOrders) {
       for (let privKey of emptyPrivKeys) {
-        await removePrivKey(this.userId, privKey, false, this.privateSeed);
+        removePrivKey(this.userId, privKey, false, this.privateSeed).then();
       }
     }
     // ? If there are no perp orders than get rid of emptyPositionPrivKeys
     if (perpOrders.length == 0) {
       for (let privKey of emptyPositionPrivKeys) {
-        await removePrivKey(this.userId, privKey, true, this.privateSeed);
+        removePrivKey(this.userId, privKey, true, this.privateSeed).then();
       }
     }
 
@@ -297,8 +298,8 @@ module.exports = class User {
       //   }
       // }
     }
-    // ? Remove pfr notes from noteData
 
+    // ? Remove pfr notes from noteData
     for (const note of pfrNotes) {
       let token = note.token;
       let addr = note.address.getX().toString();
@@ -318,15 +319,18 @@ module.exports = class User {
     }
 
     // If bad order Id and pfrAddress exists, add the note to the user's noteData
-
     this.orders = orders;
     this.perpetualOrders = perpOrders;
 
+    let counter = 0;
+
     for (let orderId of badOrderIds) {
-      removeOrderId(this.userId, orderId, false, this.privateSeed);
+      removeOrderId(this.userId, orderId, false, this.privateSeed).then(() => {
+        counter++;
+      });
 
       if (this.pfrKeys[orderId]) {
-        await handlePfrNoteData(
+        handlePfrNoteData(
           this.userId,
           this.pfrKeys[orderId],
           this.privateSeed,
@@ -335,11 +339,14 @@ module.exports = class User {
         );
       }
     }
+
     for (let orderId of badPerpOrderIds) {
-      removeOrderId(this.userId, orderId, true, this.privateSeed);
+      removeOrderId(this.userId, orderId, true, this.privateSeed).then(() => {
+        counter++;
+      });
 
       if (this.pfrKeys[orderId]) {
-        await handlePfrNoteData(
+        handlePfrNoteData(
           this.userId,
           this.pfrKeys[orderId],
           this.privateSeed,
@@ -363,6 +370,10 @@ module.exports = class User {
     }
 
     this.noteData = noteDataNew;
+
+    while (counter < badOrderIds.length + badPerpOrderIds.length) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
   }
 
   //* GENERATE ORDERS  ==========================================================
@@ -581,7 +592,6 @@ module.exports = class User {
     amount_received,
     fee_limit
   ) {
-
     // ? Get the notesIn and priv keys for these notes
     let { notesIn, refundAmount } = this.getNotesInAndRefundAmount(
       token_spent,
@@ -717,7 +727,11 @@ module.exports = class User {
   }
 
   restructureNotes(token, newAmount) {
-    if (!newAmount) throw Error("No new amount provided");
+    if (!newAmount) return null;
+
+    if (newAmount > this.getAvailableAmount(token)) {
+      return null;
+    }
 
     let { notesIn, refundAmount } = this.getNotesInAndRefundAmount(
       token,

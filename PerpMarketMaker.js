@@ -496,19 +496,32 @@ async function cancelLiquidity(marketId) {
 
   let syntheticAsset = PERP_MARKET_IDS_2_TOKENS[marketId];
 
+  let counter = 0;
   for (order of marketMaker.perpetualOrders) {
     if (order.synthetic_token == syntheticAsset) {
-      await sendCancelOrder(
+      // {order_id,expiration_timestamp,qty_left,price,synthetic_token,order_side,position_effect_type,fee_limit,position_address,notes_in,refund_note,initial_margin}
+
+      sendCancelOrder(
         marketMaker,
         order.order_id,
         order.order_side,
         isPerp,
         marketId,
         errorCounter
-      ).catch((_) => {
-        errorCounter++;
-      });
+      )
+        .then(() => {
+          counter++;
+        })
+        .catch((_) => {
+          errorCounter++;
+        });
+    } else {
+      counter++;
     }
+  }
+
+  while (counter < marketMaker.perpetualOrders.length) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
 }
 
@@ -941,27 +954,36 @@ async function run(config) {
   await initPositions();
 
   // Check for fillable orders
-  let interval1 = setInterval(fillOpenOrders, FILL_ORDERS_PERIOD);
+  let fillInterval = setInterval(fillOpenOrders, FILL_ORDERS_PERIOD);
 
   console.log("Starting market making: ", marketMaker.positionData);
 
   // brodcast orders to provide liquidity
   await indicateLiquidity();
+  let brodcastInterval = setInterval(
+    indicateLiquidity,
+    LIQUIDITY_INDICATION_PERIOD
+  );
 
-  let interval2 = setInterval(indicateLiquidity, LIQUIDITY_INDICATION_PERIOD);
   setInterval(async () => {
-    interval2 = await refreshOrders(interval2);
+    let res = await refreshOrders(fillInterval, brodcastInterval);
+    fillInterval = res.fillInterval;
+    brodcastInterval = res.brodcastInterval;
   }, REFRESH_ORDERS_PERIOD);
 
   setInterval(() => {
     if (errorCounter > 10) {
-      clearInterval(interval1);
-      clearInterval(interval2);
+      clearInterval(fillInterval);
+      clearInterval(brodcastInterval);
       throw new Error("Too many errors. Restarting...");
     }
 
     errorCounter = 0;
   }, 4 * LIQUIDITY_INDICATION_PERIOD);
+
+  await new Promise((resolve) => setTimeout(resolve, REFRESH_PERIOD));
+  clearInterval(fillInterval);
+  clearInterval(brodcastInterval);
 }
 
 let restartCount = 0;
@@ -976,6 +998,8 @@ module.exports = async function runMarketmaker(config) {
 async function safeRun(config) {
   try {
     await run(config);
+
+    await safeRun(config);
   } catch (error) {
     restartCount++;
     console.log("Error: ", error.message);
@@ -996,8 +1020,9 @@ async function safeRun(config) {
 //
 //
 
-const refreshOrders = async (interval) => {
-  clearInterval(interval);
+const refreshOrders = async (fillInterval, brodcastInterval) => {
+  clearInterval(fillInterval);
+  clearInterval(brodcastInterval);
 
   // cancel open orders
   for (let marketId of Object.values(PERP_MARKET_IDS)) {
@@ -1013,7 +1038,12 @@ const refreshOrders = async (interval) => {
 
   // brodcast orders to provide liquidity
   await indicateLiquidity();
-  interval = setInterval(indicateLiquidity, LIQUIDITY_INDICATION_PERIOD);
+  brodcastInterval = setInterval(
+    indicateLiquidity,
+    LIQUIDITY_INDICATION_PERIOD
+  );
 
-  return interval;
+  fillInterval = setInterval(fillOpenOrders, FILL_ORDERS_PERIOD);
+
+  return { fillInterval, brodcastInterval };
 };
