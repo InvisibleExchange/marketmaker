@@ -9,7 +9,7 @@ engine.proto
 src/helpers/firebase
 !src/helpers/firebase/firebaseConnection.js
 
-
+user_info.db
 
 mm-btc-usd/perp_config.json
 mm-btc-usd/spot_config.json

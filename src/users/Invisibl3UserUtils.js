@@ -221,7 +221,7 @@ async function handlePfrNoteData(
       noteData[token].push(...notes);
       notePrivKeys[pfrAddress] = pfrKey;
 
-      storePrivKey(userId, pfrKey, false);
+      // storePrivKey(userId, pfrKey, false);
     }
   });
 }

@@ -50,6 +50,11 @@ const {
   PerpOrder,
 } = require("../transactions/PerpOrder");
 const Withdrawal = require("../transactions/Withdrawal");
+const {
+  storeUserState,
+  getUserState,
+  initDb,
+} = require("../helpers/localStorage");
 
 /* global BigInt */
 
@@ -121,8 +126,10 @@ module.exports = class User {
     this.closingPositions = {}; // {orderId: position}
     this.awaittingOrder = false; // set to true when an order is created and to false when it's accepted (filled if market)
     //
-    this.pfrKeys = {}; // Maps {orderId: pfrPrivKey}
+    // this.pfrKeys = {}; // Maps {orderId: pfrPrivKey}
     this.fills = []; // [{base_token, amount, price, side, time, isPerp}]
+
+    this.db = null;
   }
 
   //* FETCH USER DATA  =========================================================
@@ -140,21 +147,14 @@ module.exports = class User {
   }
 
   async login() {
-    let userData = await fetchUserData(this.userId, this.privateSeed).catch(
-      console.log
-    );
+    this.db = await initDb();
 
-    // let depPKs = await fetchDeprecatedKeys(this.userId, this.privateSeed);
-    // let depKeyPairs =
-    //   depPKs.length > 0 ? depPKs.map((pk) => getKeyPair(pk)) : [];
-
-    // console.log(
-    //   "depKeyPairs",
-    //   depKeyPairs.map((kp) => kp.getPublic().getX().toString())
+    let userData = await getUserState(this.db, this.userId);
+    // let userData = await fetchUserData(this.userId, this.privateSeed).catch(
+    //   console.log
     // );
 
     // ? Get Note Data ============================================
-
     let keyPairs =
       userData.privKeys.length > 0
         ? userData.privKeys.map((pk) => getKeyPair(pk))
@@ -203,7 +203,7 @@ module.exports = class User {
     this.positionPrivKeys = posPrivKeys;
     this.orderIds = [...new Set(userData.orderIds)];
     this.perpetualOrderIds = [...new Set(userData.perpetualOrderIds)];
-    this.pfrKeys = userData.pfrKeys;
+    // this.pfrKeys = userData.pfrKeys;
     this.fills = [...new Set(fills)];
 
     return { emptyPrivKeys, emptyPositionPrivKeys };
@@ -256,17 +256,17 @@ module.exports = class User {
           order.position_effect_type != "Close");
     }
 
-    if (noActiveOrders) {
-      for (let privKey of emptyPrivKeys) {
-        removePrivKey(this.userId, privKey, false, this.privateSeed).then();
-      }
-    }
-    // ? If there are no perp orders than get rid of emptyPositionPrivKeys
-    if (perpOrders.length == 0) {
-      for (let privKey of emptyPositionPrivKeys) {
-        removePrivKey(this.userId, privKey, true, this.privateSeed).then();
-      }
-    }
+    // if (noActiveOrders) {
+    //   for (let privKey of emptyPrivKeys) {
+    //     removePrivKey(this.userId, privKey, false, this.privateSeed);
+    //   }
+    // }
+    // // ? If there are no perp orders than get rid of emptyPositionPrivKeys
+    // if (perpOrders.length == 0) {
+    //   for (let privKey of emptyPositionPrivKeys) {
+    //     removePrivKey(this.userId, privKey, true, this.privateSeed);
+    //   }
+    // }
 
     // ? Get the notes that aren't currently used in active orders and save the addresses of those that are
     let frozenAddresses = [];
@@ -282,21 +282,6 @@ module.exports = class User {
           frozenAddresses.push(note.address.getX().toString());
         }
       }
-
-      // for (const pfrKey of pfrKeys) {
-      //   let addr = getKeyPair(pfrKey).getPublic().getX();
-
-      //   let idxs = newNoteData[token]
-      //     .filter((n) => n.address.getX().toString() == addr.toString())
-      //     .map((n) => Number.parseInt(n.index));
-      //   let maxIdx = Math.max(...idxs);
-
-      //   let idx = newNoteData[token].findIndex((n) => n.index == maxIdx);
-
-      //   if (idx !== -1 && !frozenAddresses.includes(addr.toString())) {
-      //     newNoteData[token].splice(idx, 1);
-      //   }
-      // }
     }
 
     // ? Remove pfr notes from noteData
@@ -323,37 +308,38 @@ module.exports = class User {
     this.perpetualOrders = perpOrders;
 
     let counter = 0;
-
     for (let orderId of badOrderIds) {
-      removeOrderId(this.userId, orderId, false, this.privateSeed).then(() => {
-        counter++;
-      });
-
-      if (this.pfrKeys[orderId]) {
-        handlePfrNoteData(
-          this.userId,
-          this.pfrKeys[orderId],
-          this.privateSeed,
-          newNoteData,
-          this.notePrivKeys
-        );
-      }
+      // removeOrderId(this.userId, orderId, false, this.privateSeed).then(() => {
+      //   counter++;
+      // });
+      // if (this.pfrKeys[orderId]) {
+      //   handlePfrNoteData(
+      //     this.userId,
+      //     this.pfrKeys[orderId],
+      //     this.privateSeed,
+      //     newNoteData,
+      //     this.notePrivKeys
+      //   ).then(() => {
+      //     counter++;
+      //   });
+      // }
     }
 
     for (let orderId of badPerpOrderIds) {
-      removeOrderId(this.userId, orderId, true, this.privateSeed).then(() => {
-        counter++;
-      });
-
-      if (this.pfrKeys[orderId]) {
-        handlePfrNoteData(
-          this.userId,
-          this.pfrKeys[orderId],
-          this.privateSeed,
-          newNoteData,
-          this.notePrivKeys
-        );
-      }
+      // removeOrderId(this.userId, orderId, true, this.privateSeed).then(() => {
+      //   counter++;
+      // });
+      // if (this.pfrKeys[orderId]) {
+      //   handlePfrNoteData(
+      //     this.userId,
+      //     this.pfrKeys[orderId],
+      //     this.privateSeed,
+      //     newNoteData,
+      //     this.notePrivKeys
+      //   ).then(() => {
+      //     counter++;
+      //   });
+      // }
     }
 
     let noteDataNew = {};
@@ -371,9 +357,11 @@ module.exports = class User {
 
     this.noteData = noteDataNew;
 
-    while (counter < badOrderIds.length + badPerpOrderIds.length) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
+    // while (counter < badOrderIds.length + badPerpOrderIds.length) {
+    //   await new Promise((resolve) => setTimeout(resolve, 50));
+    // }
+
+    storeUserState(this.db, this);
   }
 
   //* GENERATE ORDERS  ==========================================================
@@ -434,7 +422,7 @@ module.exports = class User {
           notesIn[0].note.index
         );
 
-        storePrivKey(this.userId, koR, false, this.privateSeed);
+        // storePrivKey(this.userId, koR, false, this.privateSeed);
       }
 
       let { positionPrivKey, positionAddress } =
@@ -451,18 +439,16 @@ module.exports = class User {
         allow_partial_liquidation
       );
 
-      storeUserData(this.userId, this.noteCounts, this.positionCounts);
-
-      storePrivKey(this.userId, positionPrivKey, true, this.privateSeed);
+      // storeUserData(this.userId, this.noteCounts, this.positionCounts);
+      // storePrivKey(this.userId, positionPrivKey, true, this.privateSeed);
     } else if (position_effect_type == "Close") {
       let { KoR, koR, ytR } = this.getDestReceivedAddresses(collateral_token);
       this.notePrivKeys[KoR.getX().toString()] = koR;
 
       close_order_fields = new CloseOrderFields(KoR, ytR);
 
-      storeUserData(this.userId, this.noteCounts, this.positionCounts);
-
-      storePrivKey(this.userId, koR, false, this.privateSeed);
+      // storeUserData(this.userId, this.noteCounts, this.positionCounts);
+      // storePrivKey(this.userId, koR, false, this.privateSeed);
 
       // ? Get the position priv Key for this position
       if (this.positionData[synthetic_token].length > 0) {
@@ -515,6 +501,9 @@ module.exports = class User {
 
     let _signature = perpOrder.signOrder(privKeys, positionPrivKey);
 
+    // ? Store the userData locally
+    storeUserState(this.db, this);
+
     return { perpOrder, pfrKey: privKeySum };
   }
 
@@ -550,7 +539,7 @@ module.exports = class User {
         notesIn[0].note.index
       );
 
-      storePrivKey(this.userId, koR, false, this.privateSeed);
+      // storePrivKey(this.userId, koR, false, this.privateSeed);
     }
 
     let { positionPrivKey, positionAddress } = this.getPositionAddress(
@@ -567,8 +556,8 @@ module.exports = class User {
       allow_partial_liquidation
     );
 
-    storeUserData(this.userId, this.noteCounts, this.positionCounts);
-    storePrivKey(this.userId, positionPrivKey, true, this.privateSeed);
+    // storeUserData(this.userId, this.noteCounts, this.positionCounts);
+    // storePrivKey(this.userId, positionPrivKey, true, this.privateSeed);
 
     let perpOrder = new LiquidationOrder(
       liquidatedPosition,
@@ -580,6 +569,9 @@ module.exports = class User {
     );
 
     let _sig = perpOrder.signOrder(privKeys);
+
+    // ? Store the userData locally
+    storeUserState(this.db, this);
 
     return perpOrder;
   }
@@ -623,7 +615,7 @@ module.exports = class User {
         notesIn[0].note.index
       );
 
-      storePrivKey(this.userId, koR2, false, this.privateSeed);
+      // storePrivKey(this.userId, koR2, false, this.privateSeed);
     }
 
     // ? generate the refund note
@@ -643,9 +635,11 @@ module.exports = class User {
 
     let _sig = limitOrder.signOrder(privKeys);
 
-    storeUserData(this.userId, this.noteCounts, this.positionCounts);
+    // storeUserData(this.userId, this.noteCounts, this.positionCounts);
+    // storePrivKey(this.userId, koR, false, this.privateSeed);
 
-    storePrivKey(this.userId, koR, false, this.privateSeed);
+    // ? Store the userData locally
+    storeUserState(this.db, this);
 
     return { limitOrder, pfrKey: privKeySum };
   }
@@ -674,9 +668,11 @@ module.exports = class User {
       sig
     );
 
-    storeUserData(this.userId, this.noteCounts, this.positionCounts);
+    // storeUserData(this.userId, this.noteCounts, this.positionCounts);
+    // storePrivKey(this.userId, koR, false, this.privateSeed);
 
-    storePrivKey(this.userId, koR, false, this.privateSeed);
+    // ? Store the userData locally
+    storeUserState(this.db, this);
 
     return deposit;
   }
@@ -719,9 +715,11 @@ module.exports = class User {
       signature
     );
 
-    storeUserData(this.userId, this.noteCounts, this.positionCounts);
+    // storeUserData(this.userId, this.noteCounts, this.positionCounts);
+    // storePrivKey(this.userId, koR, false, this.privateSeed);
 
-    storePrivKey(this.userId, koR, false, this.privateSeed);
+    // ? Store the userData locally
+    storeUserState(this.db, this);
 
     return withdrawal;
   }
@@ -828,8 +826,11 @@ module.exports = class User {
       );
 
       // this.perpetualOrderIds.push(order_id);
-      storeUserData(this.userId, this.noteCounts, this.positionCounts);
-      storePrivKey(this.userId, koR, false, this.privateSeed);
+      // storeUserData(this.userId, this.noteCounts, this.positionCounts);
+      // storePrivKey(this.userId, koR, false, this.privateSeed);
+
+      // ? Store the userData locally
+      storeUserState(this.db, this);
     } else throw Error("Invalid direction");
 
     return {

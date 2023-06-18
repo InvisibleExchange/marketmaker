@@ -553,19 +553,21 @@ async function fetchLatestFills(n, isPerp, token) {
 
 module.exports = {
   fetchStoredNotes,
+  fetchStoredPosition,
+  fetchUserFills,
+  fetchLatestFills,
+  fetchIndividualPosition,
+  //
   storeUserData,
   fetchUserData,
-  fetchStoredPosition,
-  storeOnchainDeposit,
-  storeDepositId,
-  removeDepositFromDb,
-  fetchOnchainDeposits,
   storePrivKey,
   removePrivKey,
   storeOrderId,
   removeOrderId,
-  fetchUserFills,
-  fetchLatestFills,
-  fetchDeprecatedKeys,
-  fetchIndividualPosition,
+  // fetchDeprecatedKeys,
 };
+
+// storeOnchainDeposit,
+// storeDepositId,
+// removeDepositFromDb,
+// fetchOnchainDeposits,

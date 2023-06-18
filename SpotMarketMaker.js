@@ -212,9 +212,6 @@ async function indicateLiquidity(marketIds = activeMarkets) {
     let quoteBalance =
       marketMaker.getAvailableAmount(quoteAsset) / activeMarkets.length;
 
-    // console.log("baseBalance: ", baseBalance);
-    // console.log("quoteBalance: ", quoteBalance);
-
     // sum up all the active orders
     let activeOrderBaseValue = ACTIVE_ORDERS[marketId + "Sell"]
       ? ACTIVE_ORDERS[marketId + "Sell"].reduce(
@@ -255,19 +252,6 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       buySplits = Math.floor(usdQuoteBalance / 10);
     if (usdBaseBalance && usdBaseBalance < 10 * sellSplits)
       sellSplits = Math.floor(usdBaseBalance / 10);
-
-    // console.log(
-    //   "\nsell orders: ",
-    //   ACTIVE_ORDERS[marketId + "Sell"]
-    //     ? ACTIVE_ORDERS[marketId + "Sell"].map((o) => o.id)
-    //     : []
-    // );
-    // console.log(
-    //   "buy orders: ",
-    //   ACTIVE_ORDERS[marketId + "Buy"]
-    //     ? ACTIVE_ORDERS[marketId + "Buy"].map((o) => o.id)
-    //     : []
-    // );
 
     if (["b", "d"].includes(side) && maxBuySize > 0) {
       // make a clone of the  ACTIVE_ORDERS[marketId + "Buy"] array
@@ -319,20 +303,16 @@ async function indicateLiquidity(marketIds = activeMarkets) {
               (mmConfig.slippageRate * maxBuySize * i) / buySplits) -
           extraTestSpread;
 
+        let quoteAmount =
+          quoteBalance /
+          (10 ** DECIMALS_PER_ASSET[quoteAsset] *
+            (buySplits - activeOrdersCopy.length));
+
         // PLACE ORDER
         try {
-          await sendSplitOrder(
-            marketMaker,
-            quoteAsset,
-            quoteBalance /
-              (10 ** DECIMALS_PER_ASSET[quoteAsset] *
-                (buySplits - activeOrdersCopy.length) *
-                1)
-          );
+          await sendSplitOrder(marketMaker, quoteAsset, quoteAmount);
         } catch (error) {
-          console.log("Error spliting notes: ");
           errorCounter++;
-          console.log("errorCounter: ", errorCounter);
         }
 
         sendSpotOrder(
@@ -342,10 +322,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           baseAsset,
           quoteAsset,
           null,
-          quoteBalance /
-            (10 ** DECIMALS_PER_ASSET[quoteAsset] *
-              (buySplits - activeOrdersCopy.length) *
-              1),
+          quoteAmount,
           buyPrice,
           0.07,
           0,
@@ -404,19 +381,14 @@ async function indicateLiquidity(marketIds = activeMarkets) {
               mmConfig.minSpread +
               (mmConfig.slippageRate * maxSellSize * i) / sellSplits) +
           extraTestSpread;
-
+        const baseAmount =
+          baseBalance /
+          (10 ** DECIMALS_PER_ASSET[baseAsset] *
+            (sellSplits - activeOrdersCopy.length));
         try {
-          await sendSplitOrder(
-            marketMaker,
-            baseAsset,
-            baseBalance /
-              (10 ** DECIMALS_PER_ASSET[baseAsset] *
-                (sellSplits - activeOrdersCopy.length))
-          );
+          await sendSplitOrder(marketMaker, baseAsset, baseAmount);
         } catch (error) {
-          console.log("Error spliting notes: ");
           errorCounter++;
-          console.log("errorCounter: ", errorCounter);
         }
 
         sendSpotOrder(
@@ -425,9 +397,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           MM_CONFIG.EXPIRATION_TIME,
           baseAsset,
           quoteAsset,
-          baseBalance /
-            (10 ** DECIMALS_PER_ASSET[baseAsset] *
-              (sellSplits - activeOrdersCopy.length)),
+          baseAmount,
           null,
           sellPrice,
           0.07,
@@ -843,7 +813,7 @@ async function run(config) {
   // Setup price feeds
   await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
 
- // Setup the market maker
+  // Setup the market maker
   await runWithTimeout(initAccountState, 30000);
 
   // Strart listening to updates from the server
@@ -894,9 +864,6 @@ async function run(config) {
 
 // =========================================================================================
 
-// 7999503444
-// 150026016195
-
 let restartCount = 0;
 module.exports = async function runMarketmaker(config) {
   setInterval(() => {
@@ -912,10 +879,8 @@ async function safeRun(config) {
 
     await safeRun(config);
   } catch (error) {
-    console.log("====================================");
     restartCount++;
     console.log("Error: ", error.message);
-    console.log("====================================");
 
     if (restartCount >= 5) {
       console.log("Too many restarts. Exiting...");

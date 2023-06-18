@@ -25,6 +25,7 @@ const {
   _getBankruptcyPrice,
   _getLiquidationPrice,
 } = require("../helpers/tradePriceCalculations");
+const { storeUserState } = require("../helpers/localStorage");
 
 // const path = require("path");
 // require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
@@ -155,28 +156,20 @@ async function sendSpotOrder(
       let order_response = res.data.response;
 
       if (order_response.successful) {
-        storeOrderId(
-          user.userId,
-          order_response.order_id,
-          pfrKey,
-          false,
-          user.privateSeed
-        ).then(() => {});
+        // storeOrderId(
+        //   user.userId,
+        //   order_response.order_id,
+        //   pfrKey,
+        //   false,
+        //   user.privateSeed
+        // );
 
-        // {base_asset,expiration_timestamp,fee_limit,notes_in,order_id,order_side,price,qty_left,quote_asset,refund_note}
+        storeUserState(user.db, user);
 
         // If this is a taker order it might have been filled fully/partially before the response was received (here)
         let filledAmount = user.filledAmounts[order_response.order_id]
           ? user.filledAmounts[order_response.order_id]
           : 0;
-
-        // if (limitOrder.notes_in.length > 0) {
-        //   for (let note of limitOrder.notes_in) {
-        //     user.noteData[note.token] = user.noteData[note.token].filter(
-        //       (n) => n.index != note.index
-        //     );
-        //   }
-        // }
 
         // ? Add the refund note
         if (limitOrder.refund_note) {
@@ -351,13 +344,15 @@ async function sendPerpOrder(
       if (order_response.successful) {
         // console.log("Order successfull: ", order_response.order_id);
 
-        storeOrderId(
-          user.userId,
-          order_response.order_id,
-          pfrKey,
-          true,
-          user.privateSeed
-        );
+        // storeOrderId(
+        //   user.userId,
+        //   order_response.order_id,
+        //   pfrKey,
+        //   true,
+        //   user.privateSeed
+        // );
+
+        storeUserState(user.db, user);
 
         // If this is a taker order it might have been filled fully/partially before the response was received (here)
         let filledAmount = user.filledAmounts[order_response.order_id]
