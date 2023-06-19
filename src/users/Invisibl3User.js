@@ -590,6 +590,10 @@ module.exports = class User {
       amount_spent
     );
 
+    if (notesIn.length == 0) {
+      throw "No notes to spend";
+    }
+
     // ? Generate the dest spent and dest received addresses and blindings
 
     let privKeys = notesIn.map((x) => x.privKey);
@@ -904,16 +908,11 @@ module.exports = class User {
       if (amount >= spendAmount) {
         let refundAmount = amount - Number.parseInt(spendAmount);
 
-        this.noteData[token] = notes;
-
         if (isNoteSplit && refundAmount < DUST_AMOUNT_PER_ASSET[token]) {
-          // ? Cancel the operation and reinsert the notes
-          for (let { note } of notesIn) {
-            this.noteData[token].push(note);
-          }
-
           return { notesIn: null, refundAmount: 0 };
         }
+
+        this.noteData[token] = notes;
 
         return { notesIn, refundAmount };
       }

@@ -849,7 +849,6 @@ const initAccountState = async () => {
       emptyPositionPrivKeys
     );
 
-
     marketMaker = user_;
 
     // cancel open orders
@@ -958,13 +957,13 @@ async function run(config) {
     LIQUIDITY_INDICATION_PERIOD
   );
 
-  setInterval(async () => {
+  let refreshInterval = setInterval(async () => {
     let res = await refreshOrders(fillInterval, brodcastInterval);
     fillInterval = res.fillInterval;
     brodcastInterval = res.brodcastInterval;
   }, REFRESH_ORDERS_PERIOD);
 
-  setInterval(() => {
+  let errorInterval = setInterval(() => {
     if (errorCounter > 10) {
       clearInterval(fillInterval);
       clearInterval(brodcastInterval);
@@ -977,6 +976,8 @@ async function run(config) {
   await new Promise((resolve) => setTimeout(resolve, REFRESH_PERIOD));
   clearInterval(fillInterval);
   clearInterval(brodcastInterval);
+  clearInterval(errorInterval);
+  clearInterval(refreshInterval);
 }
 
 let restartCount = 0;

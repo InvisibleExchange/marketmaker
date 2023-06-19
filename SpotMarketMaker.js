@@ -330,6 +330,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           ACTIVE_ORDERS
         ).catch((err) => {
           console.log("Error sending fill request: ", err);
+
           errorCounter++;
         });
       }
@@ -388,6 +389,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         try {
           await sendSplitOrder(marketMaker, baseAsset, baseAmount);
         } catch (error) {
+          console.log("error splitting note: ", error);
           errorCounter++;
         }
 
@@ -758,11 +760,9 @@ const listenToWebSocket = () => {
   };
 
   client.onclose = function () {
-    console.log("WebSocket Client Closed !!!!!!!!!!");
-
-    // setTimeout(() => {
-    //   listenToWebSocket();
-    // }, 5000);
+    setTimeout(() => {
+      listenToWebSocket();
+    }, 5000);
   };
 };
 
@@ -841,7 +841,7 @@ async function run(config) {
     LIQUIDITY_INDICATION_PERIOD
   );
 
-  setInterval(() => {
+  let errorInterval = setInterval(() => {
     if (errorCounter >= 8) {
       clearInterval(fillInterval);
       clearInterval(brodcastInterval);
@@ -851,7 +851,7 @@ async function run(config) {
     errorCounter = Math.max(0, errorCounter - 3);
   }, 2 * LIQUIDITY_INDICATION_PERIOD);
 
-  setInterval(async () => {
+  let refreshInterval = setInterval(async () => {
     let res = await refreshOrders(fillInterval, brodcastInterval);
     fillInterval = res.fillInterval;
     brodcastInterval = res.brodcastInterval;
@@ -860,6 +860,8 @@ async function run(config) {
   await new Promise((resolve) => setTimeout(resolve, REFRESH_PERIOD));
   clearInterval(fillInterval);
   clearInterval(brodcastInterval);
+  clearInterval(errorInterval);
+  clearInterval(refreshInterval);
 }
 
 // =========================================================================================
