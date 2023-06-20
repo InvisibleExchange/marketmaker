@@ -896,7 +896,7 @@ async function sendWithdrawal(user, amount, token, starkKey) {
  * @param newAmounts - array of new amounts
  */
 async function sendSplitOrder(user, token, newAmount) {
-  newAmount = newAmount * 10 ** DECIMALS_PER_ASSET[token];
+  newAmount = Number.parseInt(newAmount * 10 ** DECIMALS_PER_ASSET[token]);
 
   let res = user.restructureNotes(token, newAmount);
   if (!res) return;

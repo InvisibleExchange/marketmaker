@@ -72,24 +72,41 @@ module.exports = async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
   if (uniswapV3.length > 0) await uniswapV3Setup(uniswapV3, PRICE_FEEDS);
 };
 
+let cryptowatch_ws;
 async function cryptowatchWsSetup(
   cryptowatchMarketIds,
   PRICE_FEEDS,
   MM_CONFIG
 ) {
+  if (cryptowatch_ws) return;
+
   // Set initial prices
   const cryptowatchApiKey =
     process.env.CRYPTOWATCH_API_KEY || MM_CONFIG
       ? MM_CONFIG.cryptowatchApiKey
       : "";
 
-  const cryptowatchMarkets = await fetch(
-    "https://api.cryptowat.ch/markets?apikey=" + cryptowatchApiKey
-  ).then((r) => r.json());
+  let cryptowatchMarkets = [];
+  let cryptowatchMarketPrices = [];
+  try {
+    cryptowatchMarkets = await fetch(
+      "https://api.cryptowat.ch/markets?apikey=" + cryptowatchApiKey
+    )
+      .then((r) => r.json())
+      .catch((e) => {
+        console.log("error setting price feeds:", e);
+      });
 
-  const cryptowatchMarketPrices = await fetch(
-    "https://api.cryptowat.ch/markets/prices?apikey=" + cryptowatchApiKey
-  ).then((r) => r.json());
+    cryptowatchMarketPrices = await fetch(
+      "https://api.cryptowat.ch/markets/prices?apikey=" + cryptowatchApiKey
+    )
+      .then((r) => r.json())
+      .catch((e) => {
+        console.log("error setting price feeds:", e);
+      });
+  } catch (error) {
+    console.error("Could not fetch cryptowatch markets");
+  }
 
   for (let i in cryptowatchMarketIds) {
     const cryptowatchMarketId = cryptowatchMarketIds[i];
@@ -128,9 +145,10 @@ async function cryptowatchWsSetup(
       },
     });
   }
-  let cryptowatch_ws = new WebSocket(
+  cryptowatch_ws = new WebSocket(
     "wss://stream.cryptowat.ch/connect?apikey=" + cryptowatchApiKey
   );
+
   cryptowatch_ws.on("open", onopen);
   cryptowatch_ws.on("message", onmessage);
   cryptowatch_ws.on("close", onclose);
