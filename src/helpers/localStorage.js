@@ -68,7 +68,7 @@ function storeUserState(db, user) {
   }
 }
 
-function getUserState(db, userId) {
+async function getUserState(db, userId) {
   //
   userId = userId.toString();
 
