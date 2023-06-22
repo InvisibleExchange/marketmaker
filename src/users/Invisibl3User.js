@@ -26,6 +26,7 @@ const {
   signMarginChange,
   _restoreKeyData,
   handlePfrNoteData,
+  findNoteCombinations,
 } = require("./Invisibl3UserUtils.js");
 
 const DUST_AMOUNT_PER_ASSET = {
@@ -741,8 +742,7 @@ module.exports = class User {
       true
     );
 
-    if (!refundAmount || refundAmount < DUST_AMOUNT_PER_ASSET[token])
-      return null;
+    if (!notesIn || notesIn.length == 0) return null;
 
     let address0 = notesIn[0].note.address;
     let blinding0 = notesIn[0].note.blinding;
@@ -752,7 +752,10 @@ module.exports = class User {
     let newNote = new Note(address0, token, newAmount, blinding0);
 
     // ? generate the refund note
-    let refundNote = new Note(address1, token, refundAmount, blinding1);
+    let refundNote;
+    if (refundAmount > 0) {
+      refundNote = new Note(address1, token, refundAmount, blinding1);
+    }
 
     return {
       notesIn: notesIn.map((n) => n.note),
@@ -874,27 +877,28 @@ module.exports = class User {
 
     if (!this.noteData[token]) throw new Error("Insufficient funds");
 
-    let noteIn = this.noteData[token].find(
-      (n) =>
-        n.amount >= spendAmount &&
-        n.amount - spendAmount < DUST_AMOUNT_PER_ASSET[token]
-    );
+    let notes = [...this.noteData[token]];
+    notes = notes.sort((a, b) => a.amount - b.amount);
 
-    if (noteIn) {
-      if (isNoteSplit) {
+    let dustAmount = DUST_AMOUNT_PER_ASSET[token];
+    let notesIn_ = findNoteCombinations(notes, spendAmount, dustAmount);
+
+    if (notesIn_ && notesIn_.length > 0) {
+      if (isNoteSplit && notesIn_.length <= 5) {
         return { notesIn: null, refundAmount: 0 };
       }
 
-      this.noteData[token] = this.noteData[token].filter(
-        (n) => n.index != noteIn.index
-      );
+      for (let noteIn of notesIn_) {
+        this.noteData[token] = this.noteData[token].filter(
+          (n) => n.index != noteIn.index
+        );
 
-      const privKey = this.notePrivKeys[BigInt(noteIn.address.getX())];
-      return { notesIn: [{ privKey, note: noteIn }], refundAmount: 0 };
+        const privKey = this.notePrivKeys[BigInt(noteIn.address.getX())];
+        notesIn.push({ privKey, note: noteIn });
+      }
+
+      return { notesIn: notesIn, refundAmount: 0 };
     }
-
-    let notes = [...this.noteData[token]];
-    notes = notes.sort((a, b) => a.amount - b.amount);
 
     let l = notes.length;
     for (let i = 0; i < l; i++) {

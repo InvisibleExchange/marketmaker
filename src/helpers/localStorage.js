@@ -80,6 +80,7 @@ function getUserState(db, userId) {
         reject(err);
       }
 
+
       let correctRow;
       for (let row of rows) {
         if (row.userId == userId) {

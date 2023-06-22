@@ -40,11 +40,11 @@ let MM_CONFIG, activeMarkets;
 dotenv.config();
 
 // How often do we refresh entire state (to prevent bugs and have a fresh version of the state)
-const REFRESH_PERIOD = 60_000; // 1 hour
+const REFRESH_PERIOD = 3600_000; // 1 hour
 // How often do we send liquidity indications (orders that make the market)
 const LIQUIDITY_INDICATION_PERIOD = 5_000; // 5 seconds
 // Cancel all orders and send new ones
-const REFRESH_ORDERS_PERIOD = 12_000; // 2 minutes
+const REFRESH_ORDERS_PERIOD = 123_000; // 2 minutes
 // How often do we check if any orders can be filled
 const FILL_ORDERS_PERIOD = 1_000; // 1 seconds
 
@@ -60,8 +60,9 @@ const setPerpLiquidity = (liq) => {
 };
 
 // Maps marketId to a list of active orders
-let ACTIVE_ORDERS = {};
-let activeOrdersMidPrice = {}; // { marketId: midPrice }
+let ACTIVE_ORDERS = {}; // { id, spendAmount, price}
+let previousActiveOrders = {}; // { buy: [amount1, ...], sell: [amount1, ...]}
+let executedSwap = false; // if there was an order executed this REFRESH_ORDERS_PERIOD
 
 let marketMaker;
 const isPerp = false;
@@ -236,35 +237,21 @@ async function indicateLiquidity(marketIds = activeMarkets) {
     const maxSellSize = Math.min(totalBaseBalance, mmConfig.maxSize);
     const maxBuySize = Math.min(totalQuoteBalance / midPrice, mmConfig.maxSize);
 
-    // dont do splits if under 1000 USD
-    const usdBaseBalance = totalBaseBalance * getPrice(baseAsset);
-    const usdQuoteBalance = totalQuoteBalance * getPrice(quoteAsset);
-    let buySplits =
-      usdQuoteBalance && usdQuoteBalance < 1000
-        ? 1
-        : mmConfig.numOrdersIndicated || 4;
-    let sellSplits =
-      usdBaseBalance && usdBaseBalance < 1000
-        ? 1
-        : mmConfig.numOrdersIndicated || 4;
+    let buySplits = mmConfig.numOrdersIndicated || 4;
+    let sellSplits = mmConfig.numOrdersIndicated || 4;
 
-    if (usdQuoteBalance && usdQuoteBalance < 10 * buySplits)
-      buySplits = Math.floor(usdQuoteBalance / 10);
-    if (usdBaseBalance && usdBaseBalance < 10 * sellSplits)
-      sellSplits = Math.floor(usdBaseBalance / 10);
+    // if (usdQuoteBalance && usdQuoteBalance < 10 * buySplits)
+    //   buySplits = Math.floor(usdQuoteBalance / 10);
+    // if (usdBaseBalance && usdBaseBalance < 10 * sellSplits)
+    //   sellSplits = Math.floor(usdBaseBalance / 10);
 
-    if (["b", "d"].includes(side) && maxBuySize > 0) {
-      // make a clone of the  ACTIVE_ORDERS[marketId + "Buy"] array
-      // because we will be removing orders from it
+    if (["b", "d"].includes(side)) {
       let activeOrdersCopy = [];
       if (ACTIVE_ORDERS[marketId + "Buy"]) {
         activeOrdersCopy = [...ACTIVE_ORDERS[marketId + "Buy"]];
       }
 
       for (let i = 0; i < activeOrdersCopy.length; i++) {
-        // Todo Remove this after testing
-        let extraTestSpread = 0;
-
         const buyPrice =
           midPrice *
             (1 -
@@ -293,9 +280,6 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let i = activeOrdersCopy.length; i < buySplits; i++) {
         if (quoteBalance < DUST_AMOUNT_PER_ASSET[quoteAsset]) continue;
 
-        // Todo Remove this after testing
-        let extraTestSpread = 0;
-
         const buyPrice =
           midPrice *
             (1 -
@@ -303,10 +287,15 @@ async function indicateLiquidity(marketIds = activeMarkets) {
               (mmConfig.slippageRate * maxBuySize * i) / buySplits) -
           extraTestSpread;
 
-        let quoteAmount =
-          quoteBalance /
-          (10 ** DECIMALS_PER_ASSET[quoteAsset] *
-            (buySplits - activeOrdersCopy.length));
+        let quoteAmount = previousActiveOrders[marketId + "Buy"]
+          ? previousActiveOrders[marketId + "Buy"].pop() /
+            10 ** DECIMALS_PER_ASSET[quoteAsset]
+          : null;
+        quoteAmount = quoteAmount
+          ? quoteAmount
+          : quoteBalance /
+            (10 ** DECIMALS_PER_ASSET[quoteAsset] *
+              (buySplits - activeOrdersCopy.length));
 
         // PLACE ORDER
         try {
@@ -345,9 +334,6 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       }
 
       for (let i = 0; i < activeOrdersCopy.length; i++) {
-        // Todo Remove this after testing
-        let extraTestSpread = 0;
-
         const sellPrice =
           midPrice *
             (1 +
@@ -373,19 +359,22 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let i = activeOrdersCopy.length; i < sellSplits; i++) {
         if (baseBalance <= DUST_AMOUNT_PER_ASSET[baseAsset]) continue;
 
-        // Todo Remove this after testing
-        let extraTestSpread = 0;
-
         const sellPrice =
           midPrice *
             (1 +
               mmConfig.minSpread +
               (mmConfig.slippageRate * maxSellSize * i) / sellSplits) +
           extraTestSpread;
-        const baseAmount =
-          baseBalance /
-          (10 ** DECIMALS_PER_ASSET[baseAsset] *
-            (sellSplits - activeOrdersCopy.length));
+
+        let baseAmount = previousActiveOrders[marketId + "Sell"]
+          ? previousActiveOrders[marketId + "Sell"].pop() /
+            10 ** DECIMALS_PER_ASSET[baseAsset]
+          : null;
+        baseAmount = baseAmount
+          ? baseAmount
+          : baseBalance /
+            (10 ** DECIMALS_PER_ASSET[baseAsset] *
+              (sellSplits - activeOrdersCopy.length));
         try {
           await sendSplitOrder(marketMaker, baseAsset, baseAmount);
         } catch (error) {
@@ -415,16 +404,25 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       }
     }
 
-    activeOrdersMidPrice[marketId] = midPrice;
-
     //
   }
 }
 
 async function cancelLiquidity(marketId) {
-  activeOrdersMidPrice[marketId] = null;
-
   let baseAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+
+  if (!executedSwap) {
+    if (ACTIVE_ORDERS[marketId + "Buy"]) {
+      previousActiveOrders[marketId + "Buy"] = ACTIVE_ORDERS[
+        marketId + "Buy"
+      ].map((o) => o.spendAmount);
+    }
+    if (ACTIVE_ORDERS[marketId + "Sell"]) {
+      previousActiveOrders[marketId + "Sell"] = ACTIVE_ORDERS[
+        marketId + "Sell"
+      ].map((o) => o.spendAmount);
+    }
+  }
 
   let counter = 0;
   for (order of marketMaker.orders) {
@@ -464,12 +462,8 @@ async function cancelLiquidity(marketId) {
   }
 }
 
-// 179406941173 USDC 0 ETH 8808794756 BTC
-
 async function afterFill(amountFilled, marketId) {
   //
-
-  activeOrdersMidPrice[marketId] = null;
 
   const mmConfig = MM_CONFIG.pairs[marketId];
   if (!mmConfig) {
@@ -747,6 +741,8 @@ const listenToWebSocket = () => {
 
         afterFill(msg.new_amount_filled, msg.market_id);
 
+        executedSwap = true;
+
         break;
 
       case "PERPETUAL_SWAP":
@@ -767,6 +763,7 @@ const listenToWebSocket = () => {
 };
 
 const initAccountState = async () => {
+  executedSwap = false;
   try {
     let user_ = User.fromPrivKey(MM_CONFIG.privKey);
 
@@ -916,6 +913,7 @@ const refreshOrders = async (fillInterval, brodcastInterval) => {
   }
 
   ACTIVE_ORDERS = {};
+  executedSwap = false;
 
   // brodcast orders to provide liquidity
   await indicateLiquidity();

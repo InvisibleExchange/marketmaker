@@ -461,14 +461,12 @@ function handleNoteSplit(user, zero_idxs, notesIn, notesOut) {
   //   );
   // }
 
-  // console.log("BEFORE: ", user.getAvailableAmount(notesOut[0].token));
   for (let i = 0; i < zero_idxs.length; i++) {
     let note = notesOut[i];
     note.index = zero_idxs[i];
     // storeNewNote(note);
     user.noteData[note.token].push(note);
   }
-  // console.log("AFTER: ", user.getAvailableAmount(notesOut[0].token));
 }
 
 //

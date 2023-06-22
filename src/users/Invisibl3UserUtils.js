@@ -8,6 +8,7 @@ const {
   fetchStoredNotes,
   storePrivKey,
 } = require("../helpers/firebase/firebaseConnection");
+const { DUST_AMOUNT_PER_ASSET } = require("../helpers/utils");
 
 /* global BigInt */
 
@@ -226,6 +227,39 @@ async function handlePfrNoteData(
   });
 }
 
+function findNoteCombinations(notesData, target, dustAmount) {
+  let result = [];
+  let findNumbers = function (target, notesData, partial) {
+    let s = 0;
+    for (let i = 0; i < partial.length; i++) s += partial[i].amount;
+    if (s >= target && s <= target + dustAmount) result.push(partial);
+    if (s >= target) return;
+    for (let i = 0; i < notesData.length; i++) {
+      let remaining = [];
+      let n = notesData[i];
+      for (let j = i + 1; j < notesData.length; j++)
+        remaining.push(notesData[j]);
+      let partialRec = partial.slice(0);
+      partialRec.push(n);
+      findNumbers(target, remaining, partialRec);
+    }
+  };
+  findNumbers(target, notesData, []);
+
+  if (result.length == 0) return null;
+
+  let maxLenIdx = 0;
+  let maxLen = 0;
+  for (let i = 1; i < result.length; i++) {
+    if (result[i].length > maxLen) {
+      maxLenIdx = i;
+      maxLen = result[i].length;
+    }
+  }
+
+  return result[maxLenIdx];
+}
+
 module.exports = {
   _subaddressPrivKeys,
   _oneTimeAddressPrivKey,
@@ -237,6 +271,7 @@ module.exports = {
   fetchPositionData,
   signMarginChange,
   handlePfrNoteData,
+  findNoteCombinations,
 };
 
 // & The generation of addresses

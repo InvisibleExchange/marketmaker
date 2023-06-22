@@ -626,7 +626,7 @@ async function sendCancelOrder(
           order_response.error_message +
           " id: " +
           orderId;
-        // console.log(msg);
+        console.log(msg);
 
         errorCounter++;
       }
@@ -899,15 +899,13 @@ async function sendSplitOrder(user, token, newAmount) {
   newAmount = Number.parseInt(newAmount * 10 ** DECIMALS_PER_ASSET[token]);
 
   let res = user.restructureNotes(token, newAmount);
-  if (!res) return;
+  if (!res || !res.notesIn || res.notesIn.length == 0) return;
   let { notesIn, newNote, refundNote } = res;
 
-  let notes_in = notesIn.map((n) => n.toGrpcObject());
-
   res = await axios.post(`${EXPRESS_APP_URL}/split_notes`, {
-    notes_in,
+    notes_in: notesIn.map((n) => n.toGrpcObject()),
     note_out: newNote.toGrpcObject(),
-    refund_note: refundNote.toGrpcObject(),
+    refund_note: refundNote ? refundNote.toGrpcObject() : null,
   });
 
   let split_response = res.data.response;

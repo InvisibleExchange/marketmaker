@@ -957,12 +957,6 @@ async function run(config) {
     LIQUIDITY_INDICATION_PERIOD
   );
 
-  let refreshInterval = setInterval(async () => {
-    let res = await refreshOrders(fillInterval, brodcastInterval);
-    fillInterval = res.fillInterval;
-    brodcastInterval = res.brodcastInterval;
-  }, REFRESH_ORDERS_PERIOD);
-
   let errorInterval = setInterval(() => {
     if (errorCounter > 10) {
       clearInterval(fillInterval);
@@ -972,6 +966,12 @@ async function run(config) {
 
     errorCounter = 0;
   }, 4 * LIQUIDITY_INDICATION_PERIOD);
+
+  let refreshInterval = setInterval(async () => {
+    let res = await refreshOrders(fillInterval, brodcastInterval);
+    fillInterval = res.fillInterval;
+    brodcastInterval = res.brodcastInterval;
+  }, REFRESH_ORDERS_PERIOD);
 
   await new Promise((resolve) => setTimeout(resolve, REFRESH_PERIOD));
   clearInterval(fillInterval);
