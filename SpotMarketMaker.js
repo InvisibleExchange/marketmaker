@@ -254,10 +254,9 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let i = 0; i < activeOrdersCopy.length; i++) {
         const buyPrice =
           midPrice *
-            (1 -
-              mmConfig.minSpread -
-              (mmConfig.slippageRate * maxBuySize * i) / buySplits) -
-          extraTestSpread;
+          (1 -
+            mmConfig.minSpread -
+            (mmConfig.slippageRate * maxBuySize * i) / buySplits);
 
         let orderId = activeOrdersCopy[i].id;
         sendAmendOrder(
@@ -282,10 +281,9 @@ async function indicateLiquidity(marketIds = activeMarkets) {
 
         const buyPrice =
           midPrice *
-            (1 -
-              mmConfig.minSpread -
-              (mmConfig.slippageRate * maxBuySize * i) / buySplits) -
-          extraTestSpread;
+          (1 -
+            mmConfig.minSpread -
+            (mmConfig.slippageRate * maxBuySize * i) / buySplits);
 
         let quoteAmount = previousActiveOrders[marketId + "Buy"]
           ? previousActiveOrders[marketId + "Buy"].pop() /
@@ -336,10 +334,9 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let i = 0; i < activeOrdersCopy.length; i++) {
         const sellPrice =
           midPrice *
-            (1 +
-              mmConfig.minSpread +
-              (mmConfig.slippageRate * maxSellSize * i) / sellSplits) +
-          extraTestSpread;
+          (1 +
+            mmConfig.minSpread +
+            (mmConfig.slippageRate * maxSellSize * i) / sellSplits);
 
         let orderId = activeOrdersCopy[i].id;
         sendAmendOrder(
@@ -361,10 +358,9 @@ async function indicateLiquidity(marketIds = activeMarkets) {
 
         const sellPrice =
           midPrice *
-            (1 +
-              mmConfig.minSpread +
-              (mmConfig.slippageRate * maxSellSize * i) / sellSplits) +
-          extraTestSpread;
+          (1 +
+            mmConfig.minSpread +
+            (mmConfig.slippageRate * maxSellSize * i) / sellSplits);
 
         let baseAmount = previousActiveOrders[marketId + "Sell"]
           ? previousActiveOrders[marketId + "Sell"].pop() /
@@ -598,22 +594,15 @@ function genQuote(baseAsset, side, baseQuantity) {
     : PRICE_FEEDS[mmConfig.priceFeedPrimary];
   if (!primaryPrice) throw new Error("badprice");
 
-  // TODO:  remove after testing
-  const extraTestSpread = 0;
-
   const SPREAD = mmConfig.minSpread + baseQuantity * mmConfig.slippageRate;
 
   let quotePrice;
   let quoteQuantity;
   if (side === "b") {
-    quotePrice = Number(
-      ((primaryPrice - extraTestSpread) * (1 + SPREAD + 0.0007)).toPrecision(6)
-    );
+    quotePrice = Number((primaryPrice * (1 + SPREAD + 0.0007)).toPrecision(6));
     quoteQuantity = baseQuantity * quotePrice;
   } else if (side === "s") {
-    quotePrice = Number(
-      ((primaryPrice + extraTestSpread) * (1 - SPREAD - 0.0007)).toPrecision(6)
-    );
+    quotePrice = Number((primaryPrice * (1 - SPREAD - 0.0007)).toPrecision(6));
     quoteQuantity = baseQuantity * quotePrice;
   }
 
