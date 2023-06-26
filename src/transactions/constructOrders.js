@@ -26,6 +26,7 @@ const {
   _getLiquidationPrice,
 } = require("../helpers/tradePriceCalculations");
 const { storeUserState } = require("../helpers/localStorage");
+const LimitOrder = require("./LimitOrder");
 
 // const path = require("path");
 // require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
@@ -43,7 +44,7 @@ const EXPRESS_APP_URL = `http://${SERVER_URL}:4000`; // process.env.EXPRESS_APP_
  * @param  quoteToken (price token)
  * @param  baseAmount the amount of base tokens to be bought/sold (only for sell orders)
  * @param  quoteAmount the amount of quote tokens to be spent/received  (only for buy orders)
- * @param  price  price of base token denominated in quote token (current price if market order)
+ * @param  price a) price of base token denominated in quote token (current price if market order)
  * @param  feeLimit fee limit in percentage (1 = 1%)
  * @param  slippage  the slippage limit in percentage (1 = 1%) (null if limit)
  */
@@ -156,14 +157,6 @@ async function sendSpotOrder(
       let order_response = res.data.response;
 
       if (order_response.successful) {
-        // storeOrderId(
-        //   user.userId,
-        //   order_response.order_id,
-        //   pfrKey,
-        //   false,
-        //   user.privateSeed
-        // );
-
         storeUserState(user.db, user);
 
         // If this is a taker order it might have been filled fully/partially before the response was received (here)
@@ -231,6 +224,200 @@ async function sendSpotOrder(
       }
     });
 }
+
+//
+
+/**
+ * This constructs a spot swap and sends it to the backend
+ * ## Params:
+ * @param  order_side "Buy"/"Sell"
+ * @param  expirationTime expiration time in seconds
+ * @param  baseToken
+ * @param  quoteToken (price token)
+ * @param  prices
+ * @param  amounts
+ * @param  feeLimit fee limit in percentage (1 = 1%)
+ */
+async function sendBatchOrder(
+  user,
+  order_side,
+  expirationTime,
+  baseToken,
+  quoteToken,
+  prices,
+  amounts,
+  feeLimit,
+  ACTIVE_ORDERS
+) {
+  if (
+    !expirationTime ||
+    !baseToken ||
+    !quoteToken ||
+    !feeLimit ||
+    !(order_side == "Buy" || order_side == "Sell")
+  ) {
+    console.log("Please fill in all fields");
+    throw "Unfilled fields";
+  }
+  if (prices.length != amounts.length) throw "prices.length != amounts.length";
+
+  let baseDecimals = DECIMALS_PER_ASSET[baseToken];
+  let quoteDecimals = DECIMALS_PER_ASSET[quoteToken];
+  let priceDecimals = PRICE_DECIMALS_PER_ASSET[baseToken];
+
+  let decimalMultiplier = baseDecimals + priceDecimals - quoteDecimals;
+
+  let spendToken;
+  let spendAmounts = [];
+  let receiveToken;
+  if (order_side == "Buy") {
+    spendToken = quoteToken;
+    receiveToken = baseToken;
+
+    for (let i = 0; i < amounts.length; i++) {
+      let amount = Number.parseInt(amounts[i] * 10 ** quoteDecimals);
+
+      spendAmounts.push(amount);
+    }
+  } else {
+    spendToken = baseToken;
+    receiveToken = quoteToken;
+
+    for (let i = 0; i < amounts.length; i++) {
+      let amount = Number.parseInt(amounts[i] * 10 ** baseDecimals);
+
+      spendAmounts.push(amount);
+    }
+  }
+
+  if (expirationTime < 0 || expirationTime > 3600_000)
+    throw new Error("Expiration time Invalid");
+
+  let ts = new Date().getTime() / 1000; // number of seconds since epoch
+  let expirationTimestamp = Number.parseInt(ts.toString()) + expirationTime;
+
+  let spendAmountsSum = spendAmounts.reduce((a, b) => a + b, 0);
+  if (spendAmountsSum > user.getAvailableAmount(spendToken)) {
+    console.log("Insufficient balance");
+    throw new Error("Insufficient balance");
+  }
+
+  let receiveAmount;
+  if (order_side == "Buy") {
+    let priceScaled = Number.parseInt(prices[0] * 10 ** priceDecimals);
+
+    receiveAmount = Number.parseInt(
+      (BigInt(spendAmountsSum) * 10n ** BigInt(decimalMultiplier)) /
+        BigInt(priceScaled)
+    );
+  } else {
+    let priceScaled = Number.parseInt(prices[0] * 10 ** priceDecimals);
+
+    receiveAmount = Number.parseInt(
+      (BigInt(spendAmountsSum) * BigInt(priceScaled)) /
+        10n ** BigInt(decimalMultiplier)
+    );
+  }
+
+  feeLimit = Number.parseInt(((feeLimit * receiveAmount) / 100).toString());
+
+  let { limitOrder, pfrKey } = user.makeLimitOrder(
+    expirationTimestamp,
+    spendToken,
+    receiveToken,
+    spendAmountsSum,
+    receiveAmount,
+    feeLimit
+  );
+
+  let orderJson = limitOrder.toGrpcObject();
+  orderJson.user_id = trimHash(user.userId, 64).toString();
+  orderJson.is_market = false;
+  orderJson.prices = prices;
+  orderJson.amounts = spendAmounts;
+
+  user.awaittingOrder = true;
+
+  await axios
+    .post(`${EXPRESS_APP_URL}/submit_limit_order`, orderJson)
+    .then(async (res) => {
+      let order_response = res.data.response;
+
+      if (order_response.successful) {
+        storeUserState(user.db, user);
+
+        // If this is a taker order it might have been filled fully/partially before the response was received (here)
+        let filledAmount = user.filledAmounts[order_response.order_id]
+          ? user.filledAmounts[order_response.order_id]
+          : 0;
+
+        // ? Add the refund note
+        if (limitOrder.refund_note) {
+          if (filledAmount > 0) {
+            // If this is a market order then we can add the refund note immediately
+            user.noteData[limitOrder.refund_note.token].push(
+              limitOrder.refund_note
+            );
+          } else {
+            // If this is a limit order then we need to wait for the order to be filled
+            // (untill we receive a response through the websocket)
+            user.refundNotes[order_response.order_id] = limitOrder.refund_note;
+          }
+        }
+
+        if (
+          filledAmount <
+          receiveAmount - DUST_AMOUNT_PER_ASSET[receiveToken]
+        ) {
+          let order_id = Number(order_response.order_id);
+
+          for (let i = 0; i < spendAmounts.length; i++) {
+            let amount = spendAmounts[i];
+            let price = prices[i];
+
+            if (
+              ACTIVE_ORDERS[
+                SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
+              ]
+            ) {
+              ACTIVE_ORDERS[
+                SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
+              ].push({
+                id: order_id,
+                spendAmount: amount,
+                price,
+              });
+            } else {
+              ACTIVE_ORDERS[
+                SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
+              ] = [
+                {
+                  id: order_id,
+                  spendAmount: amount,
+                  price,
+                },
+              ];
+            }
+          }
+
+          limitOrder.order_id = order_id;
+          user.orders.push(limitOrder);
+        }
+
+        user.awaittingOrder = false;
+      } else {
+        let msg =
+          "Failed to submit order with error: \n" +
+          order_response.error_message;
+        console.log(msg);
+
+        user.awaittingOrder = false;
+        throw new Error(msg);
+      }
+    });
+}
+
+//
 
 // * =====================================================================================================================================
 // * =====================================================================================================================================
@@ -342,16 +529,6 @@ async function sendPerpOrder(
       let order_response = res.data.response;
 
       if (order_response.successful) {
-        // console.log("Order successfull: ", order_response.order_id);
-
-        // storeOrderId(
-        //   user.userId,
-        //   order_response.order_id,
-        //   pfrKey,
-        //   true,
-        //   user.privateSeed
-        // );
-
         storeUserState(user.db, user);
 
         // If this is a taker order it might have been filled fully/partially before the response was received (here)
@@ -522,6 +699,8 @@ async function sendLiquidationOrder(
  * @param orderSide true-Bid, false-Ask
  * @param isPerp
  * @param marketId market id of the order
+ * @param errorCounter
+ * @param dontUpdateState -if cancelling a batch order you dont want to update the state
  */
 async function sendCancelOrder(
   user,
@@ -529,7 +708,8 @@ async function sendCancelOrder(
   orderSide,
   isPerp,
   marketId,
-  errorCounter
+  errorCounter,
+  dontUpdateState = false
 ) {
   if (!(isPerp === true || isPerp === false) || !marketId || !orderId) {
     throw new Error("Invalid parameters");
@@ -545,7 +725,7 @@ async function sendCancelOrder(
 
   let cancelReq = {
     marketId: marketId,
-    order_id: orderId,
+    order_id: orderId.toString(),
     order_side: orderSide,
     user_id: trimHash(user.userId, 64).toString(),
     is_perp: isPerp,
@@ -557,6 +737,8 @@ async function sendCancelOrder(
       let order_response = response.data.response;
 
       if (order_response.successful) {
+        if (dontUpdateState) return;
+
         let pfrNote = order_response.pfr_note;
         if (pfrNote) {
           // This means that the order has been filled partially
@@ -564,7 +746,18 @@ async function sendCancelOrder(
           // instead we add the pfrNote to the user's noteData
 
           let note = Note.fromGrpcObject(pfrNote);
-          user.noteData[pfrNote.token].push(note);
+          let exists = false;
+          for (let n of user.noteData[pfrNote.token]) {
+            if (
+              n.address.getX().toString() == note.address.getX().toString() &&
+              n.index == note.index
+            ) {
+              exists = true;
+            }
+          }
+          if (!exists) {
+            user.noteData[pfrNote.token].push(note);
+          }
 
           if (isPerp) {
             // loop over the user's perpetual orders and find the order that has been cancelledž
@@ -611,7 +804,20 @@ async function sendCancelOrder(
                 if (notes_in.length > 0) {
                   for (let note_ of notes_in) {
                     let note = Note.fromGrpcObject(note_);
-                    user.noteData[note.token].push(note);
+
+                    let exists = false;
+                    for (let n of user.noteData[note.token]) {
+                      if (
+                        n.address.getX().toString() ==
+                          note.address.getX().toString() &&
+                        n.index == note.index
+                      ) {
+                        exists = true;
+                      }
+                    }
+                    if (!exists) {
+                      user.noteData[note.token].push(note);
+                    }
                   }
                 }
               }
@@ -626,13 +832,13 @@ async function sendCancelOrder(
           order_response.error_message +
           " id: " +
           orderId;
-        console.log(msg);
+        // console.log(msg);
 
         errorCounter++;
       }
     })
     .catch((err) => {
-      // console.log("Error submitting cancel order: ", err);
+      console.log("Error submitting cancel order: ", err);
     });
 }
 
@@ -657,7 +863,7 @@ async function sendAmendOrder(
   order_side,
   isPerp,
   marketId,
-  newPrice,
+  newPrices,
   newExpirationTime,
   match_only,
   ACTIVE_ORDERS,
@@ -666,17 +872,17 @@ async function sendAmendOrder(
   let ts = new Date().getTime() / 1000; // number of seconds since epoch
   let expirationTimestamp = Number.parseInt(ts.toString()) + newExpirationTime;
 
-  newPrice = Number(newPrice);
-
   if (
     !(isPerp === true || isPerp === false) ||
     !marketId ||
     !orderId ||
-    !newPrice ||
+    !newPrices ||
     !newExpirationTime ||
     (order_side !== "Buy" && order_side !== "Sell")
   )
     return;
+
+  newPrices = newPrices.map((p) => Number(p));
 
   let order;
   let signature;
@@ -695,7 +901,7 @@ async function sendAmendOrder(
 
     let newCollateralAmount = getQuoteQty(
       ord.synthetic_amount,
-      newPrice,
+      newPrices[0],
       ord.synthetic_token,
       COLLATERAL_TOKEN,
       null
@@ -733,7 +939,7 @@ async function sendAmendOrder(
     if (order_side == "Buy") {
       let newAmountReceived = getQtyFromQuote(
         ord.amount_spent,
-        newPrice,
+        newPrices[0],
         ord.token_received,
         ord.token_spent
       );
@@ -743,7 +949,7 @@ async function sendAmendOrder(
     } else {
       let newAmountReceived = getQuoteQty(
         ord.amount_spent,
-        newPrice,
+        newPrices[0],
         ord.token_spent,
         ord.token_received,
         null
@@ -765,9 +971,9 @@ async function sendAmendOrder(
 
   let amendReq = {
     market_id: marketId,
-    order_id: orderId,
+    order_id: orderId.toString(),
     order_side: order_side == "Buy",
-    new_price: newPrice,
+    new_prices: newPrices,
     new_expiration: expirationTimestamp,
     signature: { r: signature[0].toString(), s: signature[1].toString() },
     user_id: trimHash(user.userId, 64).toString(),
@@ -810,7 +1016,6 @@ async function sendAmendOrder(
   });
 }
 
-// * =====================================================================================================================================
 // * =====================================================================================================================================
 
 async function sendDeposit(user, depositId, amount, token, pubKey) {
@@ -1059,6 +1264,7 @@ async function sendChangeMargin(
 
 module.exports = {
   sendSpotOrder,
+  sendBatchOrder,
   sendPerpOrder,
   sendCancelOrder,
   sendDeposit,

@@ -234,9 +234,11 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
         otherSide === "s" ? "Buy" : "Sell",
         isPerp,
         marketId,
-        otherSide === "s"
-          ? otherOrder.price * (1 + 0.0001)
-          : otherOrder.price * (1 - 0.0001),
+        [
+          otherSide === "s"
+            ? otherOrder.price * (1 + 0.0001)
+            : otherOrder.price * (1 - 0.0001),
+        ],
         MM_CONFIG.EXPIRATION_TIME,
         true, // match_only
         ACTIVE_ORDERS,
@@ -356,7 +358,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           "Buy",
           isPerp,
           marketId,
-          buyPrice,
+          [buyPrice],
           MM_CONFIG.EXPIRATION_TIME,
           false, // match_only
           ACTIVE_ORDERS,
@@ -375,12 +377,11 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         )
           continue;
 
-
         const buyPrice =
           midPrice *
-            (1 -
-              mmConfig.minSpread -
-              (mmConfig.slippageRate * maxSize * i) / numSplits)
+          (1 -
+            mmConfig.minSpread -
+            (mmConfig.slippageRate * maxSize * i) / numSplits);
 
         sendPerpOrder(
           marketMaker,
@@ -411,13 +412,11 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         activeOrdersCopy = [...ACTIVE_ORDERS[marketId + "Sell"]];
       }
       for (let i = 0; i < activeOrdersCopy.length; i++) {
-    
-
         const sellPrice =
           midPrice *
-            (1 +
-              mmConfig.minSpread +
-              (mmConfig.slippageRate * maxSize * i) / numSplits)
+          (1 +
+            mmConfig.minSpread +
+            (mmConfig.slippageRate * maxSize * i) / numSplits);
 
         let orderId = activeOrdersCopy[i].id;
         sendAmendOrder(
@@ -426,7 +425,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           "Sell",
           isPerp,
           marketId,
-          sellPrice,
+          [sellPrice],
           MM_CONFIG.EXPIRATION_TIME,
           false, // match_only
           ACTIVE_ORDERS,
@@ -445,12 +444,11 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         )
           continue;
 
-
         const sellPrice =
           midPrice *
-            (1 +
-              mmConfig.minSpread +
-              (mmConfig.slippageRate * maxSize * i) / numSplits) 
+          (1 +
+            mmConfig.minSpread +
+            (mmConfig.slippageRate * maxSize * i) / numSplits);
 
         sendPerpOrder(
           marketMaker,
@@ -649,21 +647,15 @@ function genQuote(baseAsset, side, baseQuantity) {
     : PRICE_FEEDS[mmConfig.priceFeedPrimary];
   if (!primaryPrice) throw new Error("badprice");
 
-  
-
   const SPREAD = mmConfig.minSpread + baseQuantity * mmConfig.slippageRate;
 
   let quotePrice;
   let quoteQuantity;
   if (side === "b") {
-    quotePrice = Number(
-      (primaryPrice  * (1 + SPREAD + 0.0007)).toPrecision(6)
-    );
+    quotePrice = Number((primaryPrice * (1 + SPREAD + 0.0007)).toPrecision(6));
     quoteQuantity = baseQuantity * quotePrice;
   } else if (side === "s") {
-    quotePrice = Number(
-      (primaryPrice  * (1 - SPREAD - 0.0007)).toPrecision(6)
-    );
+    quotePrice = Number((primaryPrice * (1 - SPREAD - 0.0007)).toPrecision(6));
     quoteQuantity = baseQuantity * quotePrice;
   }
 

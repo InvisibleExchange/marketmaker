@@ -298,20 +298,40 @@ function handleSwapResult(
 
   let idx = user.orders.findIndex((o) => o.order_id == orderId);
   let order = user.orders[idx];
-
   if (order) {
+    // ? REMOVE THE ORDER FROM ACTIVE_ORDERS IF NECESSARY
+    let side =
+      order.token_spent == SPOT_MARKET_IDS_2_TOKENS[marketId].base
+        ? "Sell"
+        : "Buy";
+    let idx2 = ACTIVE_ORDERS[marketId.toString() + side].findIndex(
+      (o) => o.id == orderId
+    );
+
+    if (idx2 != -1) {
+      let activeOrder = ACTIVE_ORDERS[marketId.toString() + side][idx2];
+
+      let swapNoteAmount =
+        swap_response.swap_note.amount /
+        10 ** DECIMALS_PER_ASSET[swap_response.swap_note.token];
+
+      let filledValue =
+        side == "Buy"
+          ? swapNoteAmount * activeOrder.price
+          : swapNoteAmount / activeOrder.price;
+
+      activeOrder.spendAmount -= Number.parseInt(
+        filledValue * 10 ** DECIMALS_PER_ASSET[order.token_spent]
+      );
+
+      if (activeOrder.spendAmount <= DUST_AMOUNT_PER_ASSET[order.token_spent]) {
+        ACTIVE_ORDERS[marketId.toString() + side].splice(idx2, 1);
+      }
+    }
+
+    // Remove the order from the active orders if necessary
     order.qty_left -= swap_response.swap_note.amount;
-
     if (!swap_response.new_pfr_note) {
-      let side =
-        order.token_spent == SPOT_MARKET_IDS_2_TOKENS[marketId].base
-          ? "Sell"
-          : "Buy";
-
-      ACTIVE_ORDERS[marketId.toString() + side] = ACTIVE_ORDERS[
-        marketId.toString() + side
-      ].filter((o) => o.id != orderId);
-
       user.orders.splice(idx, 1);
     } else {
       user.orders[idx] = order;
