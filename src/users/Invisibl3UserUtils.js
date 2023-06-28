@@ -8,7 +8,12 @@ const {
   fetchStoredNotes,
   storePrivKey,
 } = require("../helpers/firebase/firebaseConnection");
-const { DUST_AMOUNT_PER_ASSET } = require("../helpers/utils");
+
+const DUST_AMOUNT_PER_ASSET = {
+  12345: 2500, // BTC ~ 5c
+  54321: 25000, // ETH ~ 5c
+  55555: 50000, // USDC ~ 5c
+};
 
 /* global BigInt */
 
