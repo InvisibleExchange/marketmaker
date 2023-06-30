@@ -131,30 +131,59 @@ function checkPerpOrderValidity(
   }
 }
 
-function getQuoteQty(qty, price_, baseAsset, quoteAsset) {
+// fn get_quote_qty(
+//   qty: u64,
+//   price: f64,
+//   base_asset: u64,
+//   quote_asset: u64,
+//   _side: Option<OrderSide>,
+// ) -> u64 {
+//   let base_decimals = DECIMALS_PER_ASSET[base_asset.to_string().as_str()];
+//   let quote_decimals = DECIMALS_PER_ASSET[quote_asset.to_string().as_str()];
+
+//   let qty = qty as f64 / 10_f64.powi(base_decimals as i32);
+
+//   // round the number up to ~1c precision
+//   let quote_qty = qty * price;
+//   let quote_qty = (quote_qty * 100.0).floor() / 100.0;
+
+//   return (quote_qty * 10_f64.powi(quote_decimals as i32)) as u64;
+// }
+
+function getQuoteQty(qty_, price_, baseAsset, quoteAsset) {
   let baseDecimals = DECIMALS_PER_ASSET[baseAsset];
   let quoteDecimals = DECIMALS_PER_ASSET[quoteAsset];
-  let priceDecimals = PRICE_DECIMALS_PER_ASSET[baseAsset];
 
-  let price = Number.parseInt(price_ * 10 ** priceDecimals);
+  let qty = qty_ / 10 ** baseDecimals;
 
-  let mutliplier = 10 ** (baseDecimals + priceDecimals - quoteDecimals);
+  let quoteQty = qty * price_;
+  // quoteQty = Number.parseInt(quoteQty * 100) / 100;
 
-  let res = (qty * price) / mutliplier;
-  return Number.parseInt(res);
+  return Number.parseInt(quoteQty * 10 ** quoteDecimals);
 }
 
-function getQtyFromQuote(quoteQty, price_, baseAsset, quoteAsset) {
+// fn get_qty_from_quote(quote_qty: u64, price: f64, base_asset: u64, quote_asset: u64) -> u64 {
+//   let base_decimals = DECIMALS_PER_ASSET[base_asset.to_string().as_str()];
+//   let quote_decimals = DECIMALS_PER_ASSET[quote_asset.to_string().as_str()];
+
+//   let quote_qty = quote_qty as f64 / 10_f64.powi(quote_decimals as i32);
+
+//   let qty = quote_qty / price;
+//   let qty = (qty * 100.0).floor() / 100.0;
+
+//   return (qty * 10_f64.powi(base_decimals as i32)) as u64;
+// }
+
+function getQtyFromQuote(quoteQty_, price_, baseAsset, quoteAsset) {
   let baseDecimals = DECIMALS_PER_ASSET[baseAsset];
   let quoteDecimals = DECIMALS_PER_ASSET[quoteAsset];
-  let priceDecimals = PRICE_DECIMALS_PER_ASSET[baseAsset];
 
-  let price = Number.parseInt(price_ * 10 ** priceDecimals);
+  let quoteQty = quoteQty_ / 10 ** quoteDecimals;
 
-  let mutliplier = 10 ** (baseDecimals + priceDecimals - quoteDecimals);
+  let qty = quoteQty / price_;
+  // qty = Number.parseInt(qty * 100) / 100;
 
-  let res = (quoteQty * mutliplier) / price;
-  return Number.parseInt(res);
+  return Number.parseInt(qty * 10 ** baseDecimals);
 }
 
 module.exports = {
