@@ -98,3 +98,22 @@ async function finalize_batch() {
 }
 
 main();
+
+// const User = require("./Invisibl3User");
+
+// const bigint = require("big-integer");
+
+// let privKey_ =
+//   "1d5b3e6b261372758fabd6dc509f1eabfc719d310d0b9e849bccca97a5c5983";
+
+// let user = User.fromPrivKey(privKey_);
+
+// let address = user.getPositionAddress(12345);
+// console.log(address.positionPrivKey);
+// console.log(address.positionAddress.getX().toString());
+
+// let encryptedPk = bigint(address.positionPrivKey)
+//   .xor(user.privateSeed)
+//   .toString();
+
+// console.log(encryptedPk);

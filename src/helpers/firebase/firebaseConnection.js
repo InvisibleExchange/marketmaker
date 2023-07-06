@@ -73,6 +73,16 @@ async function fetchStoredNotes(address, blinding) {
   return notes;
 }
 
+async function checkNoteExistance(address) {
+  // Address should be the x coordinate of the address in decimal format
+
+  const querySnapshot = await getDocs(
+    collection(db, `notes/${address}/indexes`)
+  );
+
+  return !querySnapshot.empty;
+}
+
 // ---- POSITIONS ---- //
 async function fetchStoredPosition(address) {
   // returns the position at this address from the db
@@ -93,6 +103,16 @@ async function fetchStoredPosition(address) {
   });
 
   return positions;
+}
+
+async function checkPositionExistance(address) {
+  // Address should be the x coordinate of the address in decimal format
+
+  const querySnapshot = await getDocs(
+    collection(db, `positions/${address}/indexes`)
+  );
+
+  return !querySnapshot.empty;
 }
 
 async function fetchIndividualPosition(address, index) {
@@ -565,6 +585,9 @@ module.exports = {
   storeOrderId,
   removeOrderId,
   // fetchDeprecatedKeys,
+  //
+  checkNoteExistance,
+  checkPositionExistance,
 };
 
 // storeOnchainDeposit,

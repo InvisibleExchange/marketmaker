@@ -78,7 +78,9 @@ async function cryptowatchWsSetup(
   PRICE_FEEDS,
   MM_CONFIG
 ) {
-  if (cryptowatch_ws) return;
+  if (cryptowatch_ws) {
+    cryptowatch_ws.close();
+  }
 
   // Set initial prices
   const cryptowatchApiKey =

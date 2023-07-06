@@ -1,100 +1,106 @@
-const { getKeyPair } = require("starknet");
 const User = require("../users/Invisibl3User");
-const { trimHash } = require("../users/Notes");
-const { pedersen } = require("./pedersen");
 
-const db = require("../helpers/firebase/firebaseAdminConfig").db;
+const { IDS_TO_SYMBOLS, PRICE_DECIMALS_PER_ASSET } = require("./utils");
+const {
+  checkNoteExistance,
+  checkPositionExistance,
+} = require("./firebase/firebaseConnection");
+const { storeUserState } = require("./localStorage");
 
 // ! RESTORE KEY DATA ========================================================================
-// TODO: Seperate logic for restoring destSpentAddress that gets generated as a sum of priv keys
-async function restoreKeyData(privateSeed, privSpendKey, privViewKey) {
+
+/**
+ *
+ * @param {bigint|string} originPrivKey
+ * @param {number[]} tokens
+ * @param {boolean} isPerpetual - if true retrieve position keys else retrieve note keys
+ */
+async function restoreKeyData(
+  user,
+  isPerpetual = false,
+  tokens = [12345, 54321, 55555]
+) {
   // ? Get all the addresses from the datatbase =====
 
-  let notesCollection = db.collection("notes");
-  let docs = await notesCollection.listDocuments();
+  if (isPerpetual) {
+    let positionPrivKeys = {};
+    for (let token of tokens) {
+      if (!PRICE_DECIMALS_PER_ASSET[token]) continue;
 
-  const sortedAddresses = docs.map((obj) => BigInt(obj.id));
-  sortedAddresses.sort((a, b) => (a > b ? 1 : a < b ? -1 : 0));
+      let counter = 0;
+      for (let i = 0; i < 16; i++) {
+        let { positionPrivKey, positionAddress } =
+          user.getPositionAddress(token);
 
-  let positionsCollection = db.collection("positions");
-  let docs2 = await positionsCollection.listDocuments();
+        checkPositionExistance(positionAddress.getX().toString()).then(
+          (keyExists) => {
+            if (keyExists) {
+              positionPrivKeys[positionAddress.getX().toString()] =
+                positionPrivKey;
+            }
 
-  const sortedPosAddresses = docs2.map((obj) => BigInt(obj.id));
-  sortedPosAddresses.sort((a, b) => (a > b ? 1 : a < b ? -1 : 0));
+            counter++;
+          }
+        );
+      }
 
-  // ? ===================================================
-
-  const tokens = [12345, 54321, 55555];
-
-  let privKeyData = {};
-
-  // & This returns the dest received address and blinding
-  for (const token of tokens) {
-    let ksi = trimHash(pedersen([privSpendKey, token]), 240);
-    let kvi = trimHash(pedersen([privViewKey, token]), 240);
-    let Kvi = getKeyPair(kvi).getPublic();
-
-    for (let i = 0; i < 5; i++) {
-      let ko = trimHash(pedersen([i, BigInt(Kvi.getX())]), 240) + ksi;
-      let Ko = BigInt(getKeyPair(ko).getPublic().getX());
-
-      // If the address is found in the database, then it is a valid address
-      let isFound = isNumberInSortedArray(Ko, sortedAddresses);
-
-      if (isFound) {
-        privKeyData[Ko] = ko;
+      while (counter < 16) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
     }
-  }
 
-  // ? ===================================================
+    return positionPrivKeys;
+  } else {
+    let privKeys = {};
+    for (let token of tokens) {
+      if (!IDS_TO_SYMBOLS[token]) continue;
 
-  let posPrivKeyData = {};
+      let counter = 0;
+      for (let i = 0; i < 32; i++) {
+        let { KoR, koR, _ } = user.getDestReceivedAddresses(token);
 
-  for (const token of tokens) {
-    let ksi = trimHash(pedersen([privSpendKey, token]), 240);
-    let kvi = trimHash(pedersen([privViewKey, token]), 240);
-    let Kvi = getKeyPair(kvi).getPublic();
+        checkNoteExistance(KoR.getX().toString()).then((keyExists) => {
+          if (keyExists) {
+            privKeys[KoR.getX().toString()] = koR;
+          }
 
-    for (let i = 0; i < 5; i++) {
-      let ko = trimHash(pedersen([i, BigInt(Kvi.getX())]), 240) + ksi;
-      let Ko = BigInt(getKeyPair(ko).getPublic().getX());
+          counter++;
+        });
+      }
 
-      // If the address is found in the database, then it is a valid address
-      let isFound = isNumberInSortedArray(Ko, sortedPosAddresses);
-
-      if (isFound) {
-        posPrivKeyData[Ko] = ko;
+      while (counter < 32) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
     }
+
+    return privKeys;
   }
 }
 
-async function main() {
-  let user = User.fromPrivKey(1234);
+/**
+ *
+ * @param {bigint|string} originPrivKey
+ * @param {boolean} restoreNotes  - if true retrieve note keys
+ * @param {boolean} restorePositions - if true retrieve position keys
+ */
+async function restoreUserState(originPrivKey, restoreNotes, restorePositions) {
+  let user = User.fromPrivKey(originPrivKey.toString());
+  await user.login();
 
-  //   console.log(user);
+  if (restoreNotes) {
+    let privKeys = await restoreKeyData(user, false);
+    console.log("note keyData: ", privKeys);
 
-  await restoreKeyData(user.privateSeed, user.privSpendKey, user.privViewKey);
-}
+    user.notePrivKeys = privKeys;
+  }
+  if (restorePositions) {
+    let posPrivKeys = await restoreKeyData(user, true);
+    console.log("position keyData: ", posPrivKeys);
 
-main();
-
-function isNumberInSortedArray(num, array) {
-  let left = 0;
-  let right = array.length - 1;
-
-  while (left <= right) {
-    let mid = Math.floor((left + right) / 2);
-
-    if (array[mid] === num) {
-      return true;
-    } else if (array[mid] < num) {
-      left = mid + 1;
-    } else {
-      right = mid - 1;
-    }
+    user.positionPrivKeys = posPrivKeys;
   }
 
-  return false;
+  storeUserState(user.db, user);
 }
+
+module.exports = { restoreUserState };

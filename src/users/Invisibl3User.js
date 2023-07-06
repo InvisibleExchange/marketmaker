@@ -161,6 +161,13 @@ module.exports = class User {
         ? userData.privKeys.map((pk) => getKeyPair(pk))
         : [];
 
+    console.log(userData.privKeys);
+
+    console.log(
+      "keyPairs: ",
+      keyPairs.map((kp) => kp.getPublic().getX().toString())
+    );
+
     let { emptyPrivKeys, noteData, notePrivKeys } = await fetchNoteData(
       keyPairs,
       this.privateSeed
@@ -257,18 +264,6 @@ module.exports = class User {
           order.position_effect_type != "Close");
     }
 
-    // if (noActiveOrders) {
-    //   for (let privKey of emptyPrivKeys) {
-    //     removePrivKey(this.userId, privKey, false, this.privateSeed);
-    //   }
-    // }
-    // // ? If there are no perp orders than get rid of emptyPositionPrivKeys
-    // if (perpOrders.length == 0) {
-    //   for (let privKey of emptyPositionPrivKeys) {
-    //     removePrivKey(this.userId, privKey, true, this.privateSeed);
-    //   }
-    // }
-
     // ? Get the notes that aren't currently used in active orders and save the addresses of those that are
     let frozenAddresses = [];
     let newNoteData = {};
@@ -308,41 +303,6 @@ module.exports = class User {
     this.orders = orders;
     this.perpetualOrders = perpOrders;
 
-    let counter = 0;
-    for (let orderId of badOrderIds) {
-      // removeOrderId(this.userId, orderId, false, this.privateSeed).then(() => {
-      //   counter++;
-      // });
-      // if (this.pfrKeys[orderId]) {
-      //   handlePfrNoteData(
-      //     this.userId,
-      //     this.pfrKeys[orderId],
-      //     this.privateSeed,
-      //     newNoteData,
-      //     this.notePrivKeys
-      //   ).then(() => {
-      //     counter++;
-      //   });
-      // }
-    }
-
-    for (let orderId of badPerpOrderIds) {
-      // removeOrderId(this.userId, orderId, true, this.privateSeed).then(() => {
-      //   counter++;
-      // });
-      // if (this.pfrKeys[orderId]) {
-      //   handlePfrNoteData(
-      //     this.userId,
-      //     this.pfrKeys[orderId],
-      //     this.privateSeed,
-      //     newNoteData,
-      //     this.notePrivKeys
-      //   ).then(() => {
-      //     counter++;
-      //   });
-      // }
-    }
-
     let noteDataNew = {};
     for (let [token, arr] of Object.entries(newNoteData)) {
       let newArr = [];
@@ -357,10 +317,6 @@ module.exports = class User {
     }
 
     this.noteData = noteDataNew;
-
-    // while (counter < badOrderIds.length + badPerpOrderIds.length) {
-    //   await new Promise((resolve) => setTimeout(resolve, 50));
-    // }
 
     storeUserState(this.db, this);
   }
@@ -858,7 +814,7 @@ module.exports = class User {
     let noteCount2 = this.noteCounts[tokenReceived] ?? 0;
 
     // ? Update the note count
-    this.noteCounts[tokenReceived] = (noteCount2 + 1) % 50;
+    this.noteCounts[tokenReceived] = (noteCount2 + 1) % 32;
 
     // ? Generate a new address and private key pair
     let koR = this.oneTimeAddressPrivKey(noteCount2, tokenReceived);
@@ -929,7 +885,7 @@ module.exports = class User {
   getPositionAddress(syntheticToken) {
     let posCount = this.positionCounts[syntheticToken] ?? 0;
 
-    this.positionCounts[syntheticToken] = (posCount + 1) % 50;
+    this.positionCounts[syntheticToken] = (posCount + 1) % 16;
 
     let positionPrivKey = this.oneTimeAddressPrivKey(posCount, syntheticToken);
     let positionAddress = getKeyPair(positionPrivKey).getPublic();
