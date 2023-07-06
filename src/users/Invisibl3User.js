@@ -161,13 +161,6 @@ module.exports = class User {
         ? userData.privKeys.map((pk) => getKeyPair(pk))
         : [];
 
-    console.log(userData.privKeys);
-
-    console.log(
-      "keyPairs: ",
-      keyPairs.map((kp) => kp.getPublic().getX().toString())
-    );
-
     let { emptyPrivKeys, noteData, notePrivKeys } = await fetchNoteData(
       keyPairs,
       this.privateSeed
