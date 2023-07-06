@@ -66,10 +66,14 @@ module.exports = async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
       }
     });
   }
-  if (chainlink.length > 0) await chainlinkSetup(chainlink, PRICE_FEEDS);
-  if (cryptowatch.length > 0)
+  // if (chainlink.length > 0) await chainlinkSetup(chainlink, PRICE_FEEDS);
+  // if (uniswapV3.length > 0) await uniswapV3Setup(uniswapV3, PRICE_FEEDS);
+
+  try {
     await cryptowatchWsSetup(cryptowatch, PRICE_FEEDS, MM_CONFIG);
-  if (uniswapV3.length > 0) await uniswapV3Setup(uniswapV3, PRICE_FEEDS);
+  } catch (error) {
+    console.log("123");
+  }
 };
 
 let cryptowatch_ws;
@@ -79,7 +83,7 @@ async function cryptowatchWsSetup(
   MM_CONFIG
 ) {
   if (cryptowatch_ws) {
-    cryptowatch_ws.close();
+    return;
   }
 
   // Set initial prices
@@ -122,9 +126,11 @@ async function cryptowatchWsSetup(
       const pair = cryptowatchMarket.pair;
       const key = `market:${exchange}:${pair}`;
 
-      PRICE_FEEDS["cryptowatch:" + cryptowatchMarketIds[i]] =
+      PRICE_FEEDS["cryptowatch:" + cryptowatchMarketId] =
         cryptowatchMarketPrices.result[key];
     } catch (e) {
+      console.log(e);
+      console.log("cryptowatchMarketIds", cryptowatchMarketIds);
       console.error(
         "Could not set price feed for cryptowatch:" + cryptowatchMarketId
       );
@@ -154,7 +160,10 @@ async function cryptowatchWsSetup(
   cryptowatch_ws.on("open", onopen);
   cryptowatch_ws.on("message", onmessage);
   cryptowatch_ws.on("close", onclose);
-  cryptowatch_ws.on("error", console.error);
+  cryptowatch_ws.on("error", (err) => {
+    console.log("cryptowatch ws error", err);
+    cryptowatch_ws.close();
+  });
 
   function onopen() {
     cryptowatch_ws.send(JSON.stringify(subscriptionMsg));

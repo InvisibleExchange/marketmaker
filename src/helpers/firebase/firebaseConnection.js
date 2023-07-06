@@ -27,7 +27,7 @@ const BN = require("bn.js");
 /* global BigInt */
 
 // ---- NOTES ---- //
-async function fetchStoredNotes(address, blinding) {
+async function fetchStoredNotes(address, blinding) {  
   // Address should be the x coordinate of the address in decimal format
 
   const querySnapshot = await getDocs(
@@ -81,6 +81,17 @@ async function checkNoteExistance(address) {
   );
 
   return !querySnapshot.empty;
+}
+
+
+async function testGetState() {
+
+  const querySnapshot = await getDocs(
+    collection(db, `notes/${address}/indexes`)
+  );
+
+
+  
 }
 
 // ---- POSITIONS ---- //
@@ -349,118 +360,6 @@ async function fetchUserData(userId, privateSeed) {
     positionPrivKeys,
     pfrKeys,
   };
-}
-
-async function fetchDeprecatedKeys(userId, privateSeed) {
-  let querySnapshot = await getDocs(
-    collection(db, `users/${userId}/deprecatedKeys`)
-  );
-  let privKeys = [];
-  if (!querySnapshot.empty) {
-    querySnapshot.forEach((doc) => {
-      let decyrptedPk = bigInt(doc.id).xor(privateSeed).value;
-
-      privKeys.push(BigInt(decyrptedPk));
-    });
-  }
-
-  return privKeys;
-}
-
-// ---- DEPOSIT ---- //
-async function storeOnchainDeposit(deposit) {
-  let depositDoc = doc(db, "deposits", deposit.depositId.toString());
-  let depositData = await getDoc(depositDoc);
-
-  if (depositData.exists()) {
-    await updateDoc(depositDoc, {
-      depositId: deposit.depositId.toString(),
-      starkKey: deposit.starkKey.toString(),
-      tokenId: deposit.tokenId.toString(),
-      depositAmountScaled: deposit.depositAmountScaled.toString(),
-      timestamp: deposit.timestamp,
-    });
-  } else {
-    await setDoc(depositDoc, {
-      depositId: deposit.depositId.toString(),
-      starkKey: deposit.starkKey.toString(),
-      tokenId: deposit.tokenId.toString(),
-      depositAmountScaled: deposit.depositAmountScaled.toString(),
-      timestamp: deposit.timestamp,
-    });
-  }
-}
-
-async function storeDepositId(userId, depositId, privateSeed) {
-  if (!depositId) return;
-  // ? Stores the depositId of the user
-
-  let userDataDoc = doc(db, "users", userId.toString());
-  let userDataData = await getDoc(userDataDoc);
-
-  let mask = trimHash(privateSeed, 64);
-  let encryptedDepositId = bigInt(depositId).xor(mask).toString();
-
-  let depositIdData = userDataData.data().depositIds;
-  if (!depositIdData.includes(encryptedDepositId.toString())) {
-    depositIdData.push(encryptedDepositId.toString());
-  }
-
-  await updateDoc(userDataDoc, {
-    depositIds: depositIdData,
-  });
-}
-
-async function removeDepositFromDb(depositId) {
-  //
-  if (!depositId) return;
-
-  let depositDoc = doc(db, `deposits`, depositId.toString());
-  let depositData = await getDoc(depositDoc);
-
-  if (depositData.exists()) {
-    await deleteDoc(depositDoc);
-  }
-
-  let docRef2 = doc(db, `users/${userId}/deprecatedDeposits`, depositId);
-  await setDoc(docRef2, {});
-}
-
-async function fetchOnchainDeposits(userId, privateSeed) {
-  if (!userId) {
-    return [];
-  }
-
-  let userDataDoc = doc(db, "users", userId.toString());
-  let userDataData = await getDoc(userDataDoc);
-
-  let depositIds = userDataData.data().depositIds;
-
-  let badDepositIds = [];
-  let deposits = [];
-  for (const depositId of depositIds) {
-    let mask = trimHash(privateSeed, 64);
-    let decryptedDepositId = bigInt(depositId).xor(mask).toString();
-
-    let depositDoc = doc(db, "deposits", decryptedDepositId);
-    let depositData = await getDoc(depositDoc);
-
-    if (!depositData.exists()) {
-      badDepositIds.push(depositId);
-      continue;
-    }
-
-    deposits.push({
-      depositId: depositData.data().depositId,
-      starkKey: depositData.data().starkKey,
-      tokenId: depositData.data().tokenId,
-      depositAmountScaled: depositData.data().depositAmountScaled,
-      timestamp: depositData.data().timestamp,
-    });
-  }
-
-  // return badDepositIds;
-  return deposits;
 }
 
 // ---- FILLS ---- //

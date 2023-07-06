@@ -932,7 +932,11 @@ async function run(config) {
   activeMarkets = config.activeMarkets;
 
   // Setup price feeds
-  await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
+  try {
+    await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
+  } catch (error) {
+    console.log("Error setting up price feeds: ", error);
+  }
 
   // Setup the market maker
   await runWithTimeout(initAccountState, 30000);
