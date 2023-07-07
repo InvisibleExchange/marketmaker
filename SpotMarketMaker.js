@@ -270,7 +270,6 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let [order_id, count] of Object.entries(ordersPerId)) {
         let buyPrices = [];
         for (let i = 0; i < count; i++) {
-          console.log("shift: ", mmConfig.minSpread);
           const buyPrice =
             midPrice *
             (1 -
@@ -363,7 +362,6 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let [order_id, count] of Object.entries(ordersPerId)) {
         let sellPrices = [];
         for (let i = 0; i < count; i++) {
-          console.log("shift: ", mmConfig.minSpread);
           const sellPrice =
             midPrice *
             (1 +
@@ -484,18 +482,15 @@ async function cancelLiquidity(marketId) {
 
 async function afterFill(amountFilled, marketId, isBuy) {
   // TODO
-
   // const mmConfig = MM_CONFIG.pairs[marketId];
   // if (!mmConfig) {
   //   return;
   // }
-
   // // ? Delay trading after fill for delayAfterFill seconds
   // if (mmConfig.delayAfterFill) {
   //   let delayAfterFillMinSize = mmConfig.delayAfterFillMinSize
   //     ? mmConfig.delayAfterFillMinSize
   //     : 0;
-
   //   if (amountFilled > delayAfterFillMinSize) {
   //     // no array -> old config
   //     // or array and amountFilled over minSize
@@ -511,14 +506,12 @@ async function afterFill(amountFilled, marketId, isBuy) {
   //     }, mmConfig.delayAfterFill * 1000);
   //   }
   // }
-
   // // ? increaseSpreadAfterFill size might not be set
   // const increaseSpreadAfterFillMinSize =
   //   Array.isArray(mmConfig.increaseSpreadAfterFill) &&
   //   mmConfig.increaseSpreadAfterFill.length > 2
   //     ? mmConfig.increaseSpreadAfterFill[2]
   //     : 0;
-
   // if (
   //   mmConfig.increaseSpreadAfterFill &&
   //   amountFilled > increaseSpreadAfterFillMinSize
@@ -533,7 +526,6 @@ async function afterFill(amountFilled, marketId, isBuy) {
   //     indicateLiquidity(marketId);
   //   }, time * 1000);
   // }
-
   // // ? changeSizeAfterFill size might not be set
   // const changeSizeAfterFillMinSize =
   //   Array.isArray(mmConfig.changeSizeAfterFill) &&
