@@ -513,83 +513,77 @@ async function cancelLiquidity(marketId) {
 
 async function afterFill(amountFilled, marketId) {
   //
-
-  activeOrdersMidPrice[marketId] = null;
-
-  const mmConfig = MM_CONFIG.pairs[marketId];
-  if (!mmConfig) {
-    return;
-  }
-
-  // ? Delay trading after fill for delayAfterFill seconds
-  if (mmConfig.delayAfterFill) {
-    let delayAfterFillMinSize;
-    if (
-      !Array.isArray(mmConfig.delayAfterFill) ||
-      !mmConfig.delayAfterFill.length > 1
-    ) {
-      delayAfterFillMinSize = 0;
-    } else {
-      delayAfterFillMinSize = mmConfig.delayAfterFill[1];
-    }
-
-    if (amountFilled > delayAfterFillMinSize) {
-      // no array -> old config
-      // or array and amountFilled over minSize
-      mmConfig.active = false;
-      cancelLiquidity(marketId);
-      console.log(
-        `Set ${marketId} passive for ${mmConfig.delayAfterFill} seconds.`
-      );
-      setTimeout(() => {
-        mmConfig.active = true;
-        console.log(`Set ${marketId} active.`);
-        indicateLiquidity([marketId]);
-      }, mmConfig.delayAfterFill * 1000);
-    }
-  }
-
-  // ? increaseSpreadAfterFill size might not be set
-  const increaseSpreadAfterFillMinSize =
-    Array.isArray(mmConfig.increaseSpreadAfterFill) &&
-    mmConfig.increaseSpreadAfterFill.length > 2
-      ? mmConfig.increaseSpreadAfterFill[2]
-      : 0;
-  if (
-    mmConfig.increaseSpreadAfterFill &&
-    amountFilled > increaseSpreadAfterFillMinSize
-  ) {
-    const [spread, time] = mmConfig.increaseSpreadAfterFill;
-    mmConfig.minSpread = mmConfig.minSpread + spread;
-    console.log(`Changed ${marketId} minSpread by ${spread}.`);
-    indicateLiquidity(marketId);
-    setTimeout(() => {
-      mmConfig.minSpread = mmConfig.minSpread - spread;
-      console.log(`Changed ${marketId} minSpread by -${spread}.`);
-      indicateLiquidity(marketId);
-    }, time * 1000);
-  }
-
-  // ? changeSizeAfterFill size might not be set
-  const changeSizeAfterFillMinSize =
-    Array.isArray(mmConfig.changeSizeAfterFill) &&
-    mmConfig.changeSizeAfterFill.length > 2
-      ? mmConfig.changeSizeAfterFill[2]
-      : 0;
-  if (
-    mmConfig.changeSizeAfterFill &&
-    amountFilled > changeSizeAfterFillMinSize
-  ) {
-    const [size, time] = mmConfig.changeSizeAfterFill;
-    mmConfig.maxSize = mmConfig.maxSize + size;
-    console.log(`Changed ${marketId} maxSize by ${size}.`);
-    indicateLiquidity([marketId]);
-    setTimeout(() => {
-      mmConfig.maxSize = mmConfig.maxSize - size;
-      console.log(`Changed ${marketId} maxSize by ${size * -1}.`);
-      indicateLiquidity([marketId]);
-    }, time * 1000);
-  }
+  // activeOrdersMidPrice[marketId] = null;
+  // const mmConfig = MM_CONFIG.pairs[marketId];
+  // if (!mmConfig) {
+  //   return;
+  // }
+  // // ? Delay trading after fill for delayAfterFill seconds
+  // if (mmConfig.delayAfterFill) {
+  //   let delayAfterFillMinSize;
+  //   if (
+  //     !Array.isArray(mmConfig.delayAfterFill) ||
+  //     !mmConfig.delayAfterFill.length > 1
+  //   ) {
+  //     delayAfterFillMinSize = 0;
+  //   } else {
+  //     delayAfterFillMinSize = mmConfig.delayAfterFill[1];
+  //   }
+  //   if (amountFilled > delayAfterFillMinSize) {
+  //     // no array -> old config
+  //     // or array and amountFilled over minSize
+  //     mmConfig.active = false;
+  //     cancelLiquidity(marketId);
+  //     console.log(
+  //       `Set ${marketId} passive for ${mmConfig.delayAfterFill} seconds.`
+  //     );
+  //     setTimeout(() => {
+  //       mmConfig.active = true;
+  //       console.log(`Set ${marketId} active.`);
+  //       indicateLiquidity([marketId]);
+  //     }, mmConfig.delayAfterFill * 1000);
+  //   }
+  // }
+  // // ? increaseSpreadAfterFill size might not be set
+  // const increaseSpreadAfterFillMinSize =
+  //   Array.isArray(mmConfig.increaseSpreadAfterFill) &&
+  //   mmConfig.increaseSpreadAfterFill.length > 2
+  //     ? mmConfig.increaseSpreadAfterFill[2]
+  //     : 0;
+  // if (
+  //   mmConfig.increaseSpreadAfterFill &&
+  //   amountFilled > increaseSpreadAfterFillMinSize
+  // ) {
+  //   const [spread, time] = mmConfig.increaseSpreadAfterFill;
+  //   mmConfig.minSpread = mmConfig.minSpread + spread;
+  //   console.log(`Changed ${marketId} minSpread by ${spread}.`);
+  //   indicateLiquidity(marketId);
+  //   setTimeout(() => {
+  //     mmConfig.minSpread = mmConfig.minSpread - spread;
+  //     console.log(`Changed ${marketId} minSpread by -${spread}.`);
+  //     indicateLiquidity(marketId);
+  //   }, time * 1000);
+  // }
+  // // ? changeSizeAfterFill size might not be set
+  // const changeSizeAfterFillMinSize =
+  //   Array.isArray(mmConfig.changeSizeAfterFill) &&
+  //   mmConfig.changeSizeAfterFill.length > 2
+  //     ? mmConfig.changeSizeAfterFill[2]
+  //     : 0;
+  // if (
+  //   mmConfig.changeSizeAfterFill &&
+  //   amountFilled > changeSizeAfterFillMinSize
+  // ) {
+  //   const [size, time] = mmConfig.changeSizeAfterFill;
+  //   mmConfig.maxSize = mmConfig.maxSize + size;
+  //   console.log(`Changed ${marketId} maxSize by ${size}.`);
+  //   indicateLiquidity([marketId]);
+  //   setTimeout(() => {
+  //     mmConfig.maxSize = mmConfig.maxSize - size;
+  //     console.log(`Changed ${marketId} maxSize by ${size * -1}.`);
+  //     indicateLiquidity([marketId]);
+  //   }, time * 1000);
+  // }
 }
 
 // * HELPER FUNCTIONS ==========================================================================================================

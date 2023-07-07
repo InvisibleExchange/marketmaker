@@ -184,6 +184,8 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
 }
 
 async function indicateLiquidity(marketIds = activeMarkets) {
+  if (!marketMaker) return;
+
   for (const marketId of marketIds) {
     const mmConfig = MM_CONFIG.pairs[marketId];
     if (!mmConfig || !mmConfig.active) continue;
@@ -268,6 +270,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let [order_id, count] of Object.entries(ordersPerId)) {
         let buyPrices = [];
         for (let i = 0; i < count; i++) {
+          console.log("shift: ", mmConfig.minSpread);
           const buyPrice =
             midPrice *
             (1 -
@@ -360,6 +363,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let [order_id, count] of Object.entries(ordersPerId)) {
         let sellPrices = [];
         for (let i = 0; i < count; i++) {
+          console.log("shift: ", mmConfig.minSpread);
           const sellPrice =
             midPrice *
             (1 +
@@ -432,124 +436,6 @@ async function indicateLiquidity(marketIds = activeMarkets) {
   }
 }
 
-function sendInitialLiquidity(marketIds = activeMarkets) {
-  for (const marketId of marketIds) {
-    const mmConfig = MM_CONFIG.pairs[marketId];
-    if (!mmConfig || !mmConfig.active) continue;
-
-    if (
-      ACTIVE_ORDERS[marketId + "Buy"]?.length > 0 &&
-      ACTIVE_ORDERS[marketId + "Sell"]?.length > 0
-    )
-      continue;
-
-    let baseAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
-    let quoteAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
-
-    try {
-      validatePriceFeed(baseAsset);
-    } catch (e) {
-      console.error(
-        "Can not indicateLiquidity (" +
-          IDS_TO_SYMBOLS[baseAsset] +
-          ") because: " +
-          e
-      );
-      continue;
-    }
-
-    const midPrice = mmConfig.invert
-      ? 1 / PRICE_FEEDS[mmConfig.priceFeedPrimary]
-      : PRICE_FEEDS[mmConfig.priceFeedPrimary];
-    if (!midPrice) continue;
-
-    const side = mmConfig.side || "d";
-
-    let baseBalance = marketMaker.getAvailableAmount(baseAsset);
-    let quoteBalance = marketMaker.getAvailableAmount(quoteAsset);
-
-    baseBalance = baseBalance / 10 ** DECIMALS_PER_ASSET[baseAsset];
-    quoteBalance = quoteBalance / 10 ** DECIMALS_PER_ASSET[quoteAsset];
-
-    const maxSellSize = Math.min(baseBalance, mmConfig.maxSize);
-    const maxBuySize = Math.min(quoteBalance / midPrice, mmConfig.maxSize);
-
-    let buySplits = mmConfig.numOrdersIndicated || 4;
-    let sellSplits = mmConfig.numOrdersIndicated || 4;
-
-    // if (
-    //   maxSellSize * getPrice(baseAsset) < 100 ||
-    //   maxBuySize * getPrice(baseAsset) < 100
-    // )
-    // continue;
-
-    if (["b", "d"].includes(side)) {
-      let amounts = [];
-      let prices = [];
-
-      for (let i = 0; i < buySplits; i++) {
-        let amount = quoteBalance / buySplits;
-        const buyPrice =
-          midPrice *
-          (1 -
-            mmConfig.minSpread -
-            (mmConfig.slippageRate * maxBuySize * i) / buySplits);
-
-        amounts.push(amount);
-        prices.push(buyPrice);
-      }
-
-      sendBatchOrder(
-        marketMaker,
-        "Buy",
-        MM_CONFIG.EXPIRATION_TIME,
-        baseAsset,
-        quoteAsset,
-        prices,
-        amounts,
-        0.07,
-        ACTIVE_ORDERS
-      ).catch((err) => {
-        console.log("Error sending fill request: ", err);
-
-        errorCounter++;
-      });
-    }
-
-    if (["s", "d"].includes(side)) {
-      let amounts = [];
-      let prices = [];
-      for (let i = 0; i < sellSplits; i++) {
-        let amount = baseBalance / sellSplits;
-        const buyPrice =
-          midPrice *
-          (1 +
-            mmConfig.minSpread +
-            (mmConfig.slippageRate * maxSellSize * i) / sellSplits);
-
-        amounts.push(amount);
-        prices.push(buyPrice);
-      }
-
-      sendBatchOrder(
-        marketMaker,
-        "Sell",
-        MM_CONFIG.EXPIRATION_TIME,
-        baseAsset,
-        quoteAsset,
-        prices,
-        amounts,
-        0.07,
-        ACTIVE_ORDERS
-      ).catch((err) => {
-        console.log("Error sending fill request: ", err);
-
-        errorCounter++;
-      });
-    }
-  }
-}
-
 async function cancelLiquidity(marketId) {
   let baseAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
 
@@ -596,83 +482,78 @@ async function cancelLiquidity(marketId) {
   }
 }
 
-async function afterFill(amountFilled, marketId) {
-  //
+async function afterFill(amountFilled, marketId, isBuy) {
+  // TODO
 
-  const mmConfig = MM_CONFIG.pairs[marketId];
-  if (!mmConfig) {
-    return;
-  }
+  // const mmConfig = MM_CONFIG.pairs[marketId];
+  // if (!mmConfig) {
+  //   return;
+  // }
 
-  // ? Delay trading after fill for delayAfterFill seconds
-  if (mmConfig.delayAfterFill) {
-    let delayAfterFillMinSize;
-    if (
-      !Array.isArray(mmConfig.delayAfterFill) ||
-      !mmConfig.delayAfterFill.length > 1
-    ) {
-      delayAfterFillMinSize = 0;
-    } else {
-      delayAfterFillMinSize = mmConfig.delayAfterFill[1];
-    }
+  // // ? Delay trading after fill for delayAfterFill seconds
+  // if (mmConfig.delayAfterFill) {
+  //   let delayAfterFillMinSize = mmConfig.delayAfterFillMinSize
+  //     ? mmConfig.delayAfterFillMinSize
+  //     : 0;
 
-    if (amountFilled > delayAfterFillMinSize) {
-      // no array -> old config
-      // or array and amountFilled over minSize
-      mmConfig.active = false;
-      cancelLiquidity(marketId);
-      console.log(
-        `Set ${marketId} passive for ${mmConfig.delayAfterFill} seconds.`
-      );
-      setTimeout(() => {
-        mmConfig.active = true;
-        console.log(`Set ${marketId} active.`);
-        indicateLiquidity([marketId]);
-      }, mmConfig.delayAfterFill * 1000);
-    }
-  }
+  //   if (amountFilled > delayAfterFillMinSize) {
+  //     // no array -> old config
+  //     // or array and amountFilled over minSize
+  //     mmConfig.active = false;
+  //     await cancelLiquidity(marketId);
+  //     console.log(
+  //       `Set ${marketId} passive for ${mmConfig.delayAfterFill} seconds.`
+  //     );
+  //     setTimeout(() => {
+  //       mmConfig.active = true;
+  //       console.log(`Set ${marketId} active.`);
+  //       indicateLiquidity([marketId]);
+  //     }, mmConfig.delayAfterFill * 1000);
+  //   }
+  // }
 
-  // ? increaseSpreadAfterFill size might not be set
-  const increaseSpreadAfterFillMinSize =
-    Array.isArray(mmConfig.increaseSpreadAfterFill) &&
-    mmConfig.increaseSpreadAfterFill.length > 2
-      ? mmConfig.increaseSpreadAfterFill[2]
-      : 0;
-  if (
-    mmConfig.increaseSpreadAfterFill &&
-    amountFilled > increaseSpreadAfterFillMinSize
-  ) {
-    const [spread, time] = mmConfig.increaseSpreadAfterFill;
-    mmConfig.minSpread = mmConfig.minSpread + spread;
-    console.log(`Changed ${marketId} minSpread by ${spread}.`);
-    indicateLiquidity(marketId);
-    setTimeout(() => {
-      mmConfig.minSpread = mmConfig.minSpread - spread;
-      console.log(`Changed ${marketId} minSpread by -${spread}.`);
-      indicateLiquidity(marketId);
-    }, time * 1000);
-  }
+  // // ? increaseSpreadAfterFill size might not be set
+  // const increaseSpreadAfterFillMinSize =
+  //   Array.isArray(mmConfig.increaseSpreadAfterFill) &&
+  //   mmConfig.increaseSpreadAfterFill.length > 2
+  //     ? mmConfig.increaseSpreadAfterFill[2]
+  //     : 0;
 
-  // ? changeSizeAfterFill size might not be set
-  const changeSizeAfterFillMinSize =
-    Array.isArray(mmConfig.changeSizeAfterFill) &&
-    mmConfig.changeSizeAfterFill.length > 2
-      ? mmConfig.changeSizeAfterFill[2]
-      : 0;
-  if (
-    mmConfig.changeSizeAfterFill &&
-    amountFilled > changeSizeAfterFillMinSize
-  ) {
-    const [size, time] = mmConfig.changeSizeAfterFill;
-    mmConfig.maxSize = mmConfig.maxSize + size;
-    console.log(`Changed ${marketId} maxSize by ${size}.`);
-    indicateLiquidity([marketId]);
-    setTimeout(() => {
-      mmConfig.maxSize = mmConfig.maxSize - size;
-      console.log(`Changed ${marketId} maxSize by ${size * -1}.`);
-      indicateLiquidity([marketId]);
-    }, time * 1000);
-  }
+  // if (
+  //   mmConfig.increaseSpreadAfterFill &&
+  //   amountFilled > increaseSpreadAfterFillMinSize
+  // ) {
+  //   const [spread, time] = mmConfig.increaseSpreadAfterFill;
+  //   mmConfig.minSpread = mmConfig.minSpread + spread;
+  //   console.log(`Changed ${marketId} minSpread by ${spread}.`);
+  //   indicateLiquidity(marketId);
+  //   setTimeout(() => {
+  //     mmConfig.minSpread = mmConfig.minSpread - spread;
+  //     console.log(`Changed ${marketId} minSpread by -${spread}.`);
+  //     indicateLiquidity(marketId);
+  //   }, time * 1000);
+  // }
+
+  // // ? changeSizeAfterFill size might not be set
+  // const changeSizeAfterFillMinSize =
+  //   Array.isArray(mmConfig.changeSizeAfterFill) &&
+  //   mmConfig.changeSizeAfterFill.length > 2
+  //     ? mmConfig.changeSizeAfterFill[2]
+  //     : 0;
+  // if (
+  //   mmConfig.changeSizeAfterFill &&
+  //   amountFilled > changeSizeAfterFillMinSize
+  // ) {
+  //   const [size, time] = mmConfig.changeSizeAfterFill;
+  //   mmConfig.maxSize = mmConfig.maxSize + size;
+  //   console.log(`Changed ${marketId} maxSize by ${size}.`);
+  //   indicateLiquidity([marketId]);
+  //   setTimeout(() => {
+  //     mmConfig.maxSize = mmConfig.maxSize - size;
+  //     console.log(`Changed ${marketId} maxSize by ${size * -1}.`);
+  //     indicateLiquidity([marketId]);
+  //   }, time * 1000);
+  // }
 }
 
 // * HELPER FUNCTIONS ==========================================================================================================
@@ -858,6 +739,9 @@ const listenToWebSocket = () => {
         break;
 
       case "SWAP_RESULT":
+        let buyOrders = ACTIVE_ORDERS[msg.market_id + "Buy"];
+        let isBuy = buyOrders.includes(msg.market_id);
+
         handleSwapResult(
           marketMaker,
           msg.order_id,
@@ -866,7 +750,7 @@ const listenToWebSocket = () => {
           ACTIVE_ORDERS
         );
 
-        afterFill(msg.new_amount_filled, msg.market_id);
+        afterFill(msg.swap_response.new_amount_filled, msg.market_id, isBuy);
 
         break;
 
@@ -969,7 +853,7 @@ async function run(config) {
   );
 
   // brodcast orders to provide liquidity
-  sendInitialLiquidity();
+  indicateLiquidity();
   let brodcastInterval = setInterval(
     indicateLiquidity,
     LIQUIDITY_INDICATION_PERIOD
@@ -1052,7 +936,7 @@ const refreshOrders = async (fillInterval, brodcastInterval) => {
   ACTIVE_ORDERS = {};
 
   // brodcast orders to provide liquidity
-  sendInitialLiquidity();
+  indicateLiquidity();
   brodcastInterval = setInterval(
     indicateLiquidity,
     LIQUIDITY_INDICATION_PERIOD

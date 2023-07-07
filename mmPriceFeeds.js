@@ -169,14 +169,10 @@ async function cryptowatchWsSetup(
   });
 
   function onopen() {
-    console.log("cryptowatch ws open");
     cryptowatch_ws.send(JSON.stringify(subscriptionMsg));
   }
 
-  let randInt = Math.floor(Math.random() * 1000);
   function onmessage(data) {
-    console.log(randInt);
-
     const msg = JSON.parse(data);
     if (!msg.marketUpdate) return;
 
@@ -318,5 +314,4 @@ async function uniswapV3Update(PRICE_FEEDS) {
 
 module.exports = {
   setupPriceFeeds,
-  restartCryptowatchSocket,
 };
