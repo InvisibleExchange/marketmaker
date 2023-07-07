@@ -28,7 +28,7 @@ const {
   sendBatchOrder,
 } = require("./src/transactions/constructOrders");
 
-const setupPriceFeeds = require("./mmPriceFeeds");
+const { setupPriceFeeds } = require("./mmPriceFeeds");
 const { trimHash } = require("./src/users/Notes");
 
 let W3CWebSocket = require("websocket").w3cwebsocket;
@@ -976,13 +976,13 @@ async function run(config) {
   );
 
   let errorInterval = setInterval(() => {
-    if (errorCounter >= 8) {
+    if (errorCounter >= 5) {
       clearInterval(fillInterval);
       clearInterval(brodcastInterval);
       throw new Error("Too many errors. Restarting...");
     }
 
-    errorCounter = Math.max(0, errorCounter - 3);
+    errorCounter = Math.max(0, errorCounter - 2);
   }, 2 * LIQUIDITY_INDICATION_PERIOD);
 
   let refreshInterval = setInterval(async () => {

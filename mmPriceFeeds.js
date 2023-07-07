@@ -9,7 +9,7 @@ const UNISWAP_V3_PROVIDERS = {};
 let uniswap_error_counter = 0;
 let chainlink_error_counter = 0;
 
-module.exports = async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
+async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
   const cryptowatch = [],
     chainlink = [],
     uniswapV3 = [];
@@ -62,7 +62,6 @@ module.exports = async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
           throw new Error(
             "Price feed provider " + provider + " is not available."
           );
-          break;
       }
     });
   }
@@ -74,7 +73,7 @@ module.exports = async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
   } catch (error) {
     console.log("123");
   }
-};
+}
 
 let cryptowatch_ws;
 async function cryptowatchWsSetup(
@@ -83,6 +82,9 @@ async function cryptowatchWsSetup(
   MM_CONFIG
 ) {
   if (cryptowatch_ws) {
+    cryptowatch_ws.close();
+    cryptowatch_ws = null;
+
     return;
   }
 
@@ -153,6 +155,7 @@ async function cryptowatchWsSetup(
       },
     });
   }
+
   cryptowatch_ws = new WebSocket(
     "wss://stream.cryptowat.ch/connect?apikey=" + cryptowatchApiKey
   );
@@ -166,9 +169,14 @@ async function cryptowatchWsSetup(
   });
 
   function onopen() {
+    console.log("cryptowatch ws open");
     cryptowatch_ws.send(JSON.stringify(subscriptionMsg));
   }
+
+  let randInt = Math.floor(Math.random() * 1000);
   function onmessage(data) {
+    console.log(randInt);
+
     const msg = JSON.parse(data);
     if (!msg.marketUpdate) return;
 
@@ -179,11 +187,9 @@ async function cryptowatchWsSetup(
     PRICE_FEEDS[marketId] = price;
   }
   function onclose() {
-    setTimeout(cryptowatchWsSetup, 5000, [
-      cryptowatchMarketIds,
-      PRICE_FEEDS,
-      MM_CONFIG,
-    ]);
+    setTimeout(() => {
+      cryptowatchWsSetup(cryptowatchMarketIds, PRICE_FEEDS, MM_CONFIG);
+    }, 1000);
   }
 }
 
@@ -309,3 +315,8 @@ async function uniswapV3Update(PRICE_FEEDS) {
     }
   }
 }
+
+module.exports = {
+  setupPriceFeeds,
+  restartCryptowatchSocket,
+};
