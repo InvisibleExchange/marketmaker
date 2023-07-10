@@ -29,7 +29,7 @@ const {
   sendPerpOrder,
 } = require("./src/transactions/constructOrders");
 
-const setupPriceFeeds = require("./mmPriceFeeds");
+const { setupPriceFeeds } = require("./mmPriceFeeds");
 const { trimHash } = require("./src/users/Notes");
 const { getSizeFromLeverage } = require("./src/helpers/tradePriceCalculations");
 

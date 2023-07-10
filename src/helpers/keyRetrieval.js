@@ -79,14 +79,11 @@ async function restoreKeyData(
 
 /**
  *
- * @param {bigint|string} originPrivKey
+ * @param {User} user
  * @param {boolean} restoreNotes  - if true retrieve note keys
  * @param {boolean} restorePositions - if true retrieve position keys
  */
-async function restoreUserState(originPrivKey, restoreNotes, restorePositions) {
-  let user = User.fromPrivKey(originPrivKey.toString());
-  await user.login();
-
+async function restoreUserState(user, restoreNotes, restorePositions) {
   if (restoreNotes) {
     let privKeys = await restoreKeyData(user, false);
     console.log("note keyData: ", privKeys);

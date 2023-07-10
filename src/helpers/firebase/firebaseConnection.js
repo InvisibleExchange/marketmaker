@@ -84,15 +84,6 @@ async function checkNoteExistance(address) {
 }
 
 
-async function testGetState() {
-
-  const querySnapshot = await getDocs(
-    collection(db, `notes/${address}/indexes`)
-  );
-
-
-  
-}
 
 // ---- POSITIONS ---- //
 async function fetchStoredPosition(address) {
