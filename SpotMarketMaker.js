@@ -846,6 +846,7 @@ async function run(config) {
   ) {
     await restoreUserState(marketMaker, true, false);
     restoredKeys = true;
+
     return await run(config);
   }
 
