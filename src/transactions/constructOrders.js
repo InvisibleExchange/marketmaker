@@ -571,7 +571,7 @@ async function sendLiquidationOrder(
             user.positionData[position.synthetic_token].push(position);
           }
 
-          //
+          return position;
         }
       } else {
         let msg =

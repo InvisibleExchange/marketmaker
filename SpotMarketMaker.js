@@ -30,6 +30,7 @@ const {
 
 const { setupPriceFeeds } = require("./mmPriceFeeds");
 const { trimHash } = require("./src/users/Notes");
+const { restoreUserState } = require("./src/helpers/keyRetrieval");
 
 let W3CWebSocket = require("websocket").w3cwebsocket;
 let client;
@@ -803,6 +804,7 @@ const initAccountState = async () => {
 
 // * MAIN ====================================================================================================================
 
+let restoredKeys = false;
 async function run(config) {
   MM_CONFIG = config.MM_CONFIG;
   activeMarkets = config.activeMarkets;
@@ -825,24 +827,36 @@ async function run(config) {
   // Check for fillable orders
   let fillInterval = setInterval(fillOpenOrders, FILL_ORDERS_PERIOD);
 
+  let baseToken = SYMBOLS_TO_IDS[config.baseToken];
+
+  let quoteAmount = marketMaker.getAvailableAmount(55555);
+  let baseAmount = marketMaker.getAvailableAmount(baseToken);
   console.log(
     "Starting market making: ",
-    marketMaker.getAvailableAmount(55555),
+    quoteAmount,
     "USDC",
-    marketMaker.getAvailableAmount(54321),
-    "ETH",
-    marketMaker.getAvailableAmount(12345),
-    "BTC"
+    baseAmount,
+    config.baseToken.toString()
   );
 
-  console.log(
-    "marketMaker: ",
-    marketMaker.noteData[12345]?.map((n) => n.amount)
-  );
-  console.log(
-    "marketMaker: ",
-    marketMaker.noteData[55555]?.map((n) => n.amount)
-  );
+  if (
+    (baseAmount < DUST_AMOUNT_PER_ASSET[baseToken] ||
+      quoteAmount < DUST_AMOUNT_PER_ASSET[55555]) &&
+    !restoredKeys
+  ) {
+    await restoreUserState(marketMaker, true, false);
+    restoredKeys = true;
+    return await run(config);
+  }
+
+  // console.log(
+  //   "marketMaker: ",
+  //   marketMaker.noteData[12345]?.map((n) => n.amount)
+  // );
+  // console.log(
+  //   "marketMaker: ",
+  //   marketMaker.noteData[55555]?.map((n) => n.amount)
+  // );
 
   // brodcast orders to provide liquidity
   indicateLiquidity();

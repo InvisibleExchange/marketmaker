@@ -21,13 +21,14 @@ const { pedersen } = require("../pedersen.js");
 const { ec, getKeyPair } = require("starknet").ec; //require("starknet/utils/ellipticCurve.js");
 
 const BN = require("bn.js");
+const { PRICE_DECIMALS_PER_ASSET } = require("../utils.js");
 
 // TODO: fetch deposit ids on login and remove them if they've been used
 
 /* global BigInt */
 
 // ---- NOTES ---- //
-async function fetchStoredNotes(address, blinding) {  
+async function fetchStoredNotes(address, blinding) {
   // Address should be the x coordinate of the address in decimal format
 
   const querySnapshot = await getDocs(
@@ -83,8 +84,6 @@ async function checkNoteExistance(address) {
   return !querySnapshot.empty;
 }
 
-
-
 // ---- POSITIONS ---- //
 async function fetchStoredPosition(address) {
   // returns the position at this address from the db
@@ -131,6 +130,49 @@ async function fetchIndividualPosition(address, index) {
   let position = positionData.data();
 
   return position;
+}
+
+async function getLiquidatablePositions(indexPrice, token) {
+  // "liquidation_price": &position.liquidation_price,
+  // "synthetic_token": &position.synthetic_token,
+  // "order_side": &position.order_side,
+
+  indexPrice = indexPrice * 10 ** PRICE_DECIMALS_PER_ASSET[token];
+
+  // ? if long and liquidation_price >= indexPrice
+  const q1 = query(
+    collection(db, `liquidations`),
+    where("liquidation_price", ">=", indexPrice),
+    where("synthetic_token", "==", token),
+    where("order_side", "==", "Long")
+  );
+  const querySnapshot1 = await getDocs(q1);
+
+  // ? if short and liquidation_price <= indexPrice
+  const q2 = query(
+    collection(db, `liquidations`),
+    where("liquidation_price", "<=", indexPrice),
+    where("synthetic_token", "==", token),
+    where("order_side", "==", "Short")
+  );
+  const querySnapshot2 = await getDocs(q2);
+
+  let positions = [];
+  let liquidationDocs = querySnapshot1.docs.concat(querySnapshot2.docs);
+  liquidationDocs.forEach(async (doc) => {
+    let [address, index] = doc.id.split("-");
+
+    // let docData = doc.data();
+    // let liqPrice = docData.liquidation_price;
+    // let syntheticToken = docData.synthetic_token;
+    // let orderSide = docData.order_side;
+
+    let positions = await fetchIndividualPosition(address, index);
+
+    positions.push(positions);
+  });
+
+  return positions;
 }
 
 // ---- USER INFO ---- //
@@ -478,6 +520,8 @@ module.exports = {
   //
   checkNoteExistance,
   checkPositionExistance,
+
+  getLiquidatablePositions,
 };
 
 // storeOnchainDeposit,
