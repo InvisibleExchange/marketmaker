@@ -472,6 +472,7 @@ async function sendPerpOrder(
           syntheticAmount_,
           price,
           order_side,
+          isMarket,
           ACTIVE_ORDERS
         );
 
@@ -556,11 +557,13 @@ async function sendLiquidationOrder(
 
       if (order_response.successful) {
         // ? Save position data (if not null)
+
+        console.log("order_response: ", order_response);
+
         let position = order_response.new_position;
 
         if (position) {
-          this.position.order_side =
-            this.position.order_side == 1 ? "Long" : "Short";
+          position.order_side = position.order_side == 1 ? "Long" : "Short";
 
           if (
             !user.positionData[position.synthetic_token] ||

@@ -149,6 +149,7 @@ function handlePerpetualOrderResponse(
   syntheticAmount_,
   price,
   order_side,
+  isMarket,
   ACTIVE_ORDERS
 ) {
   // If this is a taker order it might have been filled fully/partially before the response was received (here)
@@ -186,11 +187,11 @@ function handlePerpetualOrderResponse(
     let side = order_side == "Long" ? "Buy" : "Sell";
     if (
       ACTIVE_ORDERS[
-        PERP_MARKET_IDS[syntheticToken].toString() + side.toString()
+        PERP_MARKET_IDS[perpOrder.synthetic_token].toString() + side.toString()
       ]
     ) {
       ACTIVE_ORDERS[
-        PERP_MARKET_IDS[syntheticToken].toString() + side.toString()
+        PERP_MARKET_IDS[perpOrder.synthetic_token].toString() + side.toString()
       ].push({
         id: order_response.order_id,
         syntheticAmount: syntheticAmount_,
@@ -198,7 +199,7 @@ function handlePerpetualOrderResponse(
       });
     } else {
       ACTIVE_ORDERS[
-        PERP_MARKET_IDS[syntheticToken].toString() + side.toString()
+        PERP_MARKET_IDS[perpOrder.synthetic_token].toString() + side.toString()
       ] = [
         {
           id: order_response.order_id,

@@ -15,3 +15,5 @@ mm-btc-usd/perp_config.json
 mm-btc-usd/spot_config.json
 mm-eth-usd/perp_config.json
 mm-eth-usd/spot_config.json
+liquidator-bot/config.json
+

@@ -21,7 +21,11 @@ const { pedersen } = require("../pedersen.js");
 const { ec, getKeyPair } = require("starknet").ec; //require("starknet/utils/ellipticCurve.js");
 
 const BN = require("bn.js");
-const { PRICE_DECIMALS_PER_ASSET } = require("../utils.js");
+
+const PRICE_DECIMALS_PER_ASSET = {
+  12345: 6, // BTC
+  54321: 6, // ETH
+};
 
 // TODO: fetch deposit ids on login and remove them if they've been used
 
@@ -159,6 +163,9 @@ async function getLiquidatablePositions(indexPrice, token) {
 
   let positions = [];
   let liquidationDocs = querySnapshot1.docs.concat(querySnapshot2.docs);
+
+  let l = liquidationDocs.length;
+  let counter = 0;
   liquidationDocs.forEach(async (doc) => {
     let [address, index] = doc.id.split("-");
 
@@ -167,10 +174,18 @@ async function getLiquidatablePositions(indexPrice, token) {
     // let syntheticToken = docData.synthetic_token;
     // let orderSide = docData.order_side;
 
-    let positions = await fetchIndividualPosition(address, index);
+    let pos = await fetchIndividualPosition(address, index);
 
-    positions.push(positions);
+    if (pos) {
+      positions.push(pos);
+    }
+
+    counter++;
   });
+
+  while (counter < l) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 
   return positions;
 }
