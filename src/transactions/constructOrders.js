@@ -36,7 +36,7 @@ const {
   handleDepositResponse,
   handleMarginChangeResponse,
 } = require("./handleOrderResponses");
-const { restoreUserState } = require("../helpers/keyRetrieval");
+// const { restoreUserState } = require("../helpers/keyRetrieval");
 
 // const path = require("path");
 // require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
@@ -189,7 +189,7 @@ async function sendSpotOrder(
         console.log(msg);
 
         if (order_response.error_message.includes("Note does not exist")) {
-          restoreUserState(user, true, false);
+          // todo: restoreUserState(user, true, false);
         }
 
         user.awaittingOrder = false;
@@ -340,7 +340,7 @@ async function sendBatchOrder(
         console.log(msg);
 
         if (order_response.error_message.includes("Note does not exist")) {
-          restoreUserState(user, true, false);
+          // todo: restoreUserState(user, true, false);
         }
 
         user.awaittingOrder = false;
@@ -487,7 +487,7 @@ async function sendPerpOrder(
           order_response.error_message.includes("Note does not exist") ||
           order_response.error_message.includes("Position does not exist")
         ) {
-          restoreUserState(user, true, true);
+          // todo: restoreUserState(user, true, true);
         }
 
         user.awaittingOrder = false;
@@ -586,7 +586,7 @@ async function sendLiquidationOrder(
           order_response.error_message.includes("Note does not exist") ||
           order_response.error_message.includes("Position does not exist")
         ) {
-          restoreUserState(user, true, true);
+          // todo: restoreUserState(user, true, true);
         }
 
         throw new Error(msg);
@@ -843,7 +843,7 @@ async function sendDeposit(user, depositId, amount, token, pubKey) {
         console.log(msg);
 
         if (deposit_response.error_message.includes("Note does not exist")) {
-          restoreUserState(user, true, false);
+          // todo: restoreUserState(user, true, false);
         }
 
         throw new Error(msg);
@@ -883,7 +883,7 @@ async function sendWithdrawal(user, amount, token, starkKey) {
         console.log(msg);
 
         if (withdrawal_response.error_message.includes("Note does not exist")) {
-          restoreUserState(user, true, false);
+          // todo: restoreUserState(user, true, false);
         }
 
         throw new Error(msg);
@@ -923,7 +923,7 @@ async function sendSplitOrder(user, token, newAmount) {
     console.log(msg);
 
     if (split_response.error_message.includes("Note does not exist")) {
-      restoreUserState(user, true, false);
+      // todo: restoreUserState(user, true, false);
     }
 
     throw new Error(msg);
@@ -1003,7 +1003,7 @@ async function sendChangeMargin(
           marginChangeResponse.error_message.includes("Note does not exist") ||
           marginChangeResponse.error_message.includes("Position does not exist")
         ) {
-          restoreUserState(user, true, true);
+          // todo: restoreUserState(user, true, true);
         }
 
         throw new Error(msg);
