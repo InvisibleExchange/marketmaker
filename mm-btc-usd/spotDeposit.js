@@ -8,7 +8,7 @@ async function main() {
 
   let config = loadMMConfig(configPath);
 
-  await makeDeposit(55555, 200_000, config);
+  await makeDeposit(55555, 150_000, config);
   await makeDeposit(12345, 8, config);
 }
 

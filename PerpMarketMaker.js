@@ -37,29 +37,11 @@ let W3CWebSocket = require("websocket").w3cwebsocket;
 let client;
 
 const path = require("path");
+const { restoreUserState } = require("./src/helpers/keyRetrieval");
 const configPath = path.join(__dirname, "perp_config.json");
 
 let errorCounter = 0;
 
-const loadMMConfig = () => {
-  // Load MM config
-  let MM_CONFIG;
-  if (process.env.MM_CONFIG) {
-    MM_CONFIG = JSON.parse(process.env.MM_CONFIG);
-  } else {
-    const mmConfigFile = fs.readFileSync(configPath, "utf8");
-    MM_CONFIG = JSON.parse(mmConfigFile);
-  }
-
-  let activeMarkets = [];
-  for (let marketId of Object.keys(MM_CONFIG.pairs)) {
-    if (MM_CONFIG.pairs[marketId].active) {
-      activeMarkets.push(marketId);
-    }
-  }
-
-  return { MM_CONFIG, activeMarkets };
-};
 let MM_CONFIG, activeMarkets;
 
 dotenv.config();
@@ -90,6 +72,7 @@ let activeOrdersMidPrice = {}; // { marketId: midPrice }
 
 let marketMaker;
 const isPerp = true;
+let shouldRestoreState = false;
 
 //
 async function fillOpenOrders() {
@@ -399,6 +382,15 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           ACTIVE_ORDERS
         ).catch((err) => {
           console.log("Error sending perp order: ", err);
+
+          if (
+            err.toString().includes("Note does not exist") ||
+            err.toString().includes("Position does not exist")
+          ) {
+            // restoreUserState(user, true, true);
+            shouldRestoreState = true;
+          }
+
           errorCounter++;
         });
       }
@@ -466,6 +458,15 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           ACTIVE_ORDERS
         ).catch((err) => {
           console.log("Error sending perp order: ", err);
+
+          if (
+            err.toString().includes("Note does not exist") ||
+            err.toString().includes("Position does not exist")
+          ) {
+            // restoreUserState(user, true, true);
+            shouldRestoreState = true;
+          }
+
           errorCounter++;
         });
       }
@@ -902,55 +903,61 @@ const initPositions = async () => {
 // * MAIN ====================================================================================================================
 
 async function run(config) {
-  MM_CONFIG = config.MM_CONFIG;
-  activeMarkets = config.activeMarkets;
+  return new Promise(async (resolve, reject) => {
+    MM_CONFIG = config.MM_CONFIG;
+    activeMarkets = config.activeMarkets;
 
-  // Setup price feeds
-  await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
+    // Setup price feeds
+    await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
 
-  // Setup the market maker
-  await runWithTimeout(initAccountState, 30000);
+    // Setup the market maker
+    await runWithTimeout(initAccountState, 30000);
 
-  // Strart listening to updates from the server
-  if (!client || client.readyState !== client.OPEN) {
-    listenToWebSocket();
-  }
-
-  await initPositions();
-
-  // Check for fillable orders
-  let fillInterval = setInterval(fillOpenOrders, FILL_ORDERS_PERIOD);
-
-  console.log("Starting market making: ", marketMaker.positionData);
-
-  // brodcast orders to provide liquidity
-  await indicateLiquidity();
-  let brodcastInterval = setInterval(
-    indicateLiquidity,
-    LIQUIDITY_INDICATION_PERIOD
-  );
-
-  let errorInterval = setInterval(() => {
-    if (errorCounter > 10) {
-      clearInterval(fillInterval);
-      clearInterval(brodcastInterval);
-      throw new Error("Too many errors. Restarting...");
+    // Strart listening to updates from the server
+    if (!client || client.readyState !== client.OPEN) {
+      listenToWebSocket();
     }
 
-    errorCounter = 0;
-  }, 4 * LIQUIDITY_INDICATION_PERIOD);
+    await initPositions();
 
-  let refreshInterval = setInterval(async () => {
-    let res = await refreshOrders(fillInterval, brodcastInterval);
-    fillInterval = res.fillInterval;
-    brodcastInterval = res.brodcastInterval;
-  }, REFRESH_ORDERS_PERIOD);
+    // Check for fillable orders
+    let fillInterval = setInterval(fillOpenOrders, FILL_ORDERS_PERIOD);
 
-  await new Promise((resolve) => setTimeout(resolve, REFRESH_PERIOD));
-  clearInterval(fillInterval);
-  clearInterval(brodcastInterval);
-  clearInterval(errorInterval);
-  clearInterval(refreshInterval);
+    console.log("Starting market making: ", marketMaker.positionData);
+
+    // brodcast orders to provide liquidity
+    await indicateLiquidity();
+    let brodcastInterval = setInterval(
+      indicateLiquidity,
+      LIQUIDITY_INDICATION_PERIOD
+    );
+
+    let errorInterval = setInterval(() => {
+      if (errorCounter > 10) {
+        clearInterval(fillInterval);
+        clearInterval(brodcastInterval);
+        clearInterval(errorInterval);
+        clearInterval(refreshInterval);
+        reject("Too many errors. Restarting...");
+      }
+
+      errorCounter = 0;
+    }, 4 * LIQUIDITY_INDICATION_PERIOD);
+
+    let refreshInterval = setInterval(async () => {
+      let res = await refreshOrders(fillInterval, brodcastInterval);
+      fillInterval = res.fillInterval;
+      brodcastInterval = res.brodcastInterval;
+    }, REFRESH_ORDERS_PERIOD);
+
+    await new Promise((resolve) => setTimeout(resolve, REFRESH_PERIOD));
+    clearInterval(fillInterval);
+    clearInterval(brodcastInterval);
+    clearInterval(errorInterval);
+    clearInterval(refreshInterval);
+
+    resolve();
+  });
 }
 
 let restartCount = 0;
@@ -966,10 +973,20 @@ async function safeRun(config) {
   try {
     await run(config);
 
+    if (marketMaker && shouldRestoreState) {
+      await restoreUserState(marketMaker, true, true);
+      shouldRestoreState = false;
+    }
+
     await safeRun(config);
   } catch (error) {
     restartCount++;
     console.log("Error: ", error.message);
+
+    if (marketMaker && shouldRestoreState) {
+      await restoreUserState(marketMaker, true, true);
+      shouldRestoreState = false;
+    }
 
     if (restartCount >= 5) {
       console.log("Too many restarts. Exiting...");

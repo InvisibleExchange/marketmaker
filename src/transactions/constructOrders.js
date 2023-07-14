@@ -188,10 +188,6 @@ async function sendSpotOrder(
           order_response.error_message;
         console.log(msg);
 
-        if (order_response.error_message.includes("Note does not exist")) {
-          // todo: restoreUserState(user, true, false);
-        }
-
         user.awaittingOrder = false;
         throw new Error(msg);
       }
@@ -315,6 +311,8 @@ async function sendBatchOrder(
     .post(`${EXPRESS_APP_URL}/submit_limit_order`, orderJson)
     .then(async (res) => {
       let order_response = res.data.response;
+
+      // throw new Error("Note does not exist");
 
       if (order_response.successful) {
         storeUserState(user.db, user);
@@ -482,13 +480,6 @@ async function sendPerpOrder(
           "Failed to submit order with error: \n" +
           order_response.error_message;
         console.log(msg);
-
-        if (
-          order_response.error_message.includes("Note does not exist") ||
-          order_response.error_message.includes("Position does not exist")
-        ) {
-          // todo: restoreUserState(user, true, true);
-        }
 
         user.awaittingOrder = false;
         throw new Error(msg);
