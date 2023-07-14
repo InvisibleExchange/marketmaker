@@ -95,7 +95,7 @@ async function fillOpenOrders() {
       }
     }
 
-    if (perpLiquidity[syntheticToken].bidQueue) {
+    if (perpLiquidity[syntheticToken].askQueue) {
       for (let order of perpLiquidity[syntheticToken].askQueue.reverse()) {
         let fillable = isOrderFillable(order, "s", syntheticToken);
 
