@@ -2,7 +2,15 @@ const { getActiveOrders } = require("./src/helpers/utils");
 
 const fs = require("fs");
 const User = require("./src/users/Invisibl3User");
-const { sendDeposit } = require("./src/transactions/constructOrders");
+const {
+  sendDeposit,
+  sendOpenOrderTab,
+} = require("./src/transactions/constructOrders");
+
+const SPOT_MARKET_IDS_2_TOKENS = {
+  11: { base: 12345, quote: 55555 },
+  12: { base: 54321, quote: 55555 },
+};
 
 async function makeDeposit(token, amount, config) {
   let MM_CONFIG = config.MM_CONFIG;
@@ -29,6 +37,43 @@ async function makeDeposit(token, amount, config) {
   console.log(marketMaker.getAvailableAmount(token));
 }
 
+async function openOrderTab(marketId, config) {
+  let MM_CONFIG = config.MM_CONFIG;
+
+  let marketMaker = User.fromPrivKey(MM_CONFIG.privKey);
+
+  let { emptyPrivKeys, emptyPositionPrivKeys } = await marketMaker.login();
+
+  let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
+    await getActiveOrders(marketMaker.orderIds, marketMaker.perpetualOrderIds);
+
+  await marketMaker.handleActiveOrders(
+    badOrderIds,
+    orders,
+    badPerpOrderIds,
+    perpOrders,
+    pfrNotes,
+    emptyPrivKeys,
+    emptyPositionPrivKeys
+  );
+
+  let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+  let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+  let baseAmount = marketMaker.getAvailableAmount(baseToken);
+  let quoteAmount = marketMaker.getAvailableAmount(quoteToken);
+
+  // await sendOpenOrderTab(
+  //   marketMaker,
+  //   baseAmount,
+  //   quoteAmount,
+  //   marketId,
+  //   3600_000
+  // );
+
+  console.log(marketMaker.orderTabData);
+}
+
 const loadMMConfig = (configPath) => {
   // Load MM config
   let MM_CONFIG;
@@ -52,4 +97,5 @@ const loadMMConfig = (configPath) => {
 module.exports = {
   loadMMConfig,
   makeDeposit,
+  openOrderTab,
 };

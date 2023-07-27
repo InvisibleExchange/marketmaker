@@ -6,10 +6,12 @@ async function initDb() {
     (userId text PRIMARY KEY NOT NULL UNIQUE, 
     privKeys TEXT,
     positionPrivKeys TEXT,
+    tabPrivKeys TEXT,
     orderIds TEXT,
     perpetualOrderIds TEXT,
     noteCounts TEXT,
-    positionCounts TEXT 
+    positionCounts TEXT,
+    orderTabCounts TEXT
     )`;
 
   let db = new sqlite3.Database("../user_info.db", (err) => {
@@ -37,10 +39,15 @@ function storeUserState(db, user) {
   let privKeys = JSON.stringify(pks);
   let posPks = Object.values(user.positionPrivKeys).map((pk) => pk.toString());
   let positionPrivKeys = JSON.stringify(posPks);
+  let tabPks = Object.values(user.tabPrivKeys).map((pk) => pk.toString());
+  let tabPrivKeys = JSON.stringify(tabPks);
+
   let orderIds = JSON.stringify(user.orderIds);
   let perpetualOrderIds = JSON.stringify(user.perpetualOrderIds);
+
   let noteCounts = JSON.stringify(user.noteCounts);
   let positionCounts = JSON.stringify(user.positionCounts);
+  let orderTabCounts = JSON.stringify(user.orderTabCounts);
 
   // Update the state in the database
   try {
@@ -49,18 +56,22 @@ function storeUserState(db, user) {
         userId,
         privKeys,
         positionPrivKeys,
-        orderIds,
-        perpetualOrderIds,
-        noteCounts,
-        positionCounts) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        userId.toString(),
-        privKeys,
-        positionPrivKeys,
+        tabPrivKeys,
         orderIds,
         perpetualOrderIds,
         noteCounts,
         positionCounts,
+        orderTabCounts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        userId.toString(),
+        privKeys,
+        positionPrivKeys,
+        tabPrivKeys,
+        orderIds,
+        perpetualOrderIds,
+        noteCounts,
+        positionCounts,
+        orderTabCounts,
       ]
     );
   } catch (e) {
@@ -91,6 +102,8 @@ async function getUserState(db, userId) {
       let positionPrivKeys = correctRow
         ? JSON.parse(correctRow?.positionPrivKeys)
         : [];
+      let tabPrivKeys = correctRow ? JSON.parse(correctRow?.tabPrivKeys) : [];
+
       let orderIds = correctRow ? JSON.parse(correctRow?.orderIds) : [];
       let perpetualOrderIds = correctRow
         ? JSON.parse(correctRow?.perpetualOrderIds)
@@ -99,14 +112,19 @@ async function getUserState(db, userId) {
       let positionCounts = correctRow
         ? JSON.parse(correctRow?.positionCounts)
         : {};
+      let orderTabCounts = correctRow
+        ? JSON.parse(correctRow?.orderTabCounts)
+        : {};
 
       resolve({
         privKeys,
         positionPrivKeys,
+        tabPrivKeys,
         orderIds,
         perpetualOrderIds,
         noteCounts,
         positionCounts,
+        orderTabCounts,
       });
     });
   });

@@ -259,39 +259,37 @@ function handleFillResult(user, result, fills, setFills) {
 function handleSwapResult(
   user,
   orderId,
+  spent_amount,
+  received_amount,
   swap_response,
   marketId,
   ACTIVE_ORDERS
 ) {
   //
 
-  let swapNoteObject = swap_response.swap_note;
-  let swapNote = Note.fromGrpcObject(swapNoteObject);
-  if (user.noteData[swapNote.token]) {
-    user.noteData[swapNote.token].push(swapNote);
-  } else {
-    user.noteData[swapNote.token] = [swapNote];
-  }
+  if (swap_response) {
+    let swapNoteObject = swap_response.swap_note;
+    let swapNote = Note.fromGrpcObject(swapNoteObject);
+    if (user.noteData[swapNote.token]) {
+      user.noteData[swapNote.token].push(swapNote);
+    } else {
+      user.noteData[swapNote.token] = [swapNote];
+    }
 
-  // let newPfrNote_ = swap_response.new_pfr_note;
-  // if (newPfrNote_) {
-  //   let newPfrNote = Note.fromGrpcObject(newPfrNote_);
-  //   user.pfrNotes.push(newPfrNote);
-  // }
+    if (user.refundNotes[orderId]) {
+      if (
+        swap_response.swap_note.amount ==
+        swap_response.new_amount_filled - swap_response.fee_taken
+      ) {
+        // This is a limit first fill order and the refun note has been stored, then we can
+        // add the refund note to the noteData
+        let refund_note = user.refundNotes[orderId];
 
-  if (user.refundNotes[orderId]) {
-    if (
-      swap_response.swap_note.amount ==
-      swap_response.new_amount_filled - swap_response.fee_taken
-    ) {
-      // This is a limit first fill order and the refun note has been stored, then we can
-      // add the refund note to the noteData
-      let refund_note = user.refundNotes[orderId];
-
-      if (user.noteData[refund_note.token]) {
-        user.noteData[refund_note.token].push(refund_note);
-      } else {
-        user.noteData[refund_note.token] = [refund_note];
+        if (user.noteData[refund_note.token]) {
+          user.noteData[refund_note.token].push(refund_note);
+        } else {
+          user.noteData[refund_note.token] = [refund_note];
+        }
       }
     }
   }
@@ -311,18 +309,7 @@ function handleSwapResult(
     if (idx2 != -1) {
       let activeOrder = ACTIVE_ORDERS[marketId.toString() + side][idx2];
 
-      let swapNoteAmount =
-        swap_response.swap_note.amount /
-        10 ** DECIMALS_PER_ASSET[swap_response.swap_note.token];
-
-      let filledValue =
-        side == "Buy"
-          ? swapNoteAmount * activeOrder.price
-          : swapNoteAmount / activeOrder.price;
-
-      activeOrder.spendAmount -= Number.parseInt(
-        filledValue * 10 ** DECIMALS_PER_ASSET[order.token_spent]
-      );
+      activeOrder.spendAmount -= Number.parseInt(spent_amount);
 
       if (activeOrder.spendAmount <= DUST_AMOUNT_PER_ASSET[order.token_spent]) {
         ACTIVE_ORDERS[marketId.toString() + side].splice(idx2, 1);
@@ -330,14 +317,14 @@ function handleSwapResult(
     }
 
     // Remove the order from the active orders if necessary
-    order.qty_left -= swap_response.swap_note.amount;
-    if (!swap_response.new_pfr_note) {
+    order.qty_left -= received_amount;
+    if (order.qty_left < DUST_AMOUNT_PER_ASSET[order.token_received]) {
       user.orders.splice(idx, 1);
     } else {
       user.orders[idx] = order;
     }
   }
-  user.filledAmounts[orderId] = swap_response.new_amount_filled;
+  user.filledAmounts[orderId] += received_amount;
 }
 
 /**
@@ -512,7 +499,8 @@ async function loginUser(signer) {
 
   let user = User.fromPrivKey(pk);
 
-  let { emptyPrivKeys, emptyPositionPrivKeys } = await user.login();
+  let { emptyPrivKeys, emptyPositionPrivKeys, emptyTabPrivKeys } =
+    await user.login();
 
   let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
     await getActiveOrders(user.orderIds, user.perpetualOrderIds);

@@ -21,6 +21,7 @@ const { pedersen } = require("../pedersen.js");
 const { ec, getKeyPair } = require("starknet").ec; //require("starknet/utils/ellipticCurve.js");
 
 const BN = require("bn.js");
+const { TabHeader, OrderTab } = require("../../transactions/LimitOrder.js");
 
 const PRICE_DECIMALS_PER_ASSET = {
   12345: 6, // BTC
@@ -188,6 +189,68 @@ async function getLiquidatablePositions(indexPrice, token) {
   }
 
   return positions;
+}
+
+// ---- POSITIONS ---- //
+async function fetchStoredTabs(address, baseBlinding, quoteBlinding) {
+  // Address should be the x coordinate of the address in decimal format
+
+  const querySnapshot = await getDocs(
+    collection(db, `order_tabs/${address}/indexes`)
+  );
+
+  if (querySnapshot.empty) {
+    return [];
+  }
+
+  let orderTabs = [];
+
+  querySnapshot.forEach((doc) => {
+    let tabData = doc.data();
+
+    let base_hash8 = trimHash(baseBlinding, 64);
+    let baseAmount = Number.parseInt(
+      bigInt(tabData.base_hidden_amount).xor(base_hash8).value
+    );
+
+    if (
+      pedersen([BigInt(baseAmount), baseBlinding]) != tabData.base_commitment
+    ) {
+      throw "Invalid base amount and blinding";
+    }
+
+    let quote_hash8 = trimHash(quoteBlinding, 64);
+    let quoteAmount = Number.parseInt(
+      bigInt(tabData.quote_hidden_amount).xor(quote_hash8).value
+    );
+    if (
+      pedersen([BigInt(quoteAmount), quoteBlinding]) != tabData.quote_commitment
+    ) {
+      throw "Invalid quote amount and blinding";
+    }
+
+    let tabHeader = new TabHeader(
+      tabData.expiration_timestamp,
+      tabData.is_perp,
+      tabData.is_smart_contract,
+      tabData.base_token,
+      tabData.quote_token,
+      baseBlinding,
+      quoteBlinding,
+      tabData.pub_key
+    );
+    let orderTab = new OrderTab(
+      tabData.index,
+      tabHeader,
+      baseAmount,
+      quoteAmount
+    );
+
+    orderTabs.push(orderTab);
+  });
+
+
+  return orderTabs;
 }
 
 // ---- USER INFO ---- //
@@ -521,6 +584,7 @@ async function fetchLatestFills(n, isPerp, token) {
 module.exports = {
   fetchStoredNotes,
   fetchStoredPosition,
+  fetchStoredTabs,
   fetchUserFills,
   fetchLatestFills,
   fetchIndividualPosition,

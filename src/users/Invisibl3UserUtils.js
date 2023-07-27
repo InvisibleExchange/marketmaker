@@ -7,6 +7,7 @@ const {
   fetchStoredPosition,
   fetchStoredNotes,
   storePrivKey,
+  fetchStoredTabs,
 } = require("../helpers/firebase/firebaseConnection");
 
 const DUST_AMOUNT_PER_ASSET = {
@@ -61,6 +62,8 @@ async function fetchNoteData(keyPairs, privateSeed) {
   return { emptyPrivKeys, noteData, notePrivKeys };
 }
 
+// ? ==============================================================================
+
 async function fetchPositionData(addressData) {
   let emptyPositionPrivKeys = [];
   let positionData = {};
@@ -98,6 +101,58 @@ async function fetchPositionData(addressData) {
   }
 
   return { emptyPositionPrivKeys, positionData, posPrivKeys };
+}
+
+// ? ==============================================================================
+
+async function fetchOrderTabData(addressData, privateSeed) {
+  let emptyTabPrivKeys = [];
+  let orderTabData = {};
+  let tabPrivKeys = {};
+
+  let count = 0;
+  for (let i = 0; i < addressData.length; i++) {
+    let addr = addressData[i].address.getX().toString();
+    let privKey = BigInt(addressData[i].pk);
+
+    let baseBlinding = _generateNewBliding(
+      BigInt(addr),
+      BigInt(privateSeed) + 1n
+    );
+    let quoteBlinding = _generateNewBliding(
+      BigInt(addr),
+      BigInt(privateSeed) + 2n
+    );
+
+    fetchStoredTabs(addr, baseBlinding, quoteBlinding).then((tabs) => {
+      count++;
+
+
+      if (!tabs || tabs.length == 0) {
+        emptyTabPrivKeys.push(privKey);
+        return;
+      }
+
+      if (orderTabData[tabs[0].tab_header.base_token]) {
+        orderTabData[tabs[0].tab_header.base_token].push(tabs[0]);
+      } else {
+        orderTabData[tabs[0].tab_header.base_token] = [tabs[0]];
+      }
+
+      for (let j = 1; j < tabs.length; j++) {
+        orderTabData[tabs[j].tab_header.base_token].push(tabs[j]);
+      }
+
+
+      tabPrivKeys[BigInt(addr)] = privKey;
+    });
+  }
+
+  while (count < addressData.length) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return { emptyTabPrivKeys, orderTabData, tabPrivKeys };
 }
 
 // *
@@ -144,12 +199,12 @@ function signMarginChange(
 }
 
 // ! CRYPTO HELPERS
-function _subaddressPrivKeys(privSpendKey, privViewKey, token) {
+function _subaddressPrivKeys(privSpendKey, privViewKey, randSeed) {
   // //ksi = ks + H(kv, i)
   // //kvi = kv + H(ks, i)
 
-  const ksi = trimHash(pedersen([privSpendKey, token]), 240);
-  const kvi = trimHash(pedersen([privViewKey, token]), 240);
+  const ksi = trimHash(pedersen([privSpendKey, randSeed]), 240);
+  const kvi = trimHash(pedersen([privViewKey, randSeed]), 240);
 
   return { ksi, kvi };
 }
@@ -274,6 +329,7 @@ module.exports = {
   _checkOwnership,
   fetchNoteData,
   fetchPositionData,
+  fetchOrderTabData,
   signMarginChange,
   handlePfrNoteData,
   findNoteCombinations,

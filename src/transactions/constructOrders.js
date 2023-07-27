@@ -20,6 +20,7 @@ const {
   DUST_AMOUNT_PER_ASSET,
   SPOT_MARKET_IDS,
   PERP_MARKET_IDS,
+  SPOT_MARKET_IDS_2_TOKENS,
 } = require("../helpers/utils");
 const {
   _getBankruptcyPrice,
@@ -54,6 +55,7 @@ const EXPRESS_APP_URL = `http://${SERVER_URL}:4000`; // process.env.EXPRESS_APP_
  * @param  quoteAmount the amount of quote tokens to be spent/received  (only for buy orders)
  * @param  price a) price of base token denominated in quote token (current price if market order)
  * @param  feeLimit fee limit in percentage (1 = 1%)
+ * @param  tabAddress the address of the tab to be used (null if non-tab order)
  * @param  slippage  the slippage limit in percentage (1 = 1%) (null if limit)
  */
 async function sendSpotOrder(
@@ -66,6 +68,7 @@ async function sendSpotOrder(
   quoteAmount,
   price,
   feeLimit,
+  tabAddress,
   slippage,
   isMarket,
   ACTIVE_ORDERS
@@ -132,7 +135,7 @@ async function sendSpotOrder(
 
   feeLimit = Number.parseInt(((feeLimit * receiveAmount) / 100).toString());
 
-  if (spendAmount > user.getAvailableAmount(spendToken)) {
+  if (spendAmount > user.getAvailableAmount(spendToken) && !tabAddress) {
     if (
       spendAmount >
       user.getAvailableAmount(spendToken) + DUST_AMOUNT_PER_ASSET[spendToken]
@@ -144,13 +147,15 @@ async function sendSpotOrder(
     spendAmount = user.getAvailableAmount(spendToken);
   }
 
-  let { limitOrder, pfrKey } = user.makeLimitOrder(
+  let limitOrder = user.makeLimitOrder(
     expirationTimestamp,
     spendToken,
     receiveToken,
     spendAmount,
     receiveAmount,
-    feeLimit
+    feeLimit,
+    order_side,
+    tabAddress
   );
 
   let orderJson = limitOrder.toGrpcObject();
@@ -159,39 +164,41 @@ async function sendSpotOrder(
 
   user.awaittingOrder = true;
 
-  await axios
-    .post(`${EXPRESS_APP_URL}/submit_limit_order`, orderJson)
-    .then(async (res) => {
-      let order_response = res.data.response;
+  console.log("orderJson: ", orderJson);
 
-      if (order_response.successful) {
-        storeUserState(user.db, user);
+  // await axios
+  //   .post(`${EXPRESS_APP_URL}/submit_limit_order`, orderJson)
+  // .then(async (res) => {
+  //   let order_response = res.data.response;
 
-        handleLimitOrderResponse(
-          user,
-          limitOrder,
-          order_response,
-          spendAmount,
-          receiveAmount,
-          price,
-          baseToken,
-          receiveToken,
-          order_side,
-          isMarket,
-          ACTIVE_ORDERS
-        );
+  //   if (order_response.successful) {
+  //     storeUserState(user.db, user);
 
-        user.awaittingOrder = false;
-      } else {
-        let msg =
-          "Failed to submit order with error: \n" +
-          order_response.error_message;
-        console.log(msg);
+  //     handleLimitOrderResponse(
+  //       user,
+  //       limitOrder,
+  //       order_response,
+  //       spendAmount,
+  //       receiveAmount,
+  //       price,
+  //       baseToken,
+  //       receiveToken,
+  //       order_side,
+  //       isMarket,
+  //       ACTIVE_ORDERS
+  //     );
 
-        user.awaittingOrder = false;
-        throw new Error(msg);
-      }
-    });
+  //     user.awaittingOrder = false;
+  //   } else {
+  //     let msg =
+  //       "Failed to submit order with error: \n" +
+  //       order_response.error_message;
+  //     console.log(msg);
+
+  //     user.awaittingOrder = false;
+  //     throw new Error(msg);
+  //   }
+  // });
 }
 
 //
@@ -1002,6 +1009,123 @@ async function sendChangeMargin(
     });
 }
 
+// * ======================================================================
+
+/**
+ * Sends a request to open an order tab
+ * ## Params:
+ * @param baseAmount the amount of base token to supply
+ * @param quoteAmount the amount of quote token to supply
+ * @param marketId  determines which market (base/quote token) to use
+ * @param expirationTime  time untill order tab expires
+ */
+async function sendOpenOrderTab(
+  user,
+  baseAmount,
+  quoteAmount,
+  marketId,
+  expirationTime
+) {
+  let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+  let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+  if (user.getAvailableAmount(baseToken) < baseAmount) return;
+  if (user.getAvailableAmount(quoteToken) < quoteAmount) return;
+
+  if (expirationTime <= 60) throw new Error("Expiration time Invalid");
+
+  let ts = new Date().getTime() / 1000; // number of seconds since epoch
+  let expirationTimestamp = Number.parseInt(ts.toString()) + expirationTime;
+
+  let grpcMessage = user.openNewOrderTab(
+    baseAmount,
+    quoteAmount,
+    marketId,
+    expirationTimestamp
+  );
+
+  await axios
+    .post(`${EXPRESS_APP_URL}/open_order_tab`, grpcMessage)
+    .then((res) => {
+      let openTabResponse = res.data.response;
+      if (openTabResponse.successful) {
+        // ? Store the userData locally
+        storeUserState(user.db, user);
+
+        console.log("openTabResponse: ", openTabResponse);
+
+        if (!user.orderTabData[baseToken]) user.orderTabData[baseToken] = [];
+
+        user.orderTabData[baseToken].push(grpcMessage.order_tab);
+      } else {
+        let msg =
+          "Failed to submit order with error: \n" +
+          openTabResponse.error_message;
+        console.log(msg);
+
+        throw new Error(msg);
+      }
+    });
+}
+
+// * ======================================================================
+
+/**
+ * Sends a request to open an order tab
+ * ## Params:
+ * @param marketId  determines which market (base/quote token) to use
+ * @param orderTab  the order tab to close
+ * @param expirationTime  time untill order tab expires
+ */
+async function sendCloseOrderTab(user, marketId, tabAddress) {
+  let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+  let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+  let { orderTab, baseCloseOrderFields, quoteCloseOrderFields, signature } =
+    user.closeOrderTab(tabAddress, baseToken, quoteToken);
+
+  let grpcMessage = {
+    order_tab: orderTab.toGrpcObject(),
+    signature: {
+      r: signature[0].toString(),
+      s: signature[1].toString(),
+    },
+    base_close_order_fields: baseCloseOrderFields.toGrpcObject(),
+    quote_close_order_fields: quoteCloseOrderFields.toGrpcObject(),
+  };
+
+  await axios
+    .post(`${EXPRESS_APP_URL}/close_order_tab`, grpcMessage)
+    .then((res) => {
+      let closeTabResponse = res.data.response;
+      if (closeTabResponse.successful) {
+        // ? Store the userData locally
+        storeUserState(user.db, user);
+
+        user.orderTabData.filter(
+          (tab) => tab.address != closeTabResponse.address
+        );
+
+        let baseReturnNote = Note.fromGrpcObject(
+          closeTabResponse.base_return_note
+        );
+        let quoteReturnNote = Note.fromGrpcObject(
+          closeTabResponse.quote_return_note
+        );
+
+        user.noteData.push(baseReturnNote);
+        user.noteData.push(quoteReturnNote);
+      } else {
+        let msg =
+          "Failed to submit order with error: \n" +
+          closeTabResponse.error_message;
+        console.log(msg);
+
+        throw new Error(msg);
+      }
+    });
+}
+
 module.exports = {
   sendSpotOrder,
   sendBatchOrder,
@@ -1013,6 +1137,8 @@ module.exports = {
   sendSplitOrder,
   sendChangeMargin,
   sendLiquidationOrder,
+  sendOpenOrderTab,
+  sendCloseOrderTab,
 };
 
 // // ========================

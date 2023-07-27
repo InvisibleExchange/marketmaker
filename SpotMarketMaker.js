@@ -212,32 +212,35 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       : PRICE_FEEDS[mmConfig.priceFeedPrimary];
     if (!midPrice) continue;
 
+    if (!marketMaker.orderTabData[baseAsset]) continue;
+
     const side = mmConfig.side || "d";
 
-    let baseBalance = marketMaker.getAvailableAmount(baseAsset);
-    let quoteBalance =
-      marketMaker.getAvailableAmount(quoteAsset) / activeMarkets.length;
+    let orderTab = marketMaker.orderTabData[baseAsset][0];
+
+    let totalBaseBalance =
+      orderTab.base_amount / 10 ** DECIMALS_PER_ASSET[baseAsset];
+    let totalQuoteBalance =
+      orderTab.quote_amount / 10 ** DECIMALS_PER_ASSET[quoteAsset];
 
     // sum up all the active orders
     let activeOrderBaseValue = ACTIVE_ORDERS[marketId + "Sell"]
       ? ACTIVE_ORDERS[marketId + "Sell"].reduce(
           (acc, order) => acc + order.spendAmount,
           0
-        )
+        ) /
+        10 ** DECIMALS_PER_ASSET[baseAsset]
       : 0;
     let activeOrderQuoteValue = ACTIVE_ORDERS[marketId + "Buy"]
       ? ACTIVE_ORDERS[marketId + "Buy"].reduce(
           (acc, order) => acc + order.spendAmount,
           0
-        )
+        ) /
+        10 ** DECIMALS_PER_ASSET[quoteAsset]
       : 0;
 
-    let totalBaseBalance =
-      (baseBalance + activeOrderBaseValue) /
-      10 ** DECIMALS_PER_ASSET[baseAsset];
-    let totalQuoteBalance =
-      (quoteBalance + activeOrderQuoteValue) /
-      10 ** DECIMALS_PER_ASSET[quoteAsset];
+    let baseBalance = totalBaseBalance - activeOrderBaseValue;
+    let quoteBalance = totalQuoteBalance - activeOrderQuoteValue;
 
     const maxSellSize = Math.min(totalBaseBalance, mmConfig.maxSize);
     const maxBuySize = Math.min(totalQuoteBalance / midPrice, mmConfig.maxSize);
@@ -258,86 +261,69 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       }
 
       // & AMEND EXISTING ORDERS -----------------------------------------------------
-      // Get distinct order ids from active orders
-      let ordersPerId = {};
-      for (let order of activeOrdersCopy) {
-        if (ordersPerId[order.id]) {
-          ordersPerId[order.id]++;
-        } else {
-          ordersPerId[order.id] = 1;
-        }
-      }
-
-      let shift = 0;
-      for (let [order_id, count] of Object.entries(ordersPerId)) {
-        let buyPrices = [];
-        for (let i = 0; i < count; i++) {
-          const buyPrice =
-            midPrice *
-            (1 -
-              mmConfig.minSpread -
-              (mmConfig.slippageRate * maxBuySize * shift) / buySplits);
-          shift++;
-
-          buyPrices.push(buyPrice);
-        }
-
-        sendAmendOrder(
-          marketMaker,
-          order_id,
-          "Buy",
-          isPerp,
-          marketId,
-          buyPrices,
-          MM_CONFIG.EXPIRATION_TIME,
-          false, // match_only
-          ACTIVE_ORDERS,
-          errorCounter
-        ).catch((err) => {
-          console.log("Error amending order: ", err);
-          errorCounter++;
-        });
-      }
-
-      // & SEND NEW ORDERS -----------------------------------------------------
-      let prices = [];
-      let amounts = [];
-
-      for (let i = activeOrdersCopy.length; i < buySplits; i++) {
-        if (quoteBalance < 100) continue;
-
+      for (let i = 0; i < activeOrdersCopy.length; i++) {
         const buyPrice =
           midPrice *
           (1 -
             mmConfig.minSpread -
             (mmConfig.slippageRate * maxBuySize * i) / buySplits);
 
-        let quoteAmount =
-          quoteBalance /
-          (10 ** DECIMALS_PER_ASSET[quoteAsset] *
-            (buySplits - activeOrdersCopy.length));
-
-        prices.push(buyPrice);
-        amounts.push(quoteAmount);
+        let orderId = activeOrdersCopy[i].id;
+        sendAmendOrder(
+          marketMaker,
+          orderId,
+          "Buy",
+          isPerp,
+          marketId,
+          [buyPrice],
+          MM_CONFIG.EXPIRATION_TIME,
+          false, // match_only
+          ACTIVE_ORDERS,
+          errorCounter
+        ).catch((err) => {
+          // console.log("Error amending order: ", err);
+          errorCounter++;
+        });
       }
 
-      if (prices.length > 0) {
-        // PLACE BUY ORDERS
-        sendBatchOrder(
+      // & SEND NEW ORDERS -----------------------------------------------------
+      for (let i = activeOrdersCopy.length; i < buySplits; i++) {
+        if (
+          quoteBalance <
+          DUST_AMOUNT_PER_ASSET[quoteAsset] /
+            10 ** DECIMALS_PER_ASSET[quoteAsset]
+        )
+          continue;
+
+        const buyPrice =
+          midPrice *
+          (1 -
+            mmConfig.minSpread -
+            (mmConfig.slippageRate * maxBuySize * i) / buySplits);
+        let quote_amount = quoteBalance / buySplits;
+
+        sendSpotOrder(
           marketMaker,
           "Buy",
           MM_CONFIG.EXPIRATION_TIME,
           baseAsset,
           quoteAsset,
-          prices,
-          amounts,
+          null,
+          quote_amount,
+          buyPrice,
           0.07,
+          orderTab.tab_header.pub_key,
+          0,
+          false,
           ACTIVE_ORDERS
         ).catch((err) => {
-          console.log("Error sending fill request: ", err);
+          console.log("Error sending spot order: ", err);
 
-          if (err.toString().includes("Note does not exist")) {
-            // restoreUserState(user, true, false);
+          if (
+            err.toString().includes("Note does not exist") ||
+            err.toString().includes("Position does not exist")
+          ) {
+            // restoreUserState(user, true, true);
             shouldRestoreState = true;
           }
 
@@ -355,85 +341,68 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       }
 
       // & AMEND EXISTING ORDERS -----------------------------------------------------
-      // Get distinct order ids from active orders
-      let ordersPerId = {};
-      for (let order of activeOrdersCopy) {
-        if (ordersPerId[order.id]) {
-          ordersPerId[order.id]++;
-        } else {
-          ordersPerId[order.id] = 1;
-        }
-      }
-
-      let shift = 0;
-      for (let [order_id, count] of Object.entries(ordersPerId)) {
-        let sellPrices = [];
-        for (let i = 0; i < count; i++) {
-          const sellPrice =
-            midPrice *
-            (1 +
-              mmConfig.minSpread +
-              (mmConfig.slippageRate * maxSellSize * shift) / sellSplits);
-          shift++;
-
-          sellPrices.push(sellPrice);
-        }
-
-        sendAmendOrder(
-          marketMaker,
-          order_id,
-          "Sell",
-          isPerp,
-          marketId,
-          sellPrices,
-          MM_CONFIG.EXPIRATION_TIME,
-          false, // match_only
-          ACTIVE_ORDERS,
-          errorCounter
-        ).catch((err) => {
-          console.log("Error amending order: ", err);
-          errorCounter++;
-        });
-      }
-
-      // & SEND NEW ORDERS -----------------------------------------------------
-      let prices = [];
-      let amounts = [];
-      for (let i = activeOrdersCopy.length; i < buySplits; i++) {
-        if (quoteBalance < 100) continue;
-
+      for (let i = 0; i < activeOrdersCopy.length; i++) {
         const sellPrice =
           midPrice *
           (1 +
             mmConfig.minSpread +
             (mmConfig.slippageRate * maxSellSize * i) / sellSplits);
 
-        let baseAmount =
-          baseBalance /
-          (10 ** DECIMALS_PER_ASSET[baseAsset] *
-            (sellSplits - activeOrdersCopy.length));
-
-        prices.push(sellPrice);
-        amounts.push(baseAmount);
+        let orderId = activeOrdersCopy[i].id;
+        sendAmendOrder(
+          marketMaker,
+          orderId,
+          "Sell",
+          isPerp,
+          marketId,
+          [sellPrice],
+          MM_CONFIG.EXPIRATION_TIME,
+          false, // match_only
+          ACTIVE_ORDERS,
+          errorCounter
+        ).catch((err) => {
+          // console.log("Error amending order: ", err);
+          errorCounter++;
+        });
       }
 
-      if (prices.length > 0) {
-        // PLACE SELL ORDERS
-        sendBatchOrder(
+      // & SEND NEW ORDERS -----------------------------------------------------
+      for (let i = activeOrdersCopy.length; i < sellSplits; i++) {
+        if (
+          baseBalance <
+          DUST_AMOUNT_PER_ASSET[baseAsset] / 10 ** DECIMALS_PER_ASSET[baseAsset]
+        )
+          continue;
+
+        const sellPrice =
+          midPrice *
+          (1 -
+            mmConfig.minSpread -
+            (mmConfig.slippageRate * maxSellSize * i) / sellSplits);
+        let base_amount = baseBalance / sellSplits;
+
+        sendSpotOrder(
           marketMaker,
           "Sell",
           MM_CONFIG.EXPIRATION_TIME,
           baseAsset,
           quoteAsset,
-          prices,
-          amounts,
+          base_amount,
+          null,
+          sellPrice,
           0.07,
+          orderTab.tab_header.pub_key,
+          0,
+          false,
           ACTIVE_ORDERS
         ).catch((err) => {
-          console.log("Error sending fill request: ", err);
+          console.log("Error sending spot order: ", err);
 
-          if (err.toString().includes("Note does not exist")) {
-            // restoreUserState(user, true, false);
+          if (
+            err.toString().includes("Note does not exist") ||
+            err.toString().includes("Position does not exist")
+          ) {
+            // restoreUserState(user, true, true);
             shouldRestoreState = true;
           }
 
@@ -869,6 +838,8 @@ async function run(config) {
     //   "marketMaker: ",
     //   marketMaker.noteData[55555]?.map((n) => n.amount)
     // );
+
+    console.log("order tab", marketMaker.orderTabData);
 
     // brodcast orders to provide liquidity
     indicateLiquidity();

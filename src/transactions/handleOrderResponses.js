@@ -24,14 +24,17 @@ function handleLimitOrderResponse(
     : 0;
 
   // ? Add the refund note
-  if (limitOrder.refund_note) {
+  if (limitOrder.spot_note_info && limitOrder.spot_note_info.refund_note) {
     if (filledAmount > 0) {
       // If this is a market order then we can add the refund note immediately
-      user.noteData[limitOrder.refund_note.token].push(limitOrder.refund_note);
+      user.noteData[limitOrder.spot_note_info.refund_note.token].push(
+        limitOrder.spot_note_info.refund_note
+      );
     } else {
       // If this is a limit order then we need to wait for the order to be filled
       // (untill we receive a response through the websocket)
-      user.refundNotes[order_response.order_id] = limitOrder.refund_note;
+      user.refundNotes[order_response.order_id] =
+        limitOrder.spot_note_info.refund_note;
     }
   }
 
