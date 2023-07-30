@@ -164,41 +164,40 @@ async function sendSpotOrder(
 
   user.awaittingOrder = true;
 
-  console.log("orderJson: ", orderJson);
+  await axios
+    .post(`${EXPRESS_APP_URL}/submit_limit_order`, orderJson)
+    .then(async (res) => {
+      let order_response = res.data.response;
 
-  // await axios
-  //   .post(`${EXPRESS_APP_URL}/submit_limit_order`, orderJson)
-  // .then(async (res) => {
-  //   let order_response = res.data.response;
+      if (order_response.successful) {
+        user.orderIds.push(order_response.order_id);
+        storeUserState(user.db, user);
 
-  //   if (order_response.successful) {
-  //     storeUserState(user.db, user);
+        handleLimitOrderResponse(
+          user,
+          limitOrder,
+          order_response,
+          spendAmount,
+          receiveAmount,
+          price,
+          baseToken,
+          receiveToken,
+          order_side,
+          isMarket,
+          ACTIVE_ORDERS
+        );
 
-  //     handleLimitOrderResponse(
-  //       user,
-  //       limitOrder,
-  //       order_response,
-  //       spendAmount,
-  //       receiveAmount,
-  //       price,
-  //       baseToken,
-  //       receiveToken,
-  //       order_side,
-  //       isMarket,
-  //       ACTIVE_ORDERS
-  //     );
+        user.awaittingOrder = false;
+      } else {
+        let msg =
+          "Failed to submit order with error: \n" +
+          order_response.error_message;
+        console.log(msg);
 
-  //     user.awaittingOrder = false;
-  //   } else {
-  //     let msg =
-  //       "Failed to submit order with error: \n" +
-  //       order_response.error_message;
-  //     console.log(msg);
-
-  //     user.awaittingOrder = false;
-  //     throw new Error(msg);
-  //   }
-  // });
+        user.awaittingOrder = false;
+        throw new Error(msg);
+      }
+    });
 }
 
 //
@@ -648,7 +647,7 @@ async function sendCancelOrder(
           order_response.error_message +
           " id: " +
           orderId;
-        // console.log(msg);
+        console.log(msg);
 
         errorCounter++;
       }
@@ -669,6 +668,7 @@ async function sendCancelOrder(
  * @param marketId market id of the order
  * @param newPrice new price of the order
  * @param newExpirationTime new expiration time in seconds
+ * @param tabAddress the address of the order tab to be used (null if non-tab order)
  * @param match_only true if order should be matched only, false if matched and amended
  * @returns true if order should be removed, false otherwise
  */
@@ -679,8 +679,9 @@ async function sendAmendOrder(
   order_side,
   isPerp,
   marketId,
-  newPrices,
+  newPrice,
   newExpirationTime,
+  tabAddress,
   match_only,
   ACTIVE_ORDERS,
   errorCounter
@@ -692,13 +693,13 @@ async function sendAmendOrder(
     !(isPerp === true || isPerp === false) ||
     !marketId ||
     !orderId ||
-    !newPrices ||
+    !newPrice ||
     !newExpirationTime ||
     (order_side !== "Buy" && order_side !== "Sell")
   )
     return;
 
-  newPrices = newPrices.map((p) => Number(p));
+  newPrice = Number(newPrice);
 
   let order;
   let signature;
@@ -717,7 +718,7 @@ async function sendAmendOrder(
 
     let newCollateralAmount = getQuoteQty(
       ord.synthetic_amount,
-      newPrices[0],
+      newPrice,
       ord.synthetic_token,
       COLLATERAL_TOKEN,
       null
@@ -755,7 +756,7 @@ async function sendAmendOrder(
     if (order_side == "Buy") {
       let newAmountReceived = getQtyFromQuote(
         ord.amount_spent,
-        newPrices[0],
+        newPrice,
         ord.token_received,
         ord.token_spent
       );
@@ -765,7 +766,7 @@ async function sendAmendOrder(
     } else {
       let newAmountReceived = getQuoteQty(
         ord.amount_spent,
-        newPrices[0],
+        newPrice,
         ord.token_spent,
         ord.token_received,
         null
@@ -775,11 +776,12 @@ async function sendAmendOrder(
       ord.expiration_timestamp = expirationTimestamp;
     }
 
-    let privKeys = ord.notes_in.map(
-      (note) => user.notePrivKeys[note.address.getX().toString()]
-    );
+    // let privKeys = ord.notes_in.map(
+    //   (note) => user.notePrivKeys[note.address.getX().toString()]
+    // );
+    let privKey = user.tabPrivKeys[tabAddress];
 
-    let sig = ord.signOrder(privKeys);
+    let sig = ord.signOrder(privKey);
 
     signature = sig;
     order = ord;
@@ -789,7 +791,7 @@ async function sendAmendOrder(
     market_id: marketId,
     order_id: orderId.toString(),
     order_side: order_side == "Buy",
-    new_prices: newPrices,
+    new_price: newPrice,
     new_expiration: expirationTimestamp,
     signature: { r: signature[0].toString(), s: signature[1].toString() },
     user_id: trimHash(user.userId, 64).toString(),
@@ -805,7 +807,7 @@ async function sendAmendOrder(
     } else {
       let msg =
         "Amend order failed with error: \n" + order_response.error_message;
-      // console.log(msg);
+      console.log(msg);
 
       ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
         marketId.toString() + order_side

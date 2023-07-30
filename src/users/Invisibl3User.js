@@ -200,7 +200,7 @@ module.exports = class User {
 
     // ? Get Fill Data ============================================
 
-    let fills = await fetchUserFills(this.userId);
+    // let fills = await fetchUserFills(this.userId);
 
     // ? Get Order Data ============================================
 
@@ -232,7 +232,7 @@ module.exports = class User {
     this.orderIds = [...new Set(userData.orderIds)];
     this.perpetualOrderIds = [...new Set(userData.perpetualOrderIds)];
     // this.pfrKeys = userData.pfrKeys;
-    this.fills = [...new Set(fills)];
+    // this.fills = [...new Set(fills)];
 
     return { emptyPrivKeys, emptyPositionPrivKeys, emptyTabPrivKeys };
   }

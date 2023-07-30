@@ -13,9 +13,3 @@ async function main() {
 }
 
 main();
-
-// base_amount: 8000000000,
-// amount_spent:2000000000,
-
-// quote_amount: 150000000000
-// amount_receiv 58275835988,

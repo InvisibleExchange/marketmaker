@@ -297,11 +297,39 @@ function handleSwapResult(
   let idx = user.orders.findIndex((o) => o.order_id == orderId);
   let order = user.orders[idx];
   if (order) {
+    let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+    let side = order.token_spent == baseToken ? "Sell" : "Buy";
+
+    // ? Update the Order tab
+    if (order.order_tab) {
+      let tabAddress = order.order_tab.tab_header.pub_key;
+
+      // ? Get the order tab
+      let orderTab;
+      if (user.orderTabData[baseToken].length > 0) {
+        for (let tab of user.orderTabData[baseToken]) {
+          if (tab.tab_header.pub_key == tabAddress) {
+            orderTab = tab;
+            break;
+          }
+        }
+      }
+
+      if (orderTab) {
+        console.log("orderTab: ", orderTab.base_amount, orderTab.quote_amount);
+
+        if (side == "Buy") {
+          orderTab.base_amount += Number.parseInt(received_amount);
+          orderTab.quote_amount -= Number.parseInt(spent_amount);
+        } else {
+          orderTab.base_amount -= Number.parseInt(spent_amount);
+          orderTab.quote_amount += Number.parseInt(received_amount);
+        }
+      }
+    }
+
     // ? REMOVE THE ORDER FROM ACTIVE_ORDERS IF NECESSARY
-    let side =
-      order.token_spent == SPOT_MARKET_IDS_2_TOKENS[marketId].base
-        ? "Sell"
-        : "Buy";
+
     let idx2 = ACTIVE_ORDERS[marketId.toString() + side].findIndex(
       (o) => o.id == orderId
     );

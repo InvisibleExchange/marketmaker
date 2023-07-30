@@ -277,8 +277,8 @@ function handleCancelOrderResponse(user, order_response, orderId, isPerp) {
       for (let i = 0; i < user.orders.length; i++) {
         let ord = user.orders[i];
 
-        if (ord.order_id == orderId) {
-          let notes_in = ord.notes_in;
+        if (ord.order_id == orderId && ord.spot_note_info) {
+          let notes_in = ord.spot_note_info.notes_in;
           if (notes_in.length > 0) {
             for (let note_ of notes_in) {
               let note = Note.fromGrpcObject(note_);

@@ -63,13 +63,13 @@ async function openOrderTab(marketId, config) {
   let baseAmount = marketMaker.getAvailableAmount(baseToken);
   let quoteAmount = marketMaker.getAvailableAmount(quoteToken);
 
-  // await sendOpenOrderTab(
-  //   marketMaker,
-  //   baseAmount,
-  //   quoteAmount,
-  //   marketId,
-  //   3600_000
-  // );
+  await sendOpenOrderTab(
+    marketMaker,
+    baseAmount,
+    quoteAmount,
+    marketId,
+    3600_000
+  );
 
   console.log(marketMaker.orderTabData);
 }

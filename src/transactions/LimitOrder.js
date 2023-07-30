@@ -39,9 +39,11 @@ class LimitOrder {
     ];
 
     let note_info_hash = this.spot_note_info ? this.spot_note_info.hash() : 0n;
-    let order_tab_hash = this.order_tab ? this.order_tab.hash : 0n;
+    let order_tab_pub_key = this.order_tab
+      ? this.order_tab.tab_header.pub_key
+      : 0n;
     hashInputs.push(note_info_hash);
-    hashInputs.push(order_tab_hash);
+    hashInputs.push(order_tab_pub_key);
 
     return computeHashOnElements(hashInputs);
   }
@@ -146,20 +148,32 @@ class OrderTab {
   }
 
   hash() {
+    return OrderTab.hashOrderTab(
+      this.tab_header.hash(),
+      this.tab_header.base_blinding,
+      this.tab_header.quote_blinding,
+      this.base_amount,
+      this.quote_amount
+    );
+  }
+
+  static hashOrderTab(
+    header_hash,
+    base_blinding,
+    quote_blinding,
+    base_amount,
+    quote_amount
+  ) {
     let base_commitment = pedersen([
-      BigInt(this.base_amount),
-      BigInt(this.tab_header.base_blinding),
+      BigInt(base_amount),
+      BigInt(base_blinding),
     ]);
     let quote_commitment = pedersen([
-      BigInt(this.quote_amount),
-      BigInt(this.tab_header.quote_blinding),
+      BigInt(quote_amount),
+      BigInt(quote_blinding),
     ]);
 
-    let hashInputs = [
-      this.tab_header.hash(),
-      base_commitment,
-      quote_commitment,
-    ];
+    let hashInputs = [header_hash, base_commitment, quote_commitment];
 
     return computeHashOnElements(hashInputs);
   }

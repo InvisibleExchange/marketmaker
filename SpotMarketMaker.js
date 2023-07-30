@@ -25,7 +25,6 @@ const {
   sendSplitOrder,
   sendAmendOrder,
   sendCancelOrder,
-  sendBatchOrder,
 } = require("./src/transactions/constructOrders");
 
 const { setupPriceFeeds } = require("./mmPriceFeeds");
@@ -105,84 +104,74 @@ async function fillOpenOrders() {
 
 // order: {price, amount, timestamp}
 async function sendFillRequest(otherOrder, otherSide, marketId) {
-  const baseAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
-  const quoteAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
-
-  const baseQuantity = otherOrder.amount / 10 ** DECIMALS_PER_ASSET[baseAsset];
-  const quote = genQuote(baseAsset, otherSide, baseQuantity);
-
-  const spendAsset = otherSide === "s" ? quoteAsset : baseAsset;
-
-  let availableAmount =
-    marketMaker.getAvailableAmount(spendAsset) /
-    10 ** DECIMALS_PER_ASSET[spendAsset];
-
-  let unfilledAmount = otherSide === "s" ? quote.quoteQuantity : baseQuantity;
-
-  const availableUsdBalance = availableAmount * getPrice(spendAsset);
-  let unfilledUsdAmount = unfilledAmount * getPrice(spendAsset);
-
-  if (availableUsdBalance >= 10 && unfilledUsdAmount >= 10) {
-    sendSpotOrder(
-      marketMaker,
-      otherSide === "s" ? "Buy" : "Sell",
-      MM_CONFIG.EXPIRATION_TIME,
-      baseAsset,
-      quoteAsset,
-      availableAmount,
-      availableAmount,
-      otherOrder.price,
-      0.07,
-      0.01,
-      true,
-      ACTIVE_ORDERS
-    ).catch((err) => {
-      console.log("Error sending fill request: ", err);
-      errorCounter++;
-    });
-
-    unfilledAmount -= availableAmount;
-  }
-
-  if (ACTIVE_ORDERS[otherSide === "s" ? marketId + "Buy" : marketId + "Sell"]) {
-    let sortedOrders = ACTIVE_ORDERS[
-      otherSide === "s" ? marketId + "Buy" : marketId + "Sell"
-    ].sort((a, b) => {
-      return otherSide === "b" ? a.price - b.price : b.price - a.price;
-    });
-
-    for (let order of sortedOrders) {
-      if (
-        unfilledAmount <
-        DUST_AMOUNT_PER_ASSET[spendAsset] / 10 ** DECIMALS_PER_ASSET[spendAsset]
-      )
-        return;
-
-      // Send amend order
-      sendAmendOrder(
-        marketMaker,
-        order.id,
-        otherSide === "s" ? "Buy" : "Sell",
-        isPerp,
-        marketId,
-        [
-          otherSide === "s"
-            ? otherOrder.price * (1 + 0.0001)
-            : otherOrder.price * (1 - 0.0001),
-        ],
-        MM_CONFIG.EXPIRATION_TIME,
-        true, // match_only
-        ACTIVE_ORDERS,
-        errorCounter
-      ).catch((err) => {
-        console.log("Error amending order: ", err);
-        errorCounter++;
-      });
-
-      unfilledAmount -=
-        order.spendAmount / 10 ** DECIMALS_PER_ASSET[spendAsset];
-    }
-  }
+  // TODO:
+  // const baseAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+  // const quoteAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+  // const baseQuantity = otherOrder.amount / 10 ** DECIMALS_PER_ASSET[baseAsset];
+  // const quote = genQuote(baseAsset, otherSide, baseQuantity);
+  // const spendAsset = otherSide === "s" ? quoteAsset : baseAsset;
+  // let availableAmount =
+  //   marketMaker.getAvailableAmount(spendAsset) /
+  //   10 ** DECIMALS_PER_ASSET[spendAsset];
+  // let unfilledAmount = otherSide === "s" ? quote.quoteQuantity : baseQuantity;
+  // const availableUsdBalance = availableAmount * getPrice(spendAsset);
+  // let unfilledUsdAmount = unfilledAmount * getPrice(spendAsset);
+  // if (availableUsdBalance >= 10 && unfilledUsdAmount >= 10) {
+  //   sendSpotOrder(
+  //     marketMaker,
+  //     otherSide === "s" ? "Buy" : "Sell",
+  //     MM_CONFIG.EXPIRATION_TIME,
+  //     baseAsset,
+  //     quoteAsset,
+  //     availableAmount,
+  //     availableAmount,
+  //     otherOrder.price,
+  //     0.07,
+  //     0.01,
+  //     true,
+  //     ACTIVE_ORDERS
+  //   ).catch((err) => {
+  //     console.log("Error sending fill request: ", err);
+  //     errorCounter++;
+  //   });
+  //   unfilledAmount -= availableAmount;
+  // }
+  // if (ACTIVE_ORDERS[otherSide === "s" ? marketId + "Buy" : marketId + "Sell"]) {
+  //   let sortedOrders = ACTIVE_ORDERS[
+  //     otherSide === "s" ? marketId + "Buy" : marketId + "Sell"
+  //   ].sort((a, b) => {
+  //     return otherSide === "b" ? a.price - b.price : b.price - a.price;
+  //   });
+  //   for (let order of sortedOrders) {
+  //     if (
+  //       unfilledAmount <
+  //       DUST_AMOUNT_PER_ASSET[spendAsset] / 10 ** DECIMALS_PER_ASSET[spendAsset]
+  //     )
+  //       return;
+  //     // Send amend order
+  //     sendAmendOrder(
+  //       marketMaker,
+  //       order.id,
+  //       otherSide === "s" ? "Buy" : "Sell",
+  //       isPerp,
+  //       marketId,
+  //       [
+  //         otherSide === "s"
+  //           ? otherOrder.price * (1 + 0.0001)
+  //           : otherOrder.price * (1 - 0.0001),
+  //       ],
+  //       MM_CONFIG.EXPIRATION_TIME,
+  //       true, // match_only
+  //       ACTIVE_ORDERS,
+  //       errorCounter
+  //     ).catch((err) => {
+  //       console.log("Error amending order: ", err);
+  //       errorCounter++;
+  //     });
+  //     unfilledAmount -=
+  //       order.spendAmount / 10 ** DECIMALS_PER_ASSET[spendAsset];
+  //   }
+  // }
 }
 
 async function indicateLiquidity(marketIds = activeMarkets) {
@@ -275,13 +264,14 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           "Buy",
           isPerp,
           marketId,
-          [buyPrice],
+          buyPrice,
           MM_CONFIG.EXPIRATION_TIME,
+          orderTab.tab_header.pub_key,
           false, // match_only
           ACTIVE_ORDERS,
           errorCounter
         ).catch((err) => {
-          // console.log("Error amending order: ", err);
+          console.log("Error amending order: ", err);
           errorCounter++;
         });
       }
@@ -302,7 +292,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
             (mmConfig.slippageRate * maxBuySize * i) / buySplits);
         let quote_amount = quoteBalance / buySplits;
 
-        sendSpotOrder(
+        await sendSpotOrder(
           marketMaker,
           "Buy",
           MM_CONFIG.EXPIRATION_TIME,
@@ -355,13 +345,14 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           "Sell",
           isPerp,
           marketId,
-          [sellPrice],
+          sellPrice,
           MM_CONFIG.EXPIRATION_TIME,
+          orderTab.tab_header.pub_key,
           false, // match_only
           ACTIVE_ORDERS,
           errorCounter
         ).catch((err) => {
-          // console.log("Error amending order: ", err);
+          console.log("Error amending order: ", err);
           errorCounter++;
         });
       }
@@ -376,12 +367,12 @@ async function indicateLiquidity(marketIds = activeMarkets) {
 
         const sellPrice =
           midPrice *
-          (1 -
-            mmConfig.minSpread -
+          (1 +
+            mmConfig.minSpread +
             (mmConfig.slippageRate * maxSellSize * i) / sellSplits);
         let base_amount = baseBalance / sellSplits;
 
-        sendSpotOrder(
+        await sendSpotOrder(
           marketMaker,
           "Sell",
           MM_CONFIG.EXPIRATION_TIME,
@@ -529,7 +520,7 @@ async function afterFill(amountFilled, marketId) {
   // }
 }
 
-// * HELPER FUNCTIONS ==========================================================================================================
+// * HELPER FUNCTIONS ========================================================================================================
 
 //order: {price, amount, timestamp}
 function isOrderFillable(order, side, baseAsset, quoteAsset) {
@@ -645,7 +636,7 @@ const getPrice = (token) => {
   return PRICE_FEEDS[MM_CONFIG.pairs[SPOT_MARKET_IDS[token]].priceFeedPrimary];
 };
 
-// * INITIALIZATION ==========================================================================================================
+// * INITIALIZATION ========================================================================================================
 
 const CONFIG_CODE = "1234567890";
 const listenToWebSocket = () => {
@@ -703,11 +694,11 @@ const listenToWebSocket = () => {
         break;
 
       case "SWAP_FILLED":
-        if (msg.type == "perpetual") {
-          // handleFillResult(marketMaker, msg, perpFills, setPerpFills);
-        } else {
-          // handleFillResult(marketMaker, msg, fills, setFills);
-        }
+        // if (msg.type == "perpetual") {
+        //   // handleFillResult(marketMaker, msg, perpFills, setPerpFills);
+        // } else {
+        //   // handleFillResult(marketMaker, msg, fills, setFills);
+        // }
 
         break;
 
@@ -715,7 +706,9 @@ const listenToWebSocket = () => {
         handleSwapResult(
           marketMaker,
           msg.order_id,
-          msg.swap_response,
+          msg.spent_amount,
+          msg.received_amount,
+          msg.swap_response.note_info_swap_response,
           msg.market_id,
           ACTIVE_ORDERS
         );
@@ -779,7 +772,7 @@ const initAccountState = async () => {
   }
 };
 
-// * MAIN ====================================================================================================================
+// * MAIN ==================================================================================================================
 
 let restoredKeys = false;
 async function run(config) {
@@ -807,39 +800,27 @@ async function run(config) {
 
     let baseToken = SYMBOLS_TO_IDS[config.baseToken];
 
-    let quoteAmount = marketMaker.getAvailableAmount(55555);
-    let baseAmount = marketMaker.getAvailableAmount(baseToken);
+    let orderTab = marketMaker.orderTabData[baseToken][0];
     console.log(
       "Starting market making: ",
-      quoteAmount,
+      orderTab.quote_amount,
       "USDC",
-      baseAmount,
+      orderTab.base_amount,
       config.baseToken.toString()
     );
 
-    if (
-      (baseAmount < DUST_AMOUNT_PER_ASSET[baseToken] ||
-        quoteAmount < DUST_AMOUNT_PER_ASSET[55555]) &&
-      !restoredKeys
-    ) {
-      await restoreUserState(marketMaker, true, false);
-      restoredKeys = true;
+    // if (
+    //   (baseAmount < DUST_AMOUNT_PER_ASSET[baseToken] ||
+    //     quoteAmount < DUST_AMOUNT_PER_ASSET[55555]) &&
+    //   !restoredKeys
+    // ) {
+    //   await restoreUserState(marketMaker, true, false);
+    //   restoredKeys = true;
 
-      clearInterval(fillInterval);
+    //   clearInterval(fillInterval);
 
-      return await run(config);
-    }
-
-    // console.log(
-    //   "marketMaker: ",
-    //   marketMaker.noteData[12345]?.map((n) => n.amount)
-    // );
-    // console.log(
-    //   "marketMaker: ",
-    //   marketMaker.noteData[55555]?.map((n) => n.amount)
-    // );
-
-    console.log("order tab", marketMaker.orderTabData);
+    //   return await run(config);
+    // }
 
     // brodcast orders to provide liquidity
     indicateLiquidity();
