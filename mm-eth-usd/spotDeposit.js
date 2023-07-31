@@ -1,4 +1,4 @@
-const { makeDeposit } = require("../helpers");
+const { makeDeposits } = require("../helpers");
 const { loadMMConfig } = require("../helpers");
 
 const path = require("path");
@@ -8,14 +8,7 @@ async function main() {
 
   let config = loadMMConfig(configPath);
 
-  await makeDeposit(55555, 100_000, config);
-  await makeDeposit(54321, 50, config);
+  await makeDeposits([55555, 54321], [150_000, 50], config);
 }
 
 main();
-
-
-
-
-
-

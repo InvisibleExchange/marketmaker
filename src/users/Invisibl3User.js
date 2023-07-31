@@ -880,7 +880,9 @@ module.exports = class User {
 
     let signature = orderTab.signOpenTabOrder(
       baseNotesIn.map((n) => n.privKey),
-      quoteNotesIn.map((n) => n.privKey)
+      quoteNotesIn.map((n) => n.privKey),
+      baseRefundNote,
+      quoteRefundNote
     );
 
     let grpcMessage = {
@@ -940,6 +942,111 @@ module.exports = class User {
       quoteCloseOrderFields,
       signature,
     };
+  }
+
+  modifyOrderTab(baseAmount, quoteAmount, marketId, tabAddress, isAdd) {
+    let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+    let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+    // ? Get the order tab
+    let orderTab;
+    if (this.orderTabData[baseToken].length > 0) {
+      for (let tab of this.orderTabData[baseToken]) {
+        if (tab.tab_header.pub_key == tabAddress) {
+          orderTab = tab;
+          break;
+        }
+      }
+    }
+
+    if (!orderTab) return;
+
+    if (isAdd) {
+      // ? Get notes in and refund amount
+      let { notesIn: baseNotesIn, refundAmount: baseRefundAmount } =
+        this.getNotesInAndRefundAmount(baseToken, baseAmount);
+      let { notesIn: quoteNotesIn, refundAmount: quoteRefundAmount } =
+        this.getNotesInAndRefundAmount(quoteToken, quoteAmount);
+
+      // ? Build refund notes if necessary
+      let baseRefundNote;
+      if (baseRefundAmount > DUST_AMOUNT_PER_ASSET[baseToken]) {
+        let { KoR, koR, ytR } = this.getDestReceivedAddresses(baseToken);
+        this.notePrivKeys[KoR.getX().toString()] = koR;
+
+        baseRefundNote = new Note(
+          KoR,
+          baseToken,
+          baseRefundAmount,
+          ytR,
+          baseNotesIn[0].note.index
+        );
+      }
+      let quoteRefundNote;
+      if (quoteRefundAmount > DUST_AMOUNT_PER_ASSET[quoteToken]) {
+        let { KoR, koR, ytR } = this.getDestReceivedAddresses(quoteToken);
+        this.notePrivKeys[KoR.getX().toString()] = koR;
+
+        quoteRefundNote = new Note(
+          KoR,
+          quoteToken,
+          quoteRefundAmount,
+          ytR,
+          quoteNotesIn[0].note.index
+        );
+      }
+
+      let pkSum = baseNotesIn
+        .concat(quoteNotesIn)
+        .map((n) => n.privKey)
+        .reduce((a, b) => a + b, 0n);
+
+      let signature = orderTab.signModifyTabOrder(
+        pkSum,
+        baseRefundNote,
+        quoteRefundNote,
+        null,
+        null,
+        isAdd
+      );
+
+      return {
+        orderTab,
+        baseNotesIn,
+        quoteNotesIn: quoteNotesIn.map((n) => n.note),
+        baseRefundNote: baseRefundNote.map((n) => n.note),
+        quoteRefundNote,
+        signature,
+      };
+    } else {
+      let baseRes = this.getDestReceivedAddresses(baseToken);
+      this.notePrivKeys[baseRes.KoR.getX().toString()] = baseRes.koR;
+      let baseCloseOrderFields = new CloseOrderFields(baseRes.KoR, baseRes.ytR);
+
+      let quoteRes = this.getDestReceivedAddresses(quoteToken);
+      this.notePrivKeys[quoteRes.KoR.getX().toString()] = quoteRes.koR;
+      let quoteCloseOrderFields = new CloseOrderFields(
+        quoteRes.KoR,
+        quoteRes.ytR
+      );
+
+      let tabPk = this.tabPrivKeys[tabAddress];
+      let signature = orderTab.signModifyTabOrder(
+        tabPk,
+        null,
+        null,
+        baseCloseOrderFields,
+        quoteCloseOrderFields,
+        isAdd
+      );
+
+      return {
+        orderTab,
+        baseCloseOrderFields,
+        quoteCloseOrderFields,
+        signature,
+      };
+    }
   }
 
   // * ORDER HELPERS ============================================================

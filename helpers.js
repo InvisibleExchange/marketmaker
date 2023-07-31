@@ -1,10 +1,12 @@
-const { getActiveOrders } = require("./src/helpers/utils");
+const { getActiveOrders, DECIMALS_PER_ASSET } = require("./src/helpers/utils");
 
 const fs = require("fs");
 const User = require("./src/users/Invisibl3User");
 const {
   sendDeposit,
   sendOpenOrderTab,
+  sendCloseOrderTab,
+  sendModifyOrderTab,
 } = require("./src/transactions/constructOrders");
 
 const SPOT_MARKET_IDS_2_TOKENS = {
@@ -12,50 +14,22 @@ const SPOT_MARKET_IDS_2_TOKENS = {
   12: { base: 54321, quote: 55555 },
 };
 
-async function makeDeposit(token, amount, config) {
-  let MM_CONFIG = config.MM_CONFIG;
+async function makeDeposits(tokens, amounts, config) {
+  let marketMaker = await _loginUser(config);
 
-  let marketMaker = User.fromPrivKey(MM_CONFIG.privKey);
+  for (let i = 0; i < tokens.length; i++) {
+    let token = tokens[i];
+    let amount = amounts[i];
 
-  let { emptyPrivKeys, emptyPositionPrivKeys } = await marketMaker.login();
+    await sendDeposit(marketMaker, 123, amount, token, 123456789);
 
-  let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
-    await getActiveOrders(marketMaker.orderIds, marketMaker.perpetualOrderIds);
-
-  await marketMaker.handleActiveOrders(
-    badOrderIds,
-    orders,
-    badPerpOrderIds,
-    perpOrders,
-    pfrNotes,
-    emptyPrivKeys,
-    emptyPositionPrivKeys
-  );
-
-  await sendDeposit(marketMaker, 123, amount, token, 123456789);
-
-  console.log(marketMaker.getAvailableAmount(token));
+    console.log(token, " amount: ", marketMaker.getAvailableAmount(token));
+  }
 }
 
+// ? OPEN ORDER TAB ===========================================================
 async function openOrderTab(marketId, config) {
-  let MM_CONFIG = config.MM_CONFIG;
-
-  let marketMaker = User.fromPrivKey(MM_CONFIG.privKey);
-
-  let { emptyPrivKeys, emptyPositionPrivKeys } = await marketMaker.login();
-
-  let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
-    await getActiveOrders(marketMaker.orderIds, marketMaker.perpetualOrderIds);
-
-  await marketMaker.handleActiveOrders(
-    badOrderIds,
-    orders,
-    badPerpOrderIds,
-    perpOrders,
-    pfrNotes,
-    emptyPrivKeys,
-    emptyPositionPrivKeys
-  );
+  let marketMaker = await _loginUser(config);
 
   let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
   let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
@@ -72,6 +46,94 @@ async function openOrderTab(marketId, config) {
   );
 
   console.log(marketMaker.orderTabData);
+}
+
+// ? CLOSE ORDER TAB ===========================================================
+async function closeOrderTab(marketId, config) {
+  let marketMaker = await _loginUser(config);
+
+  let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+  let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+  let baseAmount = marketMaker.getAvailableAmount(baseToken);
+  let quoteAmount = marketMaker.getAvailableAmount(quoteToken);
+
+  console.log("baseAmount before", baseAmount);
+  console.log("quoteAmount before", quoteAmount);
+  console.log("orderTab before: ", marketMaker.orderTabData[baseToken][0]);
+
+  let tabAddress = marketMaker.orderTabData[baseToken][0].tab_header.pub_key;
+
+  await sendCloseOrderTab(marketMaker, marketId, tabAddress);
+
+  baseAmount = marketMaker.getAvailableAmount(baseToken);
+  quoteAmount = marketMaker.getAvailableAmount(quoteToken);
+
+  console.log("baseAmount after", baseAmount);
+  console.log("quoteAmount after", quoteAmount);
+  console.log("orderTab after: ", marketMaker.orderTabData[baseToken][0]);
+}
+
+// ? MODIFY ORDER TAB ===========================================================
+async function modifyOrderTab(marketId, config) {
+  let marketMaker = await _loginUser(config);
+
+  let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+  let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+  let baseAmount = marketMaker.getAvailableAmount(baseToken);
+  let quoteAmount = marketMaker.getAvailableAmount(quoteToken);
+  let orderTab = marketMaker.orderTabData[baseToken][0];
+
+  console.log("baseAmount before", baseAmount);
+  console.log("quoteAmount before", quoteAmount);
+  console.log("orderTab before", orderTab);
+
+  let tabAddress = marketMaker.orderTabData[baseToken][0].tab_header.pub_key;
+  let baseAmountInput = 0.5 * 10 ** DECIMALS_PER_ASSET[baseToken];
+  let quoteAmountInput = 15_000 * 10 ** DECIMALS_PER_ASSET[quoteToken];
+  let isAdd = false;
+  await sendModifyOrderTab(
+    marketMaker,
+    isAdd,
+    baseAmountInput,
+    quoteAmountInput,
+    tabAddress,
+    marketId
+  );
+
+  baseAmount = marketMaker.getAvailableAmount(baseToken);
+  quoteAmount = marketMaker.getAvailableAmount(quoteToken);
+  orderTab = marketMaker.orderTabData[baseToken][0];
+
+  console.log("baseAmount after", baseAmount);
+  console.log("quoteAmount after", quoteAmount);
+  console.log("orderTab after", orderTab);
+}
+
+// HELPERS  ===================================================================
+
+async function _loginUser(config) {
+  let MM_CONFIG = config.MM_CONFIG;
+
+  let marketMaker = User.fromPrivKey(MM_CONFIG.privKey);
+
+  let { emptyPrivKeys, emptyPositionPrivKeys } = await marketMaker.login();
+
+  let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
+    await getActiveOrders(marketMaker.orderIds, marketMaker.perpetualOrderIds);
+
+  await marketMaker.handleActiveOrders(
+    badOrderIds,
+    orders,
+    badPerpOrderIds,
+    perpOrders,
+    pfrNotes,
+    emptyPrivKeys,
+    emptyPositionPrivKeys
+  );
+
+  return marketMaker;
 }
 
 const loadMMConfig = (configPath) => {
@@ -96,6 +158,8 @@ const loadMMConfig = (configPath) => {
 
 module.exports = {
   loadMMConfig,
-  makeDeposit,
+  makeDeposits,
   openOrderTab,
+  closeOrderTab,
+  modifyOrderTab,
 };

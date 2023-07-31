@@ -191,7 +191,7 @@ async function getLiquidatablePositions(indexPrice, token) {
   return positions;
 }
 
-// ---- POSITIONS ---- //
+// ---- ORDER TABS ---- //
 async function fetchStoredTabs(address, baseBlinding, quoteBlinding) {
   // Address should be the x coordinate of the address in decimal format
 
@@ -249,8 +249,17 @@ async function fetchStoredTabs(address, baseBlinding, quoteBlinding) {
     orderTabs.push(orderTab);
   });
 
-
   return orderTabs;
+}
+
+async function checkOrderTabExistance(address) {
+  // Address should be the x coordinate of the address in decimal format
+
+  const querySnapshot = await getDocs(
+    collection(db, `order_tabs/${address}/indexes`)
+  );
+
+  return !querySnapshot.empty;
 }
 
 // ---- USER INFO ---- //
@@ -599,6 +608,7 @@ module.exports = {
   //
   checkNoteExistance,
   checkPositionExistance,
+  checkOrderTabExistance,
 
   getLiquidatablePositions,
 };

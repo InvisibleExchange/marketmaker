@@ -187,7 +187,12 @@ class OrderTab {
     };
   }
 
-  signOpenTabOrder(basePrivKeys, quotePrivKeys) {
+  signOpenTabOrder(
+    basePrivKeys,
+    quotePrivKeys,
+    baseRefundNote,
+    quoteRefundNote
+  ) {
     let pkSum = 0n;
     for (let i = 0; i < basePrivKeys.length; i++) {
       pkSum += BigInt(basePrivKeys[i]);
@@ -198,7 +203,14 @@ class OrderTab {
 
     const keyPair = getKeyPair(pkSum);
 
-    let sig = sign(keyPair, "0x" + this.hash.toString(16));
+    let hashInputs = [
+      this.hash,
+      baseRefundNote ? baseRefundNote.hash : 0n,
+      quoteRefundNote ? quoteRefundNote.hash : 0n,
+    ];
+    let hash = computeHashOnElements(hashInputs);
+
+    let sig = sign(keyPair, "0x" + hash.toString(16));
 
     return sig;
   }
@@ -212,6 +224,38 @@ class OrderTab {
     let hash = computeHashOnElements(hashInputs);
 
     const keyPair = getKeyPair(BigInt(tabPrivKey));
+
+    let sig = sign(keyPair, "0x" + hash.toString(16));
+
+    return sig;
+  }
+
+  signModifyTabOrder(
+    privKey,
+    baseRefundNote,
+    quoteRefundNote,
+    baseCloseOrderFields,
+    quoteCloseOrderFields,
+    isAdd
+  ) {
+    let hashInputs = [
+      this.hash,
+      isAdd ? 1n : 0n,
+      this.base_amount,
+      this.quote_amount,
+    ];
+
+    if (isAdd) {
+      hashInputs.push(baseRefundNote ? baseRefundNote.hash : 0n);
+      hashInputs.push(quoteRefundNote ? quoteRefundNote.hash : 0n);
+    } else {
+      hashInputs.push(baseCloseOrderFields.hash());
+      hashInputs.push(quoteCloseOrderFields.hash());
+    }
+
+    let hash = computeHashOnElements(hashInputs);
+
+    const keyPair = getKeyPair(BigInt(privKey));
 
     let sig = sign(keyPair, "0x" + hash.toString(16));
 
