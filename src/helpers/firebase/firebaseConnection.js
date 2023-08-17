@@ -230,7 +230,6 @@ async function fetchStoredTabs(address, baseBlinding, quoteBlinding) {
     }
 
     let tabHeader = new TabHeader(
-      tabData.expiration_timestamp,
       tabData.is_perp,
       tabData.is_smart_contract,
       tabData.base_token,

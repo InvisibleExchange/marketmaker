@@ -35,17 +35,8 @@ class LiquidationOrder {
         throw "invalid order side (should be binary)";
     }
 
-    // [3025527714703873597024264839110661521520625888662764179864122432945230702519, 1, 12345, 982300000, 32448315900]
-
-    // [
-    //   '1205281518540558603652154109576508339453916441519633692987676295127626027733',
-    //   1n,
-    //   12345,
-    //   982300000,
-    //   32448315900
-    // ]
-
-    let position_address = this.position.position_address;
+    let position_address = this.position.position_header.position_address;
+    let fields_hash = this.open_order_fields.hash();
 
     let hash_inputs = [
       position_address,
@@ -53,14 +44,13 @@ class LiquidationOrder {
       this.synthetic_token,
       this.synthetic_amount,
       this.collateral_amount,
+      fields_hash,
     ];
 
-    console.log("hash_inputs: ", hash_inputs);
 
     let order_hash = computeHashOnElements(hash_inputs);
-    let fields_hash = this.open_order_fields.hash();
 
-    return pedersen([order_hash, fields_hash]);
+    return order_hash;
   }
 
   signOrder(privKeys) {

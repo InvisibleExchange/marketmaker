@@ -104,74 +104,121 @@ async function fillOpenOrders() {
 
 // order: {price, amount, timestamp}
 async function sendFillRequest(otherOrder, otherSide, marketId) {
-  // TODO:
-  // const baseAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
-  // const quoteAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
-  // const baseQuantity = otherOrder.amount / 10 ** DECIMALS_PER_ASSET[baseAsset];
-  // const quote = genQuote(baseAsset, otherSide, baseQuantity);
-  // const spendAsset = otherSide === "s" ? quoteAsset : baseAsset;
-  // let availableAmount =
-  //   marketMaker.getAvailableAmount(spendAsset) /
-  //   10 ** DECIMALS_PER_ASSET[spendAsset];
-  // let unfilledAmount = otherSide === "s" ? quote.quoteQuantity : baseQuantity;
-  // const availableUsdBalance = availableAmount * getPrice(spendAsset);
-  // let unfilledUsdAmount = unfilledAmount * getPrice(spendAsset);
-  // if (availableUsdBalance >= 10 && unfilledUsdAmount >= 10) {
-  //   sendSpotOrder(
-  //     marketMaker,
-  //     otherSide === "s" ? "Buy" : "Sell",
-  //     MM_CONFIG.EXPIRATION_TIME,
-  //     baseAsset,
-  //     quoteAsset,
-  //     availableAmount,
-  //     availableAmount,
-  //     otherOrder.price,
-  //     0.07,
-  //     0.01,
-  //     true,
-  //     ACTIVE_ORDERS
-  //   ).catch((err) => {
-  //     console.log("Error sending fill request: ", err);
-  //     errorCounter++;
-  //   });
-  //   unfilledAmount -= availableAmount;
-  // }
-  // if (ACTIVE_ORDERS[otherSide === "s" ? marketId + "Buy" : marketId + "Sell"]) {
-  //   let sortedOrders = ACTIVE_ORDERS[
-  //     otherSide === "s" ? marketId + "Buy" : marketId + "Sell"
-  //   ].sort((a, b) => {
-  //     return otherSide === "b" ? a.price - b.price : b.price - a.price;
-  //   });
-  //   for (let order of sortedOrders) {
-  //     if (
-  //       unfilledAmount <
-  //       DUST_AMOUNT_PER_ASSET[spendAsset] / 10 ** DECIMALS_PER_ASSET[spendAsset]
-  //     )
-  //       return;
-  //     // Send amend order
-  //     sendAmendOrder(
-  //       marketMaker,
-  //       order.id,
-  //       otherSide === "s" ? "Buy" : "Sell",
-  //       isPerp,
-  //       marketId,
-  //       [
-  //         otherSide === "s"
-  //           ? otherOrder.price * (1 + 0.0001)
-  //           : otherOrder.price * (1 - 0.0001),
-  //       ],
-  //       MM_CONFIG.EXPIRATION_TIME,
-  //       true, // match_only
-  //       ACTIVE_ORDERS,
-  //       errorCounter
-  //     ).catch((err) => {
-  //       console.log("Error amending order: ", err);
-  //       errorCounter++;
-  //     });
-  //     unfilledAmount -=
-  //       order.spendAmount / 10 ** DECIMALS_PER_ASSET[spendAsset];
-  //   }
-  // }
+  const mmConfig = MM_CONFIG.pairs[marketId];
+  if (!mmConfig || !mmConfig.active) return;
+
+  let baseAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+  let quoteAsset = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+  if (!marketMaker.orderTabData[baseAsset]) return;
+
+  let orderTab = marketMaker.orderTabData[baseAsset][0];
+
+  let totalBaseBalance =
+    orderTab.base_amount / 10 ** DECIMALS_PER_ASSET[baseAsset];
+  let totalQuoteBalance =
+    orderTab.quote_amount / 10 ** DECIMALS_PER_ASSET[quoteAsset];
+
+  // sum up all the active orders
+  let activeOrderBaseValue = ACTIVE_ORDERS[marketId + "Sell"]
+    ? ACTIVE_ORDERS[marketId + "Sell"].reduce(
+        (acc, order) => acc + order.spendAmount,
+        0
+      ) /
+      10 ** DECIMALS_PER_ASSET[baseAsset]
+    : 0;
+  let activeOrderQuoteValue = ACTIVE_ORDERS[marketId + "Buy"]
+    ? ACTIVE_ORDERS[marketId + "Buy"].reduce(
+        (acc, order) => acc + order.spendAmount,
+        0
+      ) /
+      10 ** DECIMALS_PER_ASSET[quoteAsset]
+    : 0;
+
+  let baseBalance = totalBaseBalance - activeOrderBaseValue;
+  let quoteBalance = totalQuoteBalance - activeOrderQuoteValue;
+
+  // TODO: ==============================================================
+
+  const spendAsset = otherSide === "s" ? quoteAsset : baseAsset;
+  const baseQuantity = otherOrder.amount / 10 ** DECIMALS_PER_ASSET[baseAsset];
+  const quote = genQuote(baseAsset, otherSide, baseQuantity);
+  let unfilledAmount = otherSide === "s" ? quote.quoteQuantity : baseQuantity;
+
+  if (
+    (otherSide == "s" && quoteBalance > 10) ||
+    (otherSide == "b" && baseBalance > 10 / otherOrder.price)
+  ) {
+    let orderAmount;
+    if (otherSide == "s") {
+      orderAmount = Math.min(quoteBalance, quote.quoteQuantity);
+    } else {
+      orderAmount = Math.min(baseBalance, baseQuantity);
+    }
+
+    sendSpotOrder(
+      marketMaker,
+      otherSide === "s" ? "Buy" : "Sell",
+      MM_CONFIG.EXPIRATION_TIME,
+      baseAsset,
+      quoteAsset,
+      orderAmount,
+      orderAmount,
+      otherOrder.price,
+      0.07,
+      0.01,
+      true,
+      ACTIVE_ORDERS
+    ).catch((err) => {
+      console.log("Error sending fill request: ", err);
+      errorCounter++;
+    });
+
+    unfilledAmount -= orderAmount;
+  }
+
+  if (
+    (unfilledAmount > 0,
+    ACTIVE_ORDERS[otherSide === "s" ? marketId + "Buy" : marketId + "Sell"])
+  ) {
+    let sortedOrders = ACTIVE_ORDERS[
+      otherSide === "s" ? marketId + "Buy" : marketId + "Sell"
+    ].sort((a, b) => {
+      return otherSide === "b" ? a.price - b.price : b.price - a.price;
+    });
+
+    for (let order of sortedOrders) {
+      if (
+        unfilledAmount <
+        DUST_AMOUNT_PER_ASSET[spendAsset] / 10 ** DECIMALS_PER_ASSET[spendAsset]
+      )
+        return;
+
+      // Send amend order
+      sendAmendOrder(
+        marketMaker,
+        order.id,
+        otherSide === "s" ? "Buy" : "Sell",
+        isPerp,
+        marketId,
+        otherSide === "s"
+          ? otherOrder.price * (1 + 0.0001)
+          : otherOrder.price * (1 - 0.0001),
+
+        MM_CONFIG.EXPIRATION_TIME,
+        orderTab.tab_header.pub_key,
+        true, // match_only
+        ACTIVE_ORDERS,
+        errorCounter
+      ).catch((err) => {
+        console.log("Error amending order: ", err);
+        errorCounter++;
+      });
+
+      unfilledAmount -=
+        order.spendAmount / 10 ** DECIMALS_PER_ASSET[spendAsset];
+    }
+  }
 }
 
 async function indicateLiquidity(marketIds = activeMarkets) {

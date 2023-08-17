@@ -440,7 +440,7 @@ async function sendPerpOrder(
     feeLimit
   );
 
-  let { perpOrder, pfrKey } = user.makePerpetualOrder(
+  let { perpOrder } = user.makePerpetualOrder(
     expirationTimestamp,
     position_effect_type,
     positionAddress,
@@ -521,7 +521,7 @@ async function sendLiquidationOrder(
   syntheticAmount = syntheticAmount * 10 ** syntheticDecimals;
   let scaledPrice = price * 10 ** priceDecimals;
 
-  let order_side = position.order_side == "Long" ? "Short" : "Long";
+  let order_side = position.order_side;
   scaledPrice =
     order_side == "Long"
       ? (scaledPrice * (100 + slippage)) / 100
@@ -547,15 +547,18 @@ async function sendLiquidationOrder(
   let orderJson = liquidationOrder.toGrpcObject();
   orderJson.user_id = trimHash(user.userId, 64).toString();
 
-  await axios
+  // console.log("order_json: ", orderJson, "\n\n\n");
+
+  console.log("sending liquidation order");
+  return await axios
     .post(`${EXPRESS_APP_URL}/submit_liquidation_order`, orderJson)
     .then((res) => {
       let order_response = res.data.response;
 
+      console.log("order_response", order_response);
+
       if (order_response.successful) {
         // ? Save position data (if not null)
-
-        console.log("order_response: ", order_response);
 
         let position = order_response.new_position;
 
@@ -563,12 +566,17 @@ async function sendLiquidationOrder(
           position.order_side = position.order_side == 1 ? "Long" : "Short";
 
           if (
-            !user.positionData[position.synthetic_token] ||
-            user.positionData[position.synthetic_token].length == 0
+            !user.positionData[position.position_header.synthetic_token] ||
+            user.positionData[position.position_header.synthetic_token]
+              .length == 0
           ) {
-            user.positionData[position.synthetic_token] = [position];
+            user.positionData[position.position_header.synthetic_token] = [
+              position,
+            ];
           } else {
-            user.positionData[position.synthetic_token].push(position);
+            user.positionData[position.position_header.synthetic_token].push(
+              position
+            );
           }
 
           return position;
@@ -647,7 +655,7 @@ async function sendCancelOrder(
           order_response.error_message +
           " id: " +
           orderId;
-        console.log(msg);
+        // console.log(msg);
 
         errorCounter++;
       }
@@ -737,7 +745,7 @@ async function sendAmendOrder(
       signature = sig;
     } else {
       let position_priv_key =
-        user.positionPrivKeys[ord.position.position_address];
+        user.positionPrivKeys[ord.position.position_header.position_address];
 
       let sig = ord.signOrder(null, position_priv_key);
       signature = sig;
@@ -779,6 +787,7 @@ async function sendAmendOrder(
     // let privKeys = ord.notes_in.map(
     //   (note) => user.notePrivKeys[note.address.getX().toString()]
     // );
+
     let privKey = user.tabPrivKeys[tabAddress];
 
     let sig = ord.signOrder(privKey);
@@ -1019,32 +1028,15 @@ async function sendChangeMargin(
  * @param baseAmount the amount of base token to supply
  * @param quoteAmount the amount of quote token to supply
  * @param marketId  determines which market (base/quote token) to use
- * @param expirationTime  time untill order tab expires
  */
-async function sendOpenOrderTab(
-  user,
-  baseAmount,
-  quoteAmount,
-  marketId,
-  expirationTime
-) {
+async function sendOpenOrderTab(user, baseAmount, quoteAmount, marketId) {
   let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
   let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
 
   if (user.getAvailableAmount(baseToken) < baseAmount) return;
   if (user.getAvailableAmount(quoteToken) < quoteAmount) return;
 
-  if (expirationTime <= 60) throw new Error("Expiration time Invalid");
-
-  let ts = new Date().getTime() / 1000; // number of seconds since epoch
-  let expirationTimestamp = Number.parseInt(ts.toString()) + expirationTime;
-
-  let grpcMessage = user.openNewOrderTab(
-    baseAmount,
-    quoteAmount,
-    marketId,
-    expirationTimestamp
-  );
+  let grpcMessage = user.openNewOrderTab(baseAmount, quoteAmount, marketId);
 
   await axios
     .post(`${EXPRESS_APP_URL}/open_order_tab`, grpcMessage)
@@ -1094,6 +1086,8 @@ async function sendCloseOrderTab(user, marketId, tabAddress) {
     },
     base_close_order_fields: baseCloseOrderFields.toGrpcObject(),
     quote_close_order_fields: quoteCloseOrderFields.toGrpcObject(),
+    base_amount_change: orderTab.base_amount,
+    quote_amount_change: orderTab.quote_amount,
   };
 
   await axios
@@ -1206,16 +1200,16 @@ async function sendModifyOrderTab(
     };
   }
 
-  // console.log("grpcMessage: ", grpcMessage);
   await axios
-    .post(`${EXPRESS_APP_URL}/modify_order_tab`, grpcMessage)
+    .post(
+      `${EXPRESS_APP_URL}/{isAdd ? open_order_tab : close_order_tab}`,
+      grpcMessage
+    )
     .then((res) => {
       let modifyTabResponse = res.data.response;
       if (modifyTabResponse.successful) {
         // ? Store the userData locally
         storeUserState(user.db, user);
-
-        console.log("modifyTabResponse: ", modifyTabResponse);
 
         user.orderTabData[baseToken] = user.orderTabData[baseToken].map(
           (tab) => {

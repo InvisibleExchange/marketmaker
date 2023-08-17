@@ -388,7 +388,7 @@ function handleMarginChangeResponse(
   // Update the user's position data
   user.positionData[syntheticToken] = user.positionData[syntheticToken].map(
     (pos) => {
-      if (pos.position_address == positionAddress) {
+      if (pos.position_header.position_address == positionAddress) {
         pos.margin += direction == "Add" ? margin_change : -margin_change;
 
         let bankruptcyPrice = _getBankruptcyPrice(
@@ -396,7 +396,7 @@ function handleMarginChangeResponse(
           pos.margin,
           pos.position_size,
           pos.order_side,
-          pos.synthetic_token
+          pos.position_header.synthetic_token
         );
 
         let liquidationPrice = _getLiquidationPrice(
@@ -404,8 +404,8 @@ function handleMarginChangeResponse(
           pos.margin,
           pos.position_size,
           pos.order_side,
-          pos.synthetic_token,
-          pos.allow_partial_liquidations
+          pos.position_header.synthetic_token,
+          pos.position_header.allow_partial_liquidations
         );
 
         pos.bankruptcy_price = bankruptcyPrice;
@@ -413,17 +413,17 @@ function handleMarginChangeResponse(
 
         let hash = computeHashOnElements([
           pos.order_side == "Long"
-            ? pos.allow_partial_liquidations
+            ? pos.position_header.allow_partial_liquidations
               ? 3
               : 2
-            : pos.allow_partial_liquidations
+            : pos.position_header.allow_partial_liquidations
             ? 1
             : 0,
-          pos.synthetic_token,
+          pos.position_header.synthetic_token,
           pos.position_size,
           pos.entry_price,
           pos.liquidation_price,
-          pos.position_address,
+          pos.position_header.position_address,
           pos.last_funding_idx,
         ]);
 

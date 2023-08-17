@@ -1,4 +1,8 @@
-const { getActiveOrders, DECIMALS_PER_ASSET } = require("./src/helpers/utils");
+const {
+  getActiveOrders,
+  DECIMALS_PER_ASSET,
+  CHAIN_IDS,
+} = require("./src/helpers/utils");
 
 const fs = require("fs");
 const User = require("./src/users/Invisibl3User");
@@ -21,7 +25,8 @@ async function makeDeposits(tokens, amounts, config) {
     let token = tokens[i];
     let amount = amounts[i];
 
-    await sendDeposit(marketMaker, 123, amount, token, 123456789);
+    let depositId = CHAIN_IDS["ETH Mainnet"] * 2 ** 32 + 12345;
+    await sendDeposit(marketMaker, depositId, amount, token, 123456789);
 
     console.log(token, " amount: ", marketMaker.getAvailableAmount(token));
   }

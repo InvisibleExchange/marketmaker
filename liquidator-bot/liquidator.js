@@ -30,14 +30,19 @@ async function main() {
   // Setup price feeds
   await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
 
+  // console.log("available_amount: ", user.positionData);
+  console.log("available_amount: ", user.getAvailableAmount(55555));
+
   setInterval(async () => {
     for (let pair of Object.values(MM_CONFIG.pairs)) {
-      let midPrice = pair.invert
-        ? 1 / PRICE_FEEDS[pair.priceFeedPrimary]
-        : PRICE_FEEDS[pair.priceFeedPrimary];
-      if (!midPrice) continue;
+      // let midPrice = pair.invert
+      //   ? 1 / PRICE_FEEDS[pair.priceFeedPrimary]
+      //   : PRICE_FEEDS[pair.priceFeedPrimary];
+      // if (!midPrice) continue;
 
       let token = SYMBOLS_TO_IDS[pair.symbol.split("-")[0]];
+
+      let midPrice = 35600.5;
 
       let positions;
       try {
@@ -47,7 +52,6 @@ async function main() {
       }
 
       for (let position of positions) {
-        console.log("liquidating position: ", position);
         let newPosition = await sendLiquidationOrder(
           user,
           position,
@@ -59,22 +63,26 @@ async function main() {
           0.1
         );
 
+        console.log("newPosition: ", newPosition);
+
         let orderSide = newPosition.position_size == "Long" ? "Short" : "Long";
         await sendPerpOrder(
           user,
           orderSide,
           10,
           "Close",
-          newPosition.position_address,
-          newPosition.synthetic_token,
-          newPosition.position_size,
+          newPosition.position_header.position_address,
+          newPosition.position_header.synthetic_token,
+          newPosition.position_size / 10 ** DECIMALS_PER_ASSET[token],
           midPrice,
           null,
           0.07,
           0.1,
           true,
           {}
-        );
+        ).then((res) => {
+          console.log("available_amount: ", user.getAvailableAmount(55555));
+        });
       }
     }
   }, 5000);

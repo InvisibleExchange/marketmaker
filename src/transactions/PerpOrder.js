@@ -66,10 +66,10 @@ class PerpOrder {
         position_address = this.open_order_fields.position_address;
         break;
       case "Modify":
-        position_address = this.position.position_address;
+        position_address = this.position.position_header.position_address;
         break;
       case "Close":
-        position_address = this.position.position_address;
+        position_address = this.position.position_header.position_address;
         break;
       default:
         throw "invalid position effect type (should be 0-3)";
@@ -173,6 +173,23 @@ class PerpOrder {
     if (this.position) {
       this.position.order_side = this.position.order_side == "Long" ? 1 : 0;
     }
+
+    // expiration_timestamp: this.expiration_timestamp.toString(),
+    // position: this.position,
+    // position_effect_type,
+    // order_side,
+    // synthetic_token: this.synthetic_token.toString(),
+    // synthetic_amount: this.synthetic_amount.toString(),
+    // collateral_amount: this.collateral_amount.toString(),
+    // fee_limit: this.fee_limit.toString(),
+    // open_order_fields,
+    // close_order_fields,
+    // signature: this.signature
+    //   ? {
+    //       r: this.signature[0].toString(),
+    //       s: this.signature[1].toString(),
+    //     }
+    //   : null,
 
     return {
       expiration_timestamp: this.expiration_timestamp.toString(),

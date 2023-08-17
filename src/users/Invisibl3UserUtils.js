@@ -82,14 +82,14 @@ async function fetchPositionData(addressData) {
         return;
       }
 
-      if (positionData[positions[0].synthetic_token]) {
-        positionData[positions[0].synthetic_token].push(positions[0]);
+      if (positionData[positions[0].position_header.synthetic_token]) {
+        positionData[positions[0].position_header.synthetic_token].push(positions[0]);
       } else {
-        positionData[positions[0].synthetic_token] = [positions[0]];
+        positionData[positions[0].position_header.synthetic_token] = [positions[0]];
       }
 
       for (let j = 1; j < positions.length; j++) {
-        positionData[positions[j].synthetic_token].push(positions[j]);
+        positionData[positions[j].position_header.synthetic_token].push(positions[j]);
       }
 
       posPrivKeys[BigInt(addr.getX())] = privKey;

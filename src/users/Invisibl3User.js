@@ -40,6 +40,11 @@ const SPOT_MARKET_IDS_2_TOKENS = {
   11: { base: 12345, quote: 55555 },
   12: { base: 54321, quote: 55555 },
 };
+const CHAIN_IDS = {
+  "ETH Mainnet": 9090909,
+  Starknet: 7878787,
+  ZkSync: 5656565,
+};
 
 const { Note, trimHash } = require("./Notes.js");
 // const {
@@ -425,7 +430,7 @@ module.exports = class User {
       // ? Get the position priv Key for this position
       if (this.positionData[synthetic_token].length > 0) {
         for (let pos of this.positionData[synthetic_token]) {
-          if (pos.position_address == positionAddress) {
+          if (pos.position_header.position_address == positionAddress) {
             perpPosition = pos;
             break;
           }
@@ -444,7 +449,7 @@ module.exports = class User {
       // ? Get the position priv Key for this position
       if (this.positionData[synthetic_token].length > 0) {
         for (let pos of this.positionData[synthetic_token]) {
-          if (pos.position_address == positionAddress) {
+          if (pos.position_header.position_address == positionAddress) {
             perpPosition = pos;
             break;
           }
@@ -487,7 +492,7 @@ module.exports = class User {
     allow_partial_liquidation = true
   ) {
     // ? Get the position priv Key for this position
-    let order_side = liquidatedPosition.order_side == "Long" ? "Short" : "Long";
+    let order_side = liquidatedPosition.order_side;
 
     // ? Get the notesIn and priv keys for these notes
     let { notesIn, refundAmount } = this.getNotesInAndRefundAmount(
@@ -513,7 +518,7 @@ module.exports = class User {
     }
 
     let { positionPrivKey, positionAddress } = this.getPositionAddress(
-      liquidatedPosition.synthetic_token
+      liquidatedPosition.position_header.synthetic_token
     );
     this.positionPrivKeys[positionAddress.getX().toString()] = positionPrivKey;
 
@@ -529,7 +534,7 @@ module.exports = class User {
     let perpOrder = new LiquidationOrder(
       liquidatedPosition,
       order_side,
-      liquidatedPosition.synthetic_token,
+      liquidatedPosition.position_header.synthetic_token,
       synthetic_amount,
       collateral_amount,
       open_order_fields
@@ -641,6 +646,11 @@ module.exports = class User {
     //   throw new Error("Unknown stark key");
     // }
 
+    let chainId = Number.parseInt(BigInt(depositId) / 2n ** 32n);
+    if (!Object.values(CHAIN_IDS).includes(chainId)) {
+      throw new Error("Unknown chain id");
+    }
+
     let { KoR, koR, ytR } = this.getDestReceivedAddresses(depositToken);
     let note = new Note(KoR, depositToken, depositAmount, ytR);
     this.notePrivKeys[KoR.getX().toString()] = koR;
@@ -747,7 +757,7 @@ module.exports = class User {
     let position;
     let positionPrivKey;
     for (let position_ of this.positionData[token]) {
-      if (position_.position_address == positionAddress) {
+      if (position_.position_header.position_address == positionAddress) {
         position = position_;
         positionPrivKey = this.positionPrivKeys[positionAddress];
 
@@ -824,7 +834,7 @@ module.exports = class User {
 
   // ? ORDER TAB ============================================================
 
-  openNewOrderTab(baseAmount, quoteAmount, marketId, expirationTimestamp) {
+  openNewOrderTab(baseAmount, quoteAmount, marketId) {
     let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
     let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
 
@@ -867,7 +877,6 @@ module.exports = class User {
     this.tabPrivKeys[tabAddress.getX().toString()] = tabPrivKey;
 
     let tabHeader = new TabHeader(
-      expirationTimestamp,
       false,
       false,
       baseToken,
@@ -887,12 +896,13 @@ module.exports = class User {
 
     let grpcMessage = {
       base_notes_in: baseNotesIn.map((n) => n.note.toGrpcObject()),
-      base_refund_ote: baseRefundNote ? baseRefundNote.toGrpcObject() : null,
+      base_refund_note: baseRefundNote ? baseRefundNote.toGrpcObject() : null,
       quote_notes_in: quoteNotesIn.map((n) => n.note.toGrpcObject()),
       quote_refund_note: quoteRefundNote
         ? quoteRefundNote.toGrpcObject()
         : null,
       order_tab: orderTab.toGrpcObject(),
+      add_only: false,
       signature: {
         r: signature[0].toString(),
         s: signature[1].toString(),
@@ -930,6 +940,8 @@ module.exports = class User {
     if (!orderTab) return;
 
     let signature = orderTab.signCloseTabOrder(
+      orderTab.base_amount,
+      orderTab.quote_amount,
       baseCloseOrderFields,
       quoteCloseOrderFields,
       tabPrivKey

@@ -29,6 +29,8 @@ class LimitOrder {
   }
 
   hashOrder() {
+    // & H({expiration_timestamp, token_spent, token_received, amount_spent, amount_received, fee_limit, note_info_hash, order_tab_pub_key})
+
     let hashInputs = [
       this.expiration_timestamp,
       this.token_spent,
@@ -38,12 +40,11 @@ class LimitOrder {
       this.fee_limit,
     ];
 
-    let note_info_hash = this.spot_note_info ? this.spot_note_info.hash() : 0n;
-    let order_tab_pub_key = this.order_tab
-      ? this.order_tab.tab_header.pub_key
-      : 0n;
-    hashInputs.push(note_info_hash);
-    hashInputs.push(order_tab_pub_key);
+    if (this.spot_note_info) {
+      hashInputs.push(this.spot_note_info.hash());
+    } else {
+      hashInputs.push(this.order_tab.tab_header.pub_key);
+    }
 
     return computeHashOnElements(hashInputs);
   }
@@ -78,22 +79,6 @@ class LimitOrder {
       },
     };
   }
-
-  //   verify_order_signatures(sig) {
-  //     let order_hash = this.hashOrder();
-
-  //     let pub_key_sum = getKeyPair(0).getPublic();
-  //     for (let i = 0; i < this.notesIn.length; i++) {
-  //       pub_key_sum = pub_key_sum.add(this.notesIn[i].address);
-  //     }
-
-  //     let verifyKeyPair = getKeyPairFromPublicKey(pub_key_sum.encode());
-
-  //     if (!verify(verifyKeyPair, order_hash.toString(16), sig)) {
-  //       throw new Error("Signature verification failed");
-  //     }
-  //     console.log("Signature verification successful");
-  //   }
 }
 
 class SpotNotesInfo {
@@ -204,10 +189,12 @@ class OrderTab {
     const keyPair = getKeyPair(pkSum);
 
     let hashInputs = [
+      0n,
       this.hash,
       baseRefundNote ? baseRefundNote.hash : 0n,
       quoteRefundNote ? quoteRefundNote.hash : 0n,
     ];
+
     let hash = computeHashOnElements(hashInputs);
 
     let sig = sign(keyPair, "0x" + hash.toString(16));
@@ -215,9 +202,17 @@ class OrderTab {
     return sig;
   }
 
-  signCloseTabOrder(baseCloseOrderFields, quoteCloseOrderFields, tabPrivKey) {
+  signCloseTabOrder(
+    base_amount_change,
+    quote_amount_change,
+    baseCloseOrderFields,
+    quoteCloseOrderFields,
+    tabPrivKey
+  ) {
     let hashInputs = [
       this.hash,
+      base_amount_change,
+      quote_amount_change,
       baseCloseOrderFields.hash(),
       quoteCloseOrderFields.hash(),
     ];
@@ -238,34 +233,31 @@ class OrderTab {
     quoteCloseOrderFields,
     isAdd
   ) {
-    let hashInputs = [
-      this.hash,
-      isAdd ? 1n : 0n,
-      this.base_amount,
-      this.quote_amount,
-    ];
-
-    if (isAdd) {
-      hashInputs.push(baseRefundNote ? baseRefundNote.hash : 0n);
-      hashInputs.push(quoteRefundNote ? quoteRefundNote.hash : 0n);
-    } else {
-      hashInputs.push(baseCloseOrderFields.hash());
-      hashInputs.push(quoteCloseOrderFields.hash());
-    }
-
-    let hash = computeHashOnElements(hashInputs);
-
-    const keyPair = getKeyPair(BigInt(privKey));
-
-    let sig = sign(keyPair, "0x" + hash.toString(16));
-
-    return sig;
+    // TODO !!
+    // let hashInputs = [
+    //   this.hash,
+    //   isAdd ? 1n : 0n,
+    //   this.base_amount,
+    //   this.quote_amount,
+    // ];
+    // if (isAdd) {
+    //   hashInputs = [
+    //   ];
+    //   hashInputs.push(baseRefundNote ? baseRefundNote.hash : 0n);
+    //   hashInputs.push(quoteRefundNote ? quoteRefundNote.hash : 0n);
+    // } else {
+    //   hashInputs.push(baseCloseOrderFields.hash());
+    //   hashInputs.push(quoteCloseOrderFields.hash());
+    // }
+    // let hash = computeHashOnElements(hashInputs);
+    // const keyPair = getKeyPair(BigInt(privKey));
+    // let sig = sign(keyPair, "0x" + hash.toString(16));
+    // return sig;
   }
 }
 
 class TabHeader {
   constructor(
-    expiration_timestamp,
     is_perp,
     is_smart_contract,
     base_token,
@@ -274,7 +266,6 @@ class TabHeader {
     quote_blinding,
     pub_key
   ) {
-    this.expiration_timestamp = expiration_timestamp;
     this.is_perp = is_perp;
     this.is_smart_contract = is_smart_contract;
     this.base_token = base_token;
@@ -284,9 +275,9 @@ class TabHeader {
     this.pub_key = BigInt(pub_key);
   }
 
+  // & header_hash = H({is_perp, is_smart_contract, base_token, quote_token, base_blinding, quote_bliding, pub_key})
   hash() {
     let hashInputs = [
-      this.expiration_timestamp,
       this.is_perp ? 1n : 0n,
       this.is_smart_contract ? 1n : 0n,
       this.base_token,
@@ -301,7 +292,6 @@ class TabHeader {
 
   toGrpcObject() {
     return {
-      expiration_timestamp: this.expiration_timestamp,
       is_perp: this.is_perp,
       is_smart_contract: this.is_smart_contract,
       base_token: this.base_token,

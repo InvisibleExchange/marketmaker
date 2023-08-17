@@ -168,12 +168,26 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
     addableValue * getPrice(syntheticAsset) >= 10 &&
     unfilledUsdAmount >= 10
   ) {
+    //   user,
+    // order_side,
+    // expirationTime,
+    // position_effect_type,
+    // positionAddress,
+    // syntheticToken,
+    // syntheticAmount_,
+    // price,
+    // initial_margin,
+    // feeLimit,
+    // slippage,
+    // isMarket,
+    // ACTIVE_ORDERS
+
     sendPerpOrder(
       marketMaker,
       otherSide == "s" ? "Long" : "Short",
       MM_CONFIG.EXPIRATION_TIME,
       "Modify",
-      position.position_address,
+      position.position_header.position_address,
       syntheticAsset,
       addableValue,
       otherOrder.price,
@@ -212,12 +226,11 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
         otherSide === "s" ? "Buy" : "Sell",
         isPerp,
         marketId,
-        [
-          otherSide === "s"
-            ? otherOrder.price * (1 + 0.0001)
-            : otherOrder.price * (1 - 0.0001),
-        ],
+        otherSide === "s"
+          ? otherOrder.price * (1 + 0.0001)
+          : otherOrder.price * (1 - 0.0001),
         MM_CONFIG.EXPIRATION_TIME,
+        null,
         true, // match_only
         ACTIVE_ORDERS,
         errorCounter
@@ -338,6 +351,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           marketId,
           [buyPrice],
           MM_CONFIG.EXPIRATION_TIME,
+          null,
           false, // match_only
           ACTIVE_ORDERS,
           errorCounter
@@ -366,7 +380,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           "Long",
           MM_CONFIG.EXPIRATION_TIME,
           "Modify",
-          position.position_address,
+          position.position_header.position_address,
           syntheticAsset,
           addableBuyValue / (numSplits - activeOrdersCopy.length),
           buyPrice,
@@ -414,6 +428,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           marketId,
           [sellPrice],
           MM_CONFIG.EXPIRATION_TIME,
+          null,
           false, // match_only
           ACTIVE_ORDERS,
           errorCounter
@@ -442,7 +457,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           "Short",
           MM_CONFIG.EXPIRATION_TIME,
           "Modify",
-          position.position_address,
+          position.position_header.position_address,
           syntheticAsset,
           addableSellValue / (numSplits - activeOrdersCopy.length),
           sellPrice,
@@ -884,7 +899,7 @@ const initPositions = async () => {
         midPrice,
         margin,
         0.07,
-        1,
+        5,
         true,
         ACTIVE_ORDERS
       ).catch((err) => {
