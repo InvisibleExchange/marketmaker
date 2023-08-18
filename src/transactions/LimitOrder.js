@@ -275,15 +275,13 @@ class TabHeader {
     this.pub_key = BigInt(pub_key);
   }
 
-  // & header_hash = H({is_perp, is_smart_contract, base_token, quote_token, base_blinding, quote_bliding, pub_key})
+  // & header_hash = H({is_perp, is_smart_contract, base_token, quote_token, pub_key})
   hash() {
     let hashInputs = [
       this.is_perp ? 1n : 0n,
       this.is_smart_contract ? 1n : 0n,
       this.base_token,
       this.quote_token,
-      this.base_blinding,
-      this.quote_blinding,
       this.pub_key,
     ];
 
