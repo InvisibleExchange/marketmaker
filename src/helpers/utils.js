@@ -333,18 +333,21 @@ function handleSwapResult(
     }
 
     // ? REMOVE THE ORDER FROM ACTIVE_ORDERS IF NECESSARY
+    if (ACTIVE_ORDERS) {
+      let idx2 = ACTIVE_ORDERS[marketId.toString() + side].findIndex(
+        (o) => o.id == orderId
+      );
 
-    let idx2 = ACTIVE_ORDERS[marketId.toString() + side].findIndex(
-      (o) => o.id == orderId
-    );
+      if (idx2 != -1) {
+        let activeOrder = ACTIVE_ORDERS[marketId.toString() + side][idx2];
 
-    if (idx2 != -1) {
-      let activeOrder = ACTIVE_ORDERS[marketId.toString() + side][idx2];
+        activeOrder.spendAmount -= Number.parseInt(spent_amount);
 
-      activeOrder.spendAmount -= Number.parseInt(spent_amount);
-
-      if (activeOrder.spendAmount <= DUST_AMOUNT_PER_ASSET[order.token_spent]) {
-        ACTIVE_ORDERS[marketId.toString() + side].splice(idx2, 1);
+        if (
+          activeOrder.spendAmount <= DUST_AMOUNT_PER_ASSET[order.token_spent]
+        ) {
+          ACTIVE_ORDERS[marketId.toString() + side].splice(idx2, 1);
+        }
       }
     }
 
@@ -475,12 +478,14 @@ function handlePerpSwapResult(
 
     if (order.qty_left < DUST_AMOUNT_PER_ASSET[swap_response.synthetic_token]) {
       // ? Remove the order from ACTIVE_ORDERS
-      ACTIVE_ORDERS[marketId.toString() + "Buy"] = ACTIVE_ORDERS[
-        marketId.toString() + "Buy"
-      ].filter((o) => o.id != orderId);
-      ACTIVE_ORDERS[marketId.toString() + "Sell"] = ACTIVE_ORDERS[
-        marketId.toString() + "Sell"
-      ].filter((o) => o.id != orderId);
+      if (ACTIVE_ORDERS) {
+        ACTIVE_ORDERS[marketId.toString() + "Buy"] = ACTIVE_ORDERS[
+          marketId.toString() + "Buy"
+        ].filter((o) => o.id != orderId);
+        ACTIVE_ORDERS[marketId.toString() + "Sell"] = ACTIVE_ORDERS[
+          marketId.toString() + "Sell"
+        ].filter((o) => o.id != orderId);
+      }
 
       // ? remove the order from users orders
       user.perpetualOrders.splice(idx, 1);

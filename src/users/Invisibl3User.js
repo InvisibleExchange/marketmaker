@@ -612,7 +612,13 @@ module.exports = class User {
         );
       }
 
-      spot_note_info = new SpotNotesInfo(KoR, ytR, notesIn, refundNote);
+      // ? generate the refund note
+      spot_note_info = new SpotNotesInfo(
+        KoR,
+        ytR,
+        notesIn.map((x) => x.note),
+        refundNote
+      );
     }
 
     // ? generate the refund note

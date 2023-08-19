@@ -47,28 +47,30 @@ function handleLimitOrderResponse(
     limitOrder.order_id = order_response.order_id;
     user.orders.push(limitOrder);
 
-    if (
-      ACTIVE_ORDERS[
-        SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
-      ]
-    ) {
-      ACTIVE_ORDERS[
-        SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
-      ].push({
-        id: order_response.order_id,
-        spendAmount: spendAmount,
-        price,
-      });
-    } else {
-      ACTIVE_ORDERS[
-        SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
-      ] = [
-        {
+    if (ACTIVE_ORDERS) {
+      if (
+        ACTIVE_ORDERS[
+          SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
+        ]
+      ) {
+        ACTIVE_ORDERS[
+          SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
+        ].push({
           id: order_response.order_id,
           spendAmount: spendAmount,
           price,
-        },
-      ];
+        });
+      } else {
+        ACTIVE_ORDERS[
+          SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
+        ] = [
+          {
+            id: order_response.order_id,
+            spendAmount: spendAmount,
+            price,
+          },
+        ];
+      }
     }
   }
 }
@@ -111,28 +113,30 @@ function handleBatchOrderResponse(
       let amount = spendAmounts[i];
       let price = prices[i];
 
-      if (
-        ACTIVE_ORDERS[
-          SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
-        ]
-      ) {
-        ACTIVE_ORDERS[
-          SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
-        ].push({
-          id: order_id,
-          spendAmount: amount,
-          price,
-        });
-      } else {
-        ACTIVE_ORDERS[
-          SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
-        ] = [
-          {
+      if (ACTIVE_ORDERS) {
+        if (
+          ACTIVE_ORDERS[
+            SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
+          ]
+        ) {
+          ACTIVE_ORDERS[
+            SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
+          ].push({
             id: order_id,
             spendAmount: amount,
             price,
-          },
-        ];
+          });
+        } else {
+          ACTIVE_ORDERS[
+            SPOT_MARKET_IDS[baseToken].toString() + order_side.toString()
+          ] = [
+            {
+              id: order_id,
+              spendAmount: amount,
+              price,
+            },
+          ];
+        }
       }
     }
 
@@ -188,28 +192,34 @@ function handlePerpetualOrderResponse(
     user.perpetualOrders.push(perpOrder);
 
     let side = order_side == "Long" ? "Buy" : "Sell";
-    if (
-      ACTIVE_ORDERS[
-        PERP_MARKET_IDS[perpOrder.synthetic_token].toString() + side.toString()
-      ]
-    ) {
-      ACTIVE_ORDERS[
-        PERP_MARKET_IDS[perpOrder.synthetic_token].toString() + side.toString()
-      ].push({
-        id: order_response.order_id,
-        syntheticAmount: syntheticAmount_,
-        price,
-      });
-    } else {
-      ACTIVE_ORDERS[
-        PERP_MARKET_IDS[perpOrder.synthetic_token].toString() + side.toString()
-      ] = [
-        {
+
+    if (ACTIVE_ORDERS) {
+      if (
+        ACTIVE_ORDERS[
+          PERP_MARKET_IDS[perpOrder.synthetic_token].toString() +
+            side.toString()
+        ]
+      ) {
+        ACTIVE_ORDERS[
+          PERP_MARKET_IDS[perpOrder.synthetic_token].toString() +
+            side.toString()
+        ].push({
           id: order_response.order_id,
           syntheticAmount: syntheticAmount_,
           price,
-        },
-      ];
+        });
+      } else {
+        ACTIVE_ORDERS[
+          PERP_MARKET_IDS[perpOrder.synthetic_token].toString() +
+            side.toString()
+        ] = [
+          {
+            id: order_response.order_id,
+            syntheticAmount: syntheticAmount_,
+            price,
+          },
+        ];
+      }
     }
   }
 }

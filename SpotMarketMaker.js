@@ -22,7 +22,6 @@ const {
 
 const {
   sendSpotOrder,
-  sendSplitOrder,
   sendAmendOrder,
   sendCancelOrder,
 } = require("./src/transactions/constructOrders");
