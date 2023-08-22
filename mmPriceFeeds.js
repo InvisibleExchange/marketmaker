@@ -2,17 +2,12 @@ const WebSocket = require("ws");
 const ethers = require("ethers");
 const fetch = require("node-fetch");
 const fs = require("fs");
-
-const CHAINLINK_PROVIDERS = {};
-const UNISWAP_V3_PROVIDERS = {};
-
-let uniswap_error_counter = 0;
-let chainlink_error_counter = 0;
+const { default: axios } = require("axios");
+const { setInterval } = require("timers/promises");
 
 async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
   const cryptowatch = [],
-    chainlink = [],
-    uniswapV3 = [];
+    cryptowatch2 = [];
   for (let market in MM_CONFIG.pairs) {
     const pairConfig = MM_CONFIG.pairs[market];
     if (!pairConfig.active) {
@@ -45,15 +40,11 @@ async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
             cryptowatch.push(id);
           }
           break;
-        case "chainlink":
-          if (!chainlink.includes(id)) {
-            chainlink.push(id);
+        case "cryptowatch2":
+          if (!cryptowatch2.includes(id)) {
+            cryptowatch2.push(id);
           }
-          break;
-        case "uniswapv3":
-          if (!uniswapV3.includes(id)) {
-            uniswapV3.push(id);
-          }
+
           break;
         case "constant":
           PRICE_FEEDS["constant:" + id] = parseFloat(id);
@@ -69,9 +60,15 @@ async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
   // if (uniswapV3.length > 0) await uniswapV3Setup(uniswapV3, PRICE_FEEDS);
 
   try {
-    await cryptowatchWsSetup(cryptowatch, PRICE_FEEDS, MM_CONFIG);
+    if (cryptowatch.length > 0) {
+      await cryptowatchWsSetup(cryptowatch, PRICE_FEEDS, MM_CONFIG);
+    }
+
+    if (cryptowatch2.length > 0) {
+      await cryptowatch2WsSetup(cryptowatch2, PRICE_FEEDS, MM_CONFIG);
+    }
   } catch (error) {
-    console.log("123");
+    console.log("error: ", error);
   }
 }
 
@@ -189,126 +186,67 @@ async function cryptowatchWsSetup(
   }
 }
 
-async function chainlinkSetup(chainlinkMarketAddress, PRICE_FEEDS) {
-  const results = chainlinkMarketAddress.map(async (address) => {
-    try {
-      const aggregatorV3InterfaceABI = JSON.parse(
-        fs.readFileSync("ABIs/chainlinkV3InterfaceABI.abi")
-      );
-      const provider = new ethers.Contract(
-        address,
-        aggregatorV3InterfaceABI,
-        ethersProvider
-      );
-      const decimals = await provider.decimals();
-      const key = "chainlink:" + address;
-      CHAINLINK_PROVIDERS[key] = [provider, decimals];
+let priceInterval;
+async function cryptowatch2WsSetup(
+  cryptowatchMarketIds,
+  PRICE_FEEDS,
+  MM_CONFIG
+) {
+  if (priceInterval) {
+    clearInterval(priceInterval);
 
-      // get inital price
-      const response = await provider.latestRoundData();
-      PRICE_FEEDS[key] = parseFloat(response.answer) / 10 ** decimals;
-    } catch (e) {
-      throw new Error(
-        "Error while setting up chainlink for " + address + ", Error: " + e
-      );
-    }
-  });
-  await Promise.all(results);
-  setInterval(() => chainlinkUpdate(PRICE_FEEDS), 30000);
-}
-
-async function chainlinkUpdate(PRICE_FEEDS) {
-  try {
-    await Promise.all(
-      Object.keys(CHAINLINK_PROVIDERS).map(async (key) => {
-        const [provider, decimals] = CHAINLINK_PROVIDERS[key];
-        const response = await provider.latestRoundData();
-        PRICE_FEEDS[key] = parseFloat(response.answer) / 10 ** decimals;
-      })
-    );
-    chainlink_error_counter = 0;
-  } catch (err) {
-    chainlink_error_counter += 1;
-    console.log(`Failed to update chainlink, retry: ${err.message}`);
-    if (chainlink_error_counter > 4) {
-      throw new Error("Failed to update chainlink since 150 seconds!");
-    }
+    return;
   }
+
+  console.log("here");
+
+  // Set initial prices
+  const cryptowatchApiKey =
+    process.env.CRYPTOWATCH_API_KEY || MM_CONFIG
+      ? MM_CONFIG.cryptowatchApiKey
+      : "";
+
+  // ? start price update interval
+  await _fetchPrice(cryptowatchMarketIds, PRICE_FEEDS, cryptowatchApiKey);
+  priceInterval = setInterval(
+    async () =>
+      _fetchPrice(cryptowatchMarketIds, PRICE_FEEDS, cryptowatchApiKey),
+    1000
+  );
 }
 
-async function uniswapV3Setup(uniswapV3Address, PRICE_FEEDS) {
-  const results = uniswapV3Address.map(async (address) => {
+async function _fetchPrice(
+  cryptowatchMarketIds,
+  PRICE_FEEDS,
+  cryptowatchApiKey
+) {
+  for (let id of cryptowatchMarketIds) {
+    let [exchange, pair] = id.split("-");
+
+    let summary;
     try {
-      const IUniswapV3PoolABI = JSON.parse(
-        fs.readFileSync("ABIs/IUniswapV3Pool.abi")
-      );
-      const ERC20ABI = JSON.parse(fs.readFileSync("ABIs/ERC20.abi"));
-
-      const provider = new ethers.Contract(
-        address,
-        IUniswapV3PoolABI,
-        ethersProvider
-      );
-
-      let [slot0, addressToken0, addressToken1] = await Promise.all([
-        provider.slot0(),
-        provider.token0(),
-        provider.token1(),
-      ]);
-
-      const tokenProvier0 = new ethers.Contract(
-        addressToken0,
-        ERC20ABI,
-        ethersProvider
-      );
-      const tokenProvier1 = new ethers.Contract(
-        addressToken1,
-        ERC20ABI,
-        ethersProvider
-      );
-
-      let [decimals0, decimals1] = await Promise.all([
-        tokenProvier0.decimals(),
-        tokenProvier1.decimals(),
-      ]);
-
-      const key = "uniswapv3:" + address;
-      const decimalsRatio = 10 ** decimals0 / 10 ** decimals1;
-      UNISWAP_V3_PROVIDERS[key] = [provider, decimalsRatio];
-
-      // get inital price
-      const price =
-        (slot0.sqrtPriceX96 * slot0.sqrtPriceX96 * decimalsRatio) / 2 ** 192;
-      PRICE_FEEDS[key] = price;
-    } catch (e) {
-      throw new Error(
-        "Error while setting up uniswapV3 for " + address + ", Error: " + e
-      );
+      summary = await axios
+        .get(
+          `https://api.cryptowat.ch/markets/${exchange}/${pair}/summary?apikey=` +
+            cryptowatchApiKey
+        )
+        .then((r) => r.data.result)
+        .catch((e) => console.log(e));
+    } catch (error) {
+      console.error("Could not fetch cryptowatch markets", error);
     }
-  });
-  await Promise.all(results);
-  setInterval(() => uniswapV3Update(PRICE_FEEDS), 30000);
-}
 
-async function uniswapV3Update(PRICE_FEEDS) {
-  try {
-    await Promise.all(
-      Object.keys(UNISWAP_V3_PROVIDERS).map(async (key) => {
-        const [provider, decimalsRatio] = UNISWAP_V3_PROVIDERS[key];
-        const slot0 = await provider.slot0();
-        PRICE_FEEDS[key] =
-          (slot0.sqrtPriceX96 * slot0.sqrtPriceX96 * decimalsRatio) / 2 ** 192;
-      })
-    );
-    // reset error counter if successful
-    uniswap_error_counter = 0;
-  } catch (err) {
-    uniswap_error_counter += 1;
-    console.log(`Failed to update uniswap, retry: ${err.message}`);
-    console.log(err.message);
-    if (uniswap_error_counter > 4) {
-      throw new Error("Failed to update uniswap since 150 seconds!");
+    if (!summary) {
+      return;
     }
+
+    // let [base, _] = config.symbol.split("/");
+
+    const marketId = "cryptowatch2:" + id;
+
+    console.log("summary", summary.price.last);
+
+    PRICE_FEEDS[marketId] = summary.price.last;
   }
 }
 

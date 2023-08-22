@@ -63,13 +63,17 @@ class PerpOrder {
     let position_address;
     switch (this.position_effect_type) {
       case "Open":
-        position_address = this.open_order_fields.position_address;
+        position_address = BigInt(this.open_order_fields.position_address);
         break;
       case "Modify":
-        position_address = this.position.position_header.position_address;
+        position_address = BigInt(
+          this.position.position_header.position_address
+        );
         break;
       case "Close":
-        position_address = this.position.position_header.position_address;
+        position_address = BigInt(
+          this.position.position_header.position_address
+        );
         break;
       default:
         throw "invalid position effect type (should be 0-3)";
@@ -92,6 +96,7 @@ class PerpOrder {
       if (!this.open_order_fields) {
         throw "Open order fields is not defined for open order";
       }
+
       let fields_hash = this.open_order_fields.hash();
 
       return pedersen([order_hash, fields_hash]);
@@ -102,7 +107,9 @@ class PerpOrder {
 
       let fields_hash = this.close_order_fields.hash();
 
-      return pedersen([order_hash, fields_hash]);
+      let h = pedersen([order_hash, fields_hash]);
+
+      return h;
     } else {
       return order_hash;
     }
@@ -126,6 +133,7 @@ class PerpOrder {
     }
 
     let keyPair = getKeyPair(positionPrivKey);
+
     let sig = sign(keyPair, "0x" + orderHash.toString(16));
 
     this.signature = sig;
@@ -173,23 +181,6 @@ class PerpOrder {
     if (this.position) {
       this.position.order_side = this.position.order_side == "Long" ? 1 : 0;
     }
-
-    // expiration_timestamp: this.expiration_timestamp.toString(),
-    // position: this.position,
-    // position_effect_type,
-    // order_side,
-    // synthetic_token: this.synthetic_token.toString(),
-    // synthetic_amount: this.synthetic_amount.toString(),
-    // collateral_amount: this.collateral_amount.toString(),
-    // fee_limit: this.fee_limit.toString(),
-    // open_order_fields,
-    // close_order_fields,
-    // signature: this.signature
-    //   ? {
-    //       r: this.signature[0].toString(),
-    //       s: this.signature[1].toString(),
-    //     }
-    //   : null,
 
     return {
       expiration_timestamp: this.expiration_timestamp.toString(),

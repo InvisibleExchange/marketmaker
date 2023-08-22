@@ -40,11 +40,11 @@ let MM_CONFIG, activeMarkets;
 dotenv.config();
 
 // How often do we refresh entire state (to prevent bugs and have a fresh version of the state)
-const REFRESH_PERIOD = 3600_000; // 1 hour
+const REFRESH_PERIOD = 300_000; // 1 hour
 // How often do we send liquidity indications (orders that make the market)
 const LIQUIDITY_INDICATION_PERIOD = 5_000; // 5 seconds
 // Cancel all orders and send new ones
-const REFRESH_ORDERS_PERIOD = 123_000; // 2 minutes
+const REFRESH_ORDERS_PERIOD = 27_000; // 2 minutes
 // How often do we check if any orders can be filled
 const FILL_ORDERS_PERIOD = 1_000; // 1 seconds
 

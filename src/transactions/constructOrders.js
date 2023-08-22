@@ -398,6 +398,7 @@ async function sendPerpOrder(
   let syntheticAmount = Number.parseInt(
     syntheticAmount_ * 10 ** syntheticDecimals
   );
+
   let scaledPrice = price * 10 ** priceDecimals;
   scaledPrice = isMarket
     ? order_side == "Long"

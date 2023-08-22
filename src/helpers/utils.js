@@ -5,15 +5,57 @@ const { Note, trimHash } = require("../users/Notes");
 const SERVER_URL = "localhost";
 // const SERVER_URL = "54.212.28.196";
 
+// const SYMBOLS_TO_IDS = {
+//   BTC: 12345,
+//   ETH: 54321,
+//   USDC: 55555,
+// };
+// const IDS_TO_SYMBOLS = {
+//   12345: "BTC",
+//   54321: "ETH",
+//   55555: "USDC",
+// };
+
+// const CHAIN_IDS = {
+//   "ETH Mainnet": 9090909,
+//   Starknet: 7878787,
+//   ZkSync: 5656565,
+// };
+
+// const DECIMALS_PER_ASSET = {
+//   12345: 9, // BTC
+//   54321: 9, // ETH
+//   55555: 6, // USDC
+// };
+
+// const PRICE_DECIMALS_PER_ASSET = {
+//   12345: 6, // BTC
+//   54321: 6, // ETH
+// };
+
+// const DUST_AMOUNT_PER_ASSET = {
+//   12345: 2500, // BTC ~ 5c
+//   54321: 25000, // ETH ~ 5c
+//   55555: 50000, // USDC ~ 5c
+// };
+
+// const MAX_LEVERAGE = 15;
+
+// const LEVERAGE_DECIMALS = 6;
+// const COLLATERAL_TOKEN_DECIMALS = 6;
+// const COLLATERAL_TOKEN = 55555;
+
 const SYMBOLS_TO_IDS = {
   BTC: 12345,
   ETH: 54321,
   USDC: 55555,
+  PEPE: 66666,
 };
 const IDS_TO_SYMBOLS = {
   12345: "BTC",
   54321: "ETH",
   55555: "USDC",
+  66666: "PEPE",
 };
 
 const CHAIN_IDS = {
@@ -22,33 +64,36 @@ const CHAIN_IDS = {
   ZkSync: 5656565,
 };
 
-const LEVERAGE_BOUNDS_PER_ASSET = {
-  12345: [1, 20.0], // BTC
-  54321: [10.0, 100.0], // ETH
-};
-
 const DECIMALS_PER_ASSET = {
   12345: 9, // BTC
   54321: 9, // ETH
   55555: 6, // USDC
+  66666: 0, // PEPE
 };
 
 const PRICE_DECIMALS_PER_ASSET = {
   12345: 6, // BTC
   54321: 6, // ETH
+  66666: 10, // PEPE
 };
 
 const DUST_AMOUNT_PER_ASSET = {
   12345: 2500, // BTC ~ 5c
   54321: 25000, // ETH ~ 5c
   55555: 50000, // USDC ~ 5c
+  66666: 50000, // PEPE ~ 5c
 };
 
-const MAX_LEVERAGE = 15;
+const LEVERAGE_BOUNDS_PER_ASSET = {
+  12345: [1.5, 30.0], // BTC
+  54321: [15.0, 150.0], // ETH
+  66666: [1_000_000_000, 140_000_000_000.0], // PEPE
+};
 
-const LEVERAGE_DECIMALS = 6;
+const LEVERAGE_DECIMALS = 4;
 const COLLATERAL_TOKEN_DECIMALS = 6;
 const COLLATERAL_TOKEN = 55555;
+const MAX_LEVERAGE = 15;
 
 const EXPRESS_APP_URL = `http://${SERVER_URL}:4000`;
 
@@ -81,6 +126,7 @@ const SPOT_MARKET_IDS = {
 const PERP_MARKET_IDS = {
   12345: 21,
   54321: 22,
+  66666: 23,
 };
 
 const SPOT_MARKET_IDS_2_TOKENS = {
@@ -91,6 +137,7 @@ const SPOT_MARKET_IDS_2_TOKENS = {
 const PERP_MARKET_IDS_2_TOKENS = {
   21: 12345,
   22: 54321,
+  23: 66666,
 };
 
 /**

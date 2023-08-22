@@ -371,9 +371,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
 
         const buyPrice =
           midPrice *
-          (1 -
-            mmConfig.minSpread -
-            (mmConfig.slippageRate * maxSize * i) / numSplits);
+          (1 - mmConfig.minSpread - (mmConfig.slippageRate * i) / numSplits);
 
         sendPerpOrder(
           marketMaker,
@@ -392,13 +390,13 @@ async function indicateLiquidity(marketIds = activeMarkets) {
         ).catch((err) => {
           console.log("Error sending perp order: ", err);
 
-          if (
-            err.toString().includes("Note does not exist") ||
-            err.toString().includes("Position does not exist")
-          ) {
-            // restoreUserState(user, true, true);
-            shouldRestoreState = true;
-          }
+          // if (
+          //   err.toString().includes("Note does not exist") ||
+          //   err.toString().includes("Position does not exist")
+          // ) {
+          //   // restoreUserState(user, true, true);
+          //   shouldRestoreState = true;
+          // }
 
           errorCounter++;
         });
@@ -672,6 +670,7 @@ function genQuote(baseAsset, side, baseQuantity) {
 
 function validatePriceFeed(baseAsset) {
   const mmConfig = MM_CONFIG.pairs[PERP_MARKET_IDS[baseAsset]];
+
   const primaryPriceFeedId = mmConfig.priceFeedPrimary;
   const secondaryPriceFeedId = mmConfig.priceFeedSecondary;
 
