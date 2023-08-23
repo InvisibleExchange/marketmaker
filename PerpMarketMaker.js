@@ -338,9 +338,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let i = 0; i < activeOrdersCopy.length; i++) {
         const buyPrice =
           midPrice *
-          (1 -
-            mmConfig.minSpread -
-            (mmConfig.slippageRate * maxSize * i) / numSplits);
+          (1 - mmConfig.minSpread - (mmConfig.slippageRate * i) / numSplits);
 
         let orderId = activeOrdersCopy[i].id;
         sendAmendOrder(
@@ -413,9 +411,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       for (let i = 0; i < activeOrdersCopy.length; i++) {
         const sellPrice =
           midPrice *
-          (1 +
-            mmConfig.minSpread +
-            (mmConfig.slippageRate * maxSize * i) / numSplits);
+          (1 + mmConfig.minSpread + (mmConfig.slippageRate * i) / numSplits);
 
         let orderId = activeOrdersCopy[i].id;
         sendAmendOrder(
@@ -446,9 +442,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
 
         const sellPrice =
           midPrice *
-          (1 +
-            mmConfig.minSpread +
-            (mmConfig.slippageRate * maxSize * i) / numSplits);
+          (1 + mmConfig.minSpread + (mmConfig.slippageRate * i) / numSplits);
 
         sendPerpOrder(
           marketMaker,
