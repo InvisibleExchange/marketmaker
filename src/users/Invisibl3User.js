@@ -251,6 +251,21 @@ module.exports = class User {
     emptyPrivKeys,
     emptyPositionPrivKeys
   ) {
+    // ? Remove bad orders from orderIds
+    for (let badOrderId of badOrderIds) {
+      let idx = this.orderIds.indexOf(badOrderId);
+      if (idx > -1) {
+        this.orderIds.splice(idx, 1);
+      }
+    }
+    // ? Remove bad orders from perpetualOrderIds
+    for (let badOrderId of badPerpOrderIds) {
+      let idx = this.perpetualOrderIds.indexOf(badOrderId);
+      if (idx > -1) {
+        this.perpetualOrderIds.splice(idx, 1);
+      }
+    }
+
     // ? Get the indexes of notes that are used in active orders (not partially filled)
     let activeOrderNoteIndexes = [];
     for (let order of orders) {

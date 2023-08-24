@@ -198,8 +198,6 @@ async function cryptowatch2WsSetup(
     return;
   }
 
-  console.log("here");
-
   // Set initial prices
   const cryptowatchApiKey =
     process.env.CRYPTOWATCH_API_KEY || MM_CONFIG
@@ -243,8 +241,6 @@ async function _fetchPrice(
     // let [base, _] = config.symbol.split("/");
 
     const marketId = "cryptowatch2:" + id;
-
-    console.log("summary", summary.price.last);
 
     PRICE_FEEDS[marketId] = summary.price.last;
   }
