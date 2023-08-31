@@ -1,46 +1,42 @@
-const {
-  checkPerpOrderValidity,
-  getQtyFromQuote,
-  getQuoteQty,
-} = require("../helpers/orderHelpers");
-const { trimHash, Note } = require("../users/Notes");
-
 const axios = require("axios");
-const { storeOrderId } = require("../helpers/firebase/firebaseConnection");
+
+const { getKeyPair } = require("starknet").ec;
 
 const { computeHashOnElements } = require("../helpers/pedersen");
 
 const {
   SERVER_URL,
-  COLLATERAL_TOKEN,
   COLLATERAL_TOKEN_DECIMALS,
   DECIMALS_PER_ASSET,
   PRICE_DECIMALS_PER_ASSET,
-  handleNoteSplit,
-  DUST_AMOUNT_PER_ASSET,
-  SPOT_MARKET_IDS,
-  PERP_MARKET_IDS,
   SPOT_MARKET_IDS_2_TOKENS,
+  PERP_MARKET_IDS_2_TOKENS,
 } = require("../helpers/utils");
-const {
-  _getBankruptcyPrice,
-  _getLiquidationPrice,
-} = require("../helpers/tradePriceCalculations");
-const { storeUserState } = require("../helpers/localStorage");
-const LimitOrder = require("./LimitOrder");
-const {
-  handleLimitOrderResponse,
-  handleBatchOrderResponse,
-  handlePerpetualOrderResponse,
-  handleCancelOrderResponse,
-  handleAmendOrderResponse,
-  handleDepositResponse,
-  handleMarginChangeResponse,
-} = require("./handleOrderResponses");
-// const { restoreUserState } = require("../helpers/keyRetrieval");
 
-// const path = require("path");
-// require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
+const {
+  _sendWithdrawalInner,
+  _sendDepositInner,
+} = require("./contructOrders/onChainInteractions");
+const {
+  _sendSplitOrderInner,
+  _sendChangeMarginInner,
+} = require("./contructOrders/notePositionHelpers");
+const {
+  _sendSpotOrderInner,
+  _sendPerpOrderInner,
+  _sendLiquidationOrderInner,
+} = require("./contructOrders/orderExecutions");
+const {
+  _sendAmendOrderInner,
+  _sendCancelOrderInner,
+} = require("./contructOrders/orderInteractions");
+const {
+  _sendOpenOrderTabInner,
+  _sendModifyOrderTabInner,
+} = require("./contructOrders/orderTabs");
+const { Note } = require("./stateStructs/Notes");
+const { storeUserState } = require("../helpers/localStorage");
+const { OrderTab } = require("./stateStructs/OrderTab");
 
 const EXPRESS_APP_URL = `http://${SERVER_URL}:4000`; // process.env.EXPRESS_APP_URL;
 
@@ -73,287 +69,22 @@ async function sendSpotOrder(
   isMarket,
   ACTIVE_ORDERS
 ) {
-  if (
-    !expirationTime ||
-    !baseToken ||
-    !quoteToken ||
-    !(baseAmount || quoteAmount) ||
-    !feeLimit ||
-    !(order_side == "Buy" || order_side == "Sell")
-  ) {
-    console.log("Please fill in all fields");
-    throw "Unfilled fields";
-  }
-
-  let baseDecimals = DECIMALS_PER_ASSET[baseToken];
-  let quoteDecimals = DECIMALS_PER_ASSET[quoteToken];
-  let priceDecimals = PRICE_DECIMALS_PER_ASSET[baseToken];
-
-  let decimalMultiplier = baseDecimals + priceDecimals - quoteDecimals;
-
-  let spendToken;
-  let spendAmount;
-  let receiveToken;
-  let receiveAmount;
-  if (order_side == "Buy") {
-    spendToken = quoteToken;
-    receiveToken = baseToken;
-
-    spendAmount = Number.parseInt(quoteAmount * 10 ** quoteDecimals);
-    let priceScaled = price * 10 ** priceDecimals;
-    priceScaled = isMarket
-      ? (priceScaled * (100 + slippage)) / 100
-      : priceScaled;
-    priceScaled = Number.parseInt(priceScaled);
-
-    receiveAmount = Number.parseInt(
-      (BigInt(spendAmount) * 10n ** BigInt(decimalMultiplier)) /
-        BigInt(priceScaled)
-    );
-  } else {
-    spendToken = baseToken;
-    receiveToken = quoteToken;
-
-    spendAmount = Number.parseInt(baseAmount * 10 ** baseDecimals);
-    let priceScaled = price * 10 ** priceDecimals;
-    priceScaled = isMarket
-      ? (priceScaled * (100 - slippage)) / 100
-      : priceScaled;
-    priceScaled = Number.parseInt(priceScaled);
-
-    receiveAmount = Number.parseInt(
-      (BigInt(spendAmount) * BigInt(priceScaled)) /
-        10n ** BigInt(decimalMultiplier)
-    );
-  }
-
-  if (expirationTime < 0 || expirationTime > 3600_000)
-    throw new Error("Expiration time Invalid");
-
-  let ts = new Date().getTime() / 1000; // number of seconds since epoch
-  let expirationTimestamp = Number.parseInt(ts.toString()) + expirationTime;
-
-  feeLimit = Number.parseInt(((feeLimit * receiveAmount) / 100).toString());
-
-  if (spendAmount > user.getAvailableAmount(spendToken) && !tabAddress) {
-    if (
-      spendAmount >
-      user.getAvailableAmount(spendToken) + DUST_AMOUNT_PER_ASSET[spendToken]
-    ) {
-      console.log("Insufficient balance");
-      throw new Error("Insufficient balance");
-    }
-
-    spendAmount = user.getAvailableAmount(spendToken);
-  }
-
-  let limitOrder = user.makeLimitOrder(
-    expirationTimestamp,
-    spendToken,
-    receiveToken,
-    spendAmount,
-    receiveAmount,
-    feeLimit,
+  return _sendSpotOrderInner(
+    user,
     order_side,
-    tabAddress
+    expirationTime,
+    baseToken,
+    quoteToken,
+    baseAmount,
+    quoteAmount,
+    price,
+    feeLimit,
+    tabAddress,
+    slippage,
+    isMarket,
+    ACTIVE_ORDERS
   );
-
-  let orderJson = limitOrder.toGrpcObject();
-  orderJson.user_id = trimHash(user.userId, 64).toString();
-  orderJson.is_market = isMarket;
-
-  user.awaittingOrder = true;
-
-  await axios
-    .post(`${EXPRESS_APP_URL}/submit_limit_order`, orderJson)
-    .then(async (res) => {
-      let order_response = res.data.response;
-
-      if (order_response.successful) {
-        user.orderIds.push(order_response.order_id);
-        storeUserState(user.db, user);
-
-        handleLimitOrderResponse(
-          user,
-          limitOrder,
-          order_response,
-          spendAmount,
-          receiveAmount,
-          price,
-          baseToken,
-          receiveToken,
-          order_side,
-          isMarket,
-          ACTIVE_ORDERS
-        );
-
-        user.awaittingOrder = false;
-      } else {
-        let msg =
-          "Failed to submit order with error: \n" +
-          order_response.error_message;
-        console.log(msg);
-
-        user.awaittingOrder = false;
-        throw new Error(msg);
-      }
-    });
 }
-
-//
-
-/**
- * This constructs a spot swap and sends it to the backend
- * ## Params:
- * @param  order_side "Buy"/"Sell"
- * @param  expirationTime expiration time in seconds
- * @param  baseToken
- * @param  quoteToken (price token)
- * @param  prices
- * @param  amounts
- * @param  feeLimit fee limit in percentage (1 = 1%)
- */
-async function sendBatchOrder(
-  user,
-  order_side,
-  expirationTime,
-  baseToken,
-  quoteToken,
-  prices,
-  amounts,
-  feeLimit,
-  ACTIVE_ORDERS
-) {
-  if (
-    !expirationTime ||
-    !baseToken ||
-    !quoteToken ||
-    !feeLimit ||
-    !(order_side == "Buy" || order_side == "Sell")
-  ) {
-    console.log("Please fill in all fields");
-    throw "Unfilled fields";
-  }
-  if (prices.length != amounts.length) throw "prices.length != amounts.length";
-
-  let baseDecimals = DECIMALS_PER_ASSET[baseToken];
-  let quoteDecimals = DECIMALS_PER_ASSET[quoteToken];
-  let priceDecimals = PRICE_DECIMALS_PER_ASSET[baseToken];
-
-  let decimalMultiplier = baseDecimals + priceDecimals - quoteDecimals;
-
-  let spendToken;
-  let spendAmounts = [];
-  let receiveToken;
-  if (order_side == "Buy") {
-    spendToken = quoteToken;
-    receiveToken = baseToken;
-
-    for (let i = 0; i < amounts.length; i++) {
-      let amount = Number.parseInt(amounts[i] * 10 ** quoteDecimals);
-
-      spendAmounts.push(amount);
-    }
-  } else {
-    spendToken = baseToken;
-    receiveToken = quoteToken;
-
-    for (let i = 0; i < amounts.length; i++) {
-      let amount = Number.parseInt(amounts[i] * 10 ** baseDecimals);
-
-      spendAmounts.push(amount);
-    }
-  }
-
-  if (expirationTime < 0 || expirationTime > 3600_000)
-    throw new Error("Expiration time Invalid");
-
-  let ts = new Date().getTime() / 1000; // number of seconds since epoch
-  let expirationTimestamp = Number.parseInt(ts.toString()) + expirationTime;
-
-  let spendAmountsSum = spendAmounts.reduce((a, b) => a + b, 0);
-  if (spendAmountsSum > user.getAvailableAmount(spendToken)) {
-    console.log("Insufficient balance");
-    throw new Error("Insufficient balance");
-  }
-
-  let receiveAmount;
-  if (order_side == "Buy") {
-    let priceScaled = Number.parseInt(prices[0] * 10 ** priceDecimals);
-
-    receiveAmount = Number.parseInt(
-      (BigInt(spendAmountsSum) * 10n ** BigInt(decimalMultiplier)) /
-        BigInt(priceScaled)
-    );
-  } else {
-    let priceScaled = Number.parseInt(prices[0] * 10 ** priceDecimals);
-
-    receiveAmount = Number.parseInt(
-      (BigInt(spendAmountsSum) * BigInt(priceScaled)) /
-        10n ** BigInt(decimalMultiplier)
-    );
-  }
-
-  feeLimit = Number.parseInt(((feeLimit * receiveAmount) / 100).toString());
-
-  let { limitOrder, pfrKey } = user.makeLimitOrder(
-    expirationTimestamp,
-    spendToken,
-    receiveToken,
-    spendAmountsSum,
-    receiveAmount,
-    feeLimit
-  );
-
-  let orderJson = limitOrder.toGrpcObject();
-  orderJson.user_id = trimHash(user.userId, 64).toString();
-  orderJson.is_market = false;
-  orderJson.prices = prices;
-  orderJson.amounts = spendAmounts;
-
-  user.awaittingOrder = true;
-
-  await axios
-    .post(`${EXPRESS_APP_URL}/submit_limit_order`, orderJson)
-    .then(async (res) => {
-      let order_response = res.data.response;
-
-      // throw new Error("Note does not exist");
-
-      if (order_response.successful) {
-        storeUserState(user.db, user);
-
-        handleBatchOrderResponse(
-          user,
-          limitOrder,
-          order_response,
-          receiveAmount,
-          spendAmounts,
-          prices,
-          baseToken,
-          receiveToken,
-          order_side,
-          ACTIVE_ORDERS
-        );
-
-        user.awaittingOrder = false;
-      } else {
-        let msg =
-          "Failed to submit order with error: \n" +
-          order_response.error_message;
-        console.log(msg);
-
-        if (order_response.error_message.includes("Note does not exist")) {
-          // todo: restoreUserState(user, true, false);
-        }
-
-        user.awaittingOrder = false;
-        throw new Error(msg);
-      }
-    });
-}
-
-//
 
 // * =====================================================================================================================================
 // * =====================================================================================================================================
@@ -389,109 +120,21 @@ async function sendPerpOrder(
   isMarket,
   ACTIVE_ORDERS
 ) {
-  let syntheticDecimals = DECIMALS_PER_ASSET[syntheticToken];
-  let priceDecimals = PRICE_DECIMALS_PER_ASSET[syntheticToken];
-
-  let decimalMultiplier =
-    syntheticDecimals + priceDecimals - COLLATERAL_TOKEN_DECIMALS;
-
-  let syntheticAmount = Number.parseInt(
-    syntheticAmount_ * 10 ** syntheticDecimals
-  );
-
-  let scaledPrice = price * 10 ** priceDecimals;
-  scaledPrice = isMarket
-    ? order_side == "Long"
-      ? (scaledPrice * (100 + slippage)) / 100
-      : (scaledPrice * (100 - slippage)) / 100
-    : scaledPrice;
-  scaledPrice = Number.parseInt(scaledPrice);
-
-  let collateralAmount =
-    (BigInt(syntheticAmount) * BigInt(scaledPrice)) /
-    10n ** BigInt(decimalMultiplier);
-  collateralAmount = Number.parseInt(collateralAmount.toString());
-
-  if (position_effect_type == "Open") {
-    initial_margin = Number.parseInt(
-      initial_margin * 10 ** COLLATERAL_TOKEN_DECIMALS
-    );
-  } else {
-    if (!positionAddress) throw "Choose a position to modify/close";
-  }
-
-  if (expirationTime < 0 || expirationTime > 3600_000)
-    throw new Error("Expiration time Invalid");
-
-  let ts = new Date().getTime() / 1000; // number of seconds since epoch
-  let expirationTimestamp = Number.parseInt(ts.toString()) + expirationTime;
-
-  feeLimit = Number.parseInt(((feeLimit * collateralAmount) / 100).toString());
-
-  checkPerpOrderValidity(
+  _sendPerpOrderInner(
     user,
     order_side,
-    position_effect_type,
     expirationTime,
-    syntheticToken,
-    syntheticAmount,
-    COLLATERAL_TOKEN,
-    collateralAmount,
-    initial_margin,
-    feeLimit
-  );
-
-  let { perpOrder } = user.makePerpetualOrder(
-    expirationTimestamp,
     position_effect_type,
     positionAddress,
-    order_side,
     syntheticToken,
-    COLLATERAL_TOKEN,
-    syntheticAmount,
-    collateralAmount,
+    syntheticAmount_,
+    price,
+    initial_margin,
     feeLimit,
-    initial_margin
+    slippage,
+    isMarket,
+    ACTIVE_ORDERS
   );
-
-  user.awaittingOrder = true;
-
-  let orderJson = perpOrder.toGrpcObject();
-  orderJson.user_id = trimHash(user.userId, 64).toString();
-  orderJson.is_market = isMarket;
-
-  await axios
-    .post(`${EXPRESS_APP_URL}/submit_perpetual_order`, orderJson)
-    .then((res) => {
-      let order_response = res.data.response;
-
-      if (order_response.successful) {
-        storeUserState(user.db, user);
-
-        handlePerpetualOrderResponse(
-          user,
-          orderJson,
-          perpOrder,
-          order_response,
-          syntheticAmount,
-          syntheticAmount_,
-          price,
-          order_side,
-          isMarket,
-          ACTIVE_ORDERS
-        );
-
-        user.awaittingOrder = false;
-      } else {
-        let msg =
-          "Failed to submit order with error: \n" +
-          order_response.error_message;
-        console.log(msg);
-
-        user.awaittingOrder = false;
-        throw new Error(msg);
-      }
-    });
 }
 
 /**
@@ -513,91 +156,15 @@ async function sendLiquidationOrder(
   initial_margin,
   slippage
 ) {
-  let syntheticDecimals = DECIMALS_PER_ASSET[syntheticToken];
-  let priceDecimals = PRICE_DECIMALS_PER_ASSET[syntheticToken];
-
-  let decimalMultiplier =
-    syntheticDecimals + priceDecimals - COLLATERAL_TOKEN_DECIMALS;
-
-  syntheticAmount = syntheticAmount * 10 ** syntheticDecimals;
-  let scaledPrice = price * 10 ** priceDecimals;
-
-  let order_side = position.order_side;
-  scaledPrice =
-    order_side == "Long"
-      ? (scaledPrice * (100 + slippage)) / 100
-      : (scaledPrice * (100 - slippage)) / 100;
-  scaledPrice = Number.parseInt(scaledPrice);
-
-  let collateralAmount =
-    (BigInt(syntheticAmount) * BigInt(scaledPrice)) /
-    10n ** BigInt(decimalMultiplier);
-  collateralAmount = Number.parseInt(collateralAmount.toString());
-
-  initial_margin = Number.parseInt(
-    initial_margin * 10 ** COLLATERAL_TOKEN_DECIMALS
-  );
-
-  let liquidationOrder = user.makeLiquidationOrder(
+  return _sendLiquidationOrderInner(
+    user,
     position,
+    price,
+    syntheticToken,
     syntheticAmount,
-    collateralAmount,
-    initial_margin
+    initial_margin,
+    slippage
   );
-
-  let orderJson = liquidationOrder.toGrpcObject();
-  orderJson.user_id = trimHash(user.userId, 64).toString();
-
-  // console.log("order_json: ", orderJson, "\n\n\n");
-
-  console.log("sending liquidation order");
-  return await axios
-    .post(`${EXPRESS_APP_URL}/submit_liquidation_order`, orderJson)
-    .then((res) => {
-      let order_response = res.data.response;
-
-      console.log("order_response", order_response);
-
-      if (order_response.successful) {
-        // ? Save position data (if not null)
-
-        let position = order_response.new_position;
-
-        if (position) {
-          position.order_side = position.order_side == 1 ? "Long" : "Short";
-
-          if (
-            !user.positionData[position.position_header.synthetic_token] ||
-            user.positionData[position.position_header.synthetic_token]
-              .length == 0
-          ) {
-            user.positionData[position.position_header.synthetic_token] = [
-              position,
-            ];
-          } else {
-            user.positionData[position.position_header.synthetic_token].push(
-              position
-            );
-          }
-
-          return position;
-        }
-      } else {
-        let msg =
-          "Failed to submit liquidation order with error: \n" +
-          order_response.error_message;
-        console.log(msg);
-
-        if (
-          order_response.error_message.includes("Note does not exist") ||
-          order_response.error_message.includes("Position does not exist")
-        ) {
-          // todo: restoreUserState(user, true, true);
-        }
-
-        throw new Error(msg);
-      }
-    });
 }
 
 // * =====================================================================================================================================
@@ -621,49 +188,15 @@ async function sendCancelOrder(
   errorCounter,
   dontUpdateState = false
 ) {
-  if (!(isPerp === true || isPerp === false) || !marketId || !orderId) {
-    throw new Error("Invalid parameters");
-  }
-
-  if (orderSide === 1 || orderSide === false || orderSide == "Short") {
-    orderSide = false;
-  } else if (orderSide === 0 || orderSide === true || orderSide == "Long") {
-    orderSide = true;
-  } else {
-    throw new Error("Invalid order side");
-  }
-
-  let cancelReq = {
-    marketId: marketId,
-    order_id: orderId.toString(),
-    order_side: orderSide,
-    user_id: trimHash(user.userId, 64).toString(),
-    is_perp: isPerp,
-  };
-
-  await axios
-    .post(`${EXPRESS_APP_URL}/cancel_order`, cancelReq)
-    .then((response) => {
-      let order_response = response.data.response;
-
-      if (order_response.successful) {
-        if (dontUpdateState) return;
-
-        handleCancelOrderResponse(user, order_response, orderId, isPerp);
-      } else {
-        let msg =
-          "Failed to cancel order with error: \n" +
-          order_response.error_message +
-          " id: " +
-          orderId;
-        // console.log(msg);
-
-        errorCounter++;
-      }
-    })
-    .catch((err) => {
-      console.log("Error submitting cancel order: ", err);
-    });
+  return await _sendCancelOrderInner(
+    user,
+    orderId,
+    orderSide,
+    isPerp,
+    marketId,
+    errorCounter,
+    dontUpdateState
+  );
 }
 
 // * =====================================================================================================================================
@@ -695,210 +228,31 @@ async function sendAmendOrder(
   ACTIVE_ORDERS,
   errorCounter
 ) {
-  let ts = new Date().getTime() / 1000; // number of seconds since epoch
-  let expirationTimestamp = Number.parseInt(ts.toString()) + newExpirationTime;
-
-  if (
-    !(isPerp === true || isPerp === false) ||
-    !marketId ||
-    !orderId ||
-    !newPrice ||
-    !newExpirationTime ||
-    (order_side !== "Buy" && order_side !== "Sell")
-  )
-    return;
-
-  newPrice = Number(newPrice);
-
-  let order;
-  let signature;
-  if (isPerp) {
-    let ord = user.perpetualOrders.filter((o) => o.order_id == orderId)[0];
-    if (
-      !ord ||
-      (ord.position_effect_type != "Open" && !ord.position) ||
-      (ord.position_effect_type == "Open" && !ord.open_order_fields)
-    ) {
-      ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
-        marketId.toString() + order_side
-      ].filter((o) => o.id != orderId);
-      return;
-    }
-
-    let newCollateralAmount = getQuoteQty(
-      ord.synthetic_amount,
-      newPrice,
-      ord.synthetic_token,
-      COLLATERAL_TOKEN,
-      null
-    );
-
-    ord.collateral_amount = newCollateralAmount;
-    ord.expiration_timestamp = expirationTimestamp;
-
-    if (ord.position_effect_type == "Open") {
-      // open order
-      let privKeys = ord.open_order_fields.notes_in.map(
-        (note) => user.notePrivKeys[note.address.getX().toString()]
-      );
-
-      let sig = ord.signOrder(privKeys, null);
-      signature = sig;
-    } else {
-      let position_priv_key =
-        user.positionPrivKeys[ord.position.position_header.position_address];
-
-      let sig = ord.signOrder(null, position_priv_key);
-      signature = sig;
-    }
-
-    order = ord;
-  } else {
-    let ord = user.orders.filter((o) => o.order_id == orderId)[0];
-    if (!ord) {
-      ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
-        marketId.toString() + order_side
-      ].filter((o) => o.id != orderId);
-      return;
-    }
-
-    if (order_side == "Buy") {
-      let newAmountReceived = getQtyFromQuote(
-        ord.amount_spent,
-        newPrice,
-        ord.token_received,
-        ord.token_spent
-      );
-
-      ord.amount_received = newAmountReceived;
-      ord.expiration_timestamp = expirationTimestamp;
-    } else {
-      let newAmountReceived = getQuoteQty(
-        ord.amount_spent,
-        newPrice,
-        ord.token_spent,
-        ord.token_received,
-        null
-      );
-
-      ord.amount_received = newAmountReceived;
-      ord.expiration_timestamp = expirationTimestamp;
-    }
-
-    // let privKeys = ord.notes_in.map(
-    //   (note) => user.notePrivKeys[note.address.getX().toString()]
-    // );
-
-    let privKey = user.tabPrivKeys[tabAddress];
-
-    let sig = ord.signOrder(privKey);
-
-    signature = sig;
-    order = ord;
-  }
-
-  let amendReq = {
-    market_id: marketId,
-    order_id: orderId.toString(),
-    order_side: order_side == "Buy",
-    new_price: newPrice,
-    new_expiration: expirationTimestamp,
-    signature: { r: signature[0].toString(), s: signature[1].toString() },
-    user_id: trimHash(user.userId, 64).toString(),
-    is_perp: isPerp,
+  return await _sendAmendOrderInner(
+    user,
+    orderId,
+    order_side,
+    isPerp,
+    marketId,
+    newPrice,
+    newExpirationTime,
+    tabAddress,
     match_only,
-  };
-
-  return axios.post(`${EXPRESS_APP_URL}/amend_order`, amendReq).then((res) => {
-    let order_response = res.data.response;
-
-    if (order_response.successful) {
-      handleAmendOrderResponse(user, isPerp, order, orderId);
-    } else {
-      let msg =
-        "Amend order failed with error: \n" + order_response.error_message;
-      console.log(msg);
-
-      ACTIVE_ORDERS[marketId.toString() + order_side] = ACTIVE_ORDERS[
-        marketId.toString() + order_side
-      ].filter((o) => o.id != orderId);
-
-      errorCounter++;
-    }
-  });
+    ACTIVE_ORDERS,
+    errorCounter
+  );
 }
 
 // * =====================================================================================================================================
 
 async function sendDeposit(user, depositId, amount, token, pubKey) {
-  if (!user || !amount || !token || !depositId || !pubKey) {
-    throw new Error("Invalid input");
-  }
-
-  let tokenDecimals = DECIMALS_PER_ASSET[token];
-  amount = amount * 10 ** tokenDecimals;
-
-  let deposit = user.makeDepositOrder(depositId, amount, token, pubKey);
-
-  await axios
-    .post(`${EXPRESS_APP_URL}/execute_deposit`, deposit.toGrpcObject())
-    .then((res) => {
-      let deposit_response = res.data.response;
-
-      if (deposit_response.successful) {
-        handleDepositResponse(user, deposit_response, deposit);
-      } else {
-        let msg =
-          "Deposit failed with error: \n" + deposit_response.error_message;
-        console.log(msg);
-
-        if (deposit_response.error_message.includes("Note does not exist")) {
-          // todo: restoreUserState(user, true, false);
-        }
-
-        throw new Error(msg);
-      }
-    });
+  return await _sendDepositInner(user, depositId, amount, token, pubKey);
 }
 
 // * ======================================================================
 
 async function sendWithdrawal(user, amount, token, starkKey) {
-  if (!user || !amount || !token || !starkKey) {
-    throw new Error("Invalid input");
-  }
-
-  let tokenDecimals = DECIMALS_PER_ASSET[token];
-  amount = amount * 10 ** tokenDecimals;
-
-  let withdrawal = user.makeWithdrawalOrder(amount, token, starkKey);
-
-  await axios
-    .post(`${EXPRESS_APP_URL}/execute_withdrawal`, withdrawal.toGrpcObject())
-    .then((res) => {
-      let withdrawal_response = res.data.response;
-
-      if (withdrawal_response.successful) {
-        for (let i = 0; i < withdrawal.notes_in.length; i++) {
-          let note = withdrawal.notes_in[i];
-          user.noteData[note.token] = user.noteData[note.token].filter(
-            (n) => n.index != note.index
-          );
-          // removeNoteFromDb(note);
-        }
-      } else {
-        let msg =
-          "Withdrawal failed with error: \n" +
-          withdrawal_response.error_message;
-        console.log(msg);
-
-        if (withdrawal_response.error_message.includes("Note does not exist")) {
-          // todo: restoreUserState(user, true, false);
-        }
-
-        throw new Error(msg);
-      }
-    });
+  return await _sendWithdrawalInner(user, amount, token, starkKey);
 }
 
 // * ======================================================================
@@ -910,34 +264,7 @@ async function sendWithdrawal(user, amount, token, starkKey) {
  * @param newAmounts - array of new amounts
  */
 async function sendSplitOrder(user, token, newAmount) {
-  newAmount = Number.parseInt(newAmount * 10 ** DECIMALS_PER_ASSET[token]);
-
-  let res = user.restructureNotes(token, newAmount);
-  if (!res || !res.notesIn || res.notesIn.length == 0) return;
-  let { notesIn, newNote, refundNote } = res;
-
-  res = await axios.post(`${EXPRESS_APP_URL}/split_notes`, {
-    notes_in: notesIn.map((n) => n.toGrpcObject()),
-    note_out: newNote.toGrpcObject(),
-    refund_note: refundNote ? refundNote.toGrpcObject() : null,
-  });
-
-  let split_response = res.data.response;
-
-  if (split_response.successful) {
-    let zero_idxs = split_response.zero_idxs;
-
-    handleNoteSplit(user, zero_idxs, notesIn, [newNote, refundNote]);
-  } else {
-    let msg = "Note split failed with error: \n" + split_response.error_message;
-    console.log(msg);
-
-    if (split_response.error_message.includes("Note does not exist")) {
-      // todo: restoreUserState(user, true, false);
-    }
-
-    throw new Error(msg);
-  }
+  return await _sendSplitOrderInner(user, token, newAmount);
 }
 
 // * ======================================================================
@@ -957,68 +284,13 @@ async function sendChangeMargin(
   amount,
   direction
 ) {
-  let margin_change = amount * 10 ** COLLATERAL_TOKEN_DECIMALS;
-
-  let { notes_in, refund_note, close_order_fields, position, signature } =
-    user.changeMargin(
-      positionAddress,
-      syntheticToken,
-      direction,
-      margin_change
-    );
-  let marginChangeMessage = {
-    margin_change:
-      direction == "Add"
-        ? margin_change.toString()
-        : (-margin_change).toString(),
-    notes_in: notes_in ? notes_in.map((n) => n.toGrpcObject()) : null,
-    refund_note: refund_note ? refund_note.toGrpcObject() : null,
-    close_order_fields: close_order_fields
-      ? close_order_fields.toGrpcObject()
-      : null,
-    position: {
-      ...position,
-      order_side: position.order_side == "Long" ? 1 : 0,
-    },
-    signature: {
-      r: signature[0].toString(),
-      s: signature[1].toString(),
-    },
-  };
-
-  await axios
-    .post(`${EXPRESS_APP_URL}/change_position_margin`, marginChangeMessage)
-    .then((res) => {
-      let marginChangeResponse = res.data.response;
-      if (marginChangeResponse.successful) {
-        handleMarginChangeResponse(
-          user,
-          marginChangeResponse,
-          direction,
-          notes_in,
-          refund_note,
-          position,
-          close_order_fields,
-          margin_change,
-          syntheticToken,
-          positionAddress
-        );
-      } else {
-        let msg =
-          "Failed to submit order with error: \n" +
-          marginChangeResponse.error_message;
-        console.log(msg);
-
-        if (
-          marginChangeResponse.error_message.includes("Note does not exist") ||
-          marginChangeResponse.error_message.includes("Position does not exist")
-        ) {
-          // todo: restoreUserState(user, true, true);
-        }
-
-        throw new Error(msg);
-      }
-    });
+  return _sendChangeMarginInner(
+    user,
+    positionAddress,
+    syntheticToken,
+    amount,
+    direction
+  );
 }
 
 // * ======================================================================
@@ -1031,36 +303,7 @@ async function sendChangeMargin(
  * @param marketId  determines which market (base/quote token) to use
  */
 async function sendOpenOrderTab(user, baseAmount, quoteAmount, marketId) {
-  let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
-  let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
-
-  if (user.getAvailableAmount(baseToken) < baseAmount) return;
-  if (user.getAvailableAmount(quoteToken) < quoteAmount) return;
-
-  let grpcMessage = user.openNewOrderTab(baseAmount, quoteAmount, marketId);
-
-  await axios
-    .post(`${EXPRESS_APP_URL}/open_order_tab`, grpcMessage)
-    .then((res) => {
-      let openTabResponse = res.data.response;
-      if (openTabResponse.successful) {
-        // ? Store the userData locally
-        storeUserState(user.db, user);
-
-        console.log("openTabResponse: ", openTabResponse);
-
-        if (!user.orderTabData[baseToken]) user.orderTabData[baseToken] = [];
-
-        user.orderTabData[baseToken].push(grpcMessage.order_tab);
-      } else {
-        let msg =
-          "Failed to submit order with error: \n" +
-          openTabResponse.error_message;
-        console.log(msg);
-
-        throw new Error(msg);
-      }
-    });
+  return await _sendOpenOrderTabInner(user, baseAmount, quoteAmount, marketId);
 }
 
 // * ======================================================================
@@ -1073,59 +316,7 @@ async function sendOpenOrderTab(user, baseAmount, quoteAmount, marketId) {
  * @param expirationTime  time untill order tab expires
  */
 async function sendCloseOrderTab(user, marketId, tabAddress) {
-  let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
-  let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
-
-  let { orderTab, baseCloseOrderFields, quoteCloseOrderFields, signature } =
-    user.closeOrderTab(tabAddress, baseToken, quoteToken);
-
-  let grpcMessage = {
-    order_tab: orderTab.toGrpcObject(),
-    signature: {
-      r: signature[0].toString(),
-      s: signature[1].toString(),
-    },
-    base_close_order_fields: baseCloseOrderFields.toGrpcObject(),
-    quote_close_order_fields: quoteCloseOrderFields.toGrpcObject(),
-    base_amount_change: orderTab.base_amount,
-    quote_amount_change: orderTab.quote_amount,
-  };
-
-  await axios
-    .post(`${EXPRESS_APP_URL}/close_order_tab`, grpcMessage)
-    .then((res) => {
-      let closeTabResponse = res.data.response;
-
-      console.log(closeTabResponse);
-
-      if (closeTabResponse.successful) {
-        // ? Store the userData locally
-        storeUserState(user.db, user);
-
-        user.orderTabData[baseToken].filter(
-          (tab) => tab.address != closeTabResponse.address
-        );
-
-        let baseReturnNote = Note.fromGrpcObject(
-          closeTabResponse.base_return_note
-        );
-        let quoteReturnNote = Note.fromGrpcObject(
-          closeTabResponse.quote_return_note
-        );
-
-        if (!user.noteData[baseToken]) user.noteData[baseToken] = [];
-        if (!user.noteData[quoteToken]) user.noteData[quoteToken] = [];
-        user.noteData[baseToken].push(baseReturnNote);
-        user.noteData[quoteToken].push(quoteReturnNote);
-      } else {
-        let msg =
-          "Failed to submit order with error: \n" +
-          closeTabResponse.error_message;
-        console.log(msg);
-
-        throw new Error(msg);
-      }
-    });
+  return await _sendCloseOrderTabInner(user, marketId, tabAddress);
 }
 
 // * ======================================================================
@@ -1138,108 +329,401 @@ async function sendModifyOrderTab(
   tabAddress,
   marketId
 ) {
-  let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
-  let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+  return await _sendModifyOrderTabInner(
+    user,
+    isAdd,
+    baseAmount,
+    quoteAmount,
+    tabAddress,
+    marketId
+  );
+}
 
-  let grpcMessage;
-  if (isAdd) {
-    if (user.getAvailableAmount(baseToken) < baseAmount) return;
-    if (user.getAvailableAmount(quoteToken) < quoteAmount) return;
+// * ======================================================================
 
-    let {
-      orderTab,
-      baseNotesIn,
-      quoteNotesIn,
-      baseRefundNote,
-      quoteRefundNote,
-      signature,
-    } = user.modifyOrderTab(
-      baseAmount,
-      quoteAmount,
-      marketId,
-      tabAddress,
-      isAdd
-    );
+/**
+ * Sends a request to open an order tab
+ * ## Params:
+ * @param vlpToken
+ * @param maxVlpSupply
+ * @param posTabAddress
+ * @param isPerp
+ * @param marketId  determines which market (base/quote token) to use
+ */
+async function sendRegisterMm(
+  user,
+  vlpToken,
+  maxVlpSupply,
+  posTabAddress,
+  isPerp,
+  marketId
+) {
+  let baseAsset = PERP_MARKET_IDS_2_TOKENS[marketId];
 
-    grpcMessage = {
-      base_notes_in: baseNotesIn.map((n) => n.toGrpcObject()),
-      quote_notes_in: quoteNotesIn.map((n) => n.toGrpcObject()),
-      base_refund_note: baseRefundNote.toGrpcObject(),
-      quote_refund_note: quoteRefundNote.toGrpcObject(),
-      signature: {
-        r: signature[0].toString(),
-        s: signature[1].toString(),
-      },
-      base_close_order_fields: null,
-      quote_close_order_fields: null,
-      order_tab: orderTab.toGrpcObject(),
-      base_amount_change: baseAmount,
-      quote_amount_change: quoteAmount,
-      is_add: isAdd,
-      market_id: marketId,
-    };
-  } else {
-    let { orderTab, baseCloseOrderFields, quoteCloseOrderFields, signature } =
-      user.modifyOrderTab(baseAmount, quoteAmount, marketId, tabAddress, isAdd);
+  maxVlpSupply = maxVlpSupply * 10 ** COLLATERAL_TOKEN_DECIMALS;
 
-    grpcMessage = {
-      base_notes_in: null,
-      quote_notes_in: null,
-      base_refund_note: null,
-      quote_refund_note: null,
-      signature: {
-        r: signature[0].toString(),
-        s: signature[1].toString(),
-      },
-      base_close_order_fields: baseCloseOrderFields.toGrpcObject(),
-      quote_close_order_fields: quoteCloseOrderFields.toGrpcObject(),
-      order_tab: orderTab.toGrpcObject(),
-      base_amount_change: baseAmount,
-      quote_amount_change: quoteAmount,
-      is_add: isAdd,
-      market_id: marketId,
-    };
-  }
+  let grpcMessage = user.onchainRegisterMM(
+    baseAsset,
+    vlpToken,
+    maxVlpSupply,
+    posTabAddress,
+    isPerp,
+    marketId
+  );
+
+  // console.log("grpcMessage", grpcMessage);
 
   await axios
-    .post(
-      `${EXPRESS_APP_URL}/{isAdd ? open_order_tab : close_order_tab}`,
-      grpcMessage
-    )
+    .post(`${EXPRESS_APP_URL}/onchain_register_mm`, grpcMessage)
     .then((res) => {
-      let modifyTabResponse = res.data.response;
-      if (modifyTabResponse.successful) {
+      let registerMMResponse = res.data.response;
+
+      if (registerMMResponse.successful) {
         // ? Store the userData locally
         storeUserState(user.db, user);
 
-        user.orderTabData[baseToken] = user.orderTabData[baseToken].map(
-          (tab) => {
-            if (tab.tab_header.pub_key == tabAddress) {
-              tab.base_amount += isAdd ? baseAmount : -baseAmount;
-              tab.quote_amount += isAdd ? quoteAmount : -quoteAmount;
+        if (registerMMResponse.position) {
+          if (!user.positionData[baseAsset]) user.positionData[baseAsset] = [];
+          user.positionData[baseAsset].push(registerMMResponse.position);
+        }
 
-              return tab;
-            }
-          }
-        );
+        if (registerMMResponse.order_tab) {
+          let orderTab = OrderTab.fromGrpcObject(registerMMResponse.order_tab);
 
-        if (!isAdd) {
-          let baseReturnNote = Note.fromGrpcObject(
-            modifyTabResponse.base_return_note
-          );
-          let quoteReturnNote = Note.fromGrpcObject(
-            modifyTabResponse.quote_return_note
-          );
+          if (!user.orderTabData[baseAsset]) user.orderTabData[baseAsset] = [];
+          user.orderTabData[baseAsset].push(orderTab);
+        }
 
-          if (!user.noteData[baseToken]) user.noteData[baseToken] = [];
-          if (!user.noteData[quoteToken]) user.noteData[quoteToken] = [];
-          user.noteData[baseToken].push(baseReturnNote);
-          user.noteData[quoteToken].push(quoteReturnNote);
+        if (registerMMResponse.vlp_note) {
+          let vlpNote = Note.fromGrpcObject(registerMMResponse.vlp_note);
+
+          if (!user.noteData[vlpToken]) user.noteData[vlpToken] = [];
+          user.noteData[vlpToken].push(vlpNote);
         }
       } else {
         let msg =
           "Failed to submit order with error: \n" +
-          modifyTabResponse.error_message;
+          registerMMResponse.error_message;
+        console.log(msg);
+
+        throw new Error(msg);
+      }
+    });
+}
+
+//  * =======================================================================================================
+
+/**
+ * Sends a request to add liquidity to the order tab
+ * ## Params:
+ * @param posTabPubKey the public key of the position/tab
+ * @param vLPToken  the vlp token of the tab
+ * @param baseAmount  the amount of base token to supply (only if not isPerp)
+ * @param quoteAmount the amount of quote token to supply (only if not isPerp)
+ * @param collateralAmount the amount of collateral to supply (only if isPerp)
+ * @param marketId
+ * @param isPerp
+ */
+async function sendAddLiquidityUser(
+  user,
+  posTabPubKey,
+  vLPToken,
+  baseAmount,
+  quoteAmount,
+  collateralAmount,
+  marketId,
+  isPerp
+) {
+  if (isPerp) {
+    collateralAmount = collateralAmount * 10 ** COLLATERAL_TOKEN_DECIMALS;
+  } else {
+    let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+    let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+    baseAmount = baseAmount * 10 ** DECIMALS_PER_ASSET[baseToken];
+    quoteAmount = quoteAmount * 10 ** DECIMALS_PER_ASSET[quoteToken];
+  }
+
+  let grpcMessage = user.addLiquidityMM(
+    posTabPubKey,
+    vLPToken,
+    baseAmount,
+    quoteAmount,
+    collateralAmount,
+    marketId,
+    isPerp
+  );
+
+  storeUserState(user.db, user);
+
+  // ? Send this to the marketMaker
+  return grpcMessage;
+}
+
+async function sendOnChainAddLiquidityMM(user, grpcMessage) {
+  let tabPubKey = grpcMessage.tab_pub_key;
+
+  let tab_add_liquidity_req;
+  let position_add_liquidity_req;
+  let baseAsset;
+  if (grpcMessage.pos_address) {
+    // {
+    //   collateral_notes_in,
+    //   collateral_refund_note,
+    //   pos_address,
+    //   vlp_close_order_fields,
+    //   signature,
+    //   market_id,
+    // }
+
+    baseAsset = PERP_MARKET_IDS_2_TOKENS[grpcMessage.market_id];
+
+    let position = user.positionData[baseAsset].find(
+      (pos) =>
+        pos.position_header.position_address.toString() ==
+        grpcMessage.pos_address.toString()
+    );
+
+    position_add_liquidity_req = {
+      collateral_notes_in: grpcMessage.collateral_notes_in,
+      collateral_refund_note: grpcMessage.collateral_refund_note,
+      position: position,
+    };
+  } else {
+    // {
+    //   base_notes_in,
+    //   quote_notes_in,
+    //   base_refund_note,
+    //   quote_refund_note,
+    //   tab_pub_key,
+    //   vlp_close_order_fields,
+    //   signature,
+    //   market_id,
+    // }
+
+    baseAsset = SPOT_MARKET_IDS_2_TOKENS[grpcMessage.market_id].base;
+
+    let order_tab = user.orderTabData[baseAsset].find(
+      (tab) => tab.tab_header.pub_key.toString() == tabPubKey.toString()
+    );
+
+    tab_add_liquidity_req = {
+      base_notes_in: grpcMessage.base_notes_in,
+      quote_notes_in: grpcMessage.quote_notes_in,
+      base_refund_note: grpcMessage.base_refund_note,
+      quote_refund_note: grpcMessage.quote_refund_note,
+      order_tab: order_tab.toGrpcObject(),
+    };
+  }
+
+  let onChainAddLiqReq = {
+    tab_add_liquidity_req,
+    position_add_liquidity_req,
+    vlp_close_order_fields: grpcMessage.vlp_close_order_fields,
+    signature: grpcMessage.signature,
+    market_id: grpcMessage.market_id,
+    base_token: baseAsset,
+  };
+
+  // console.log("onChainAddLiqReq", onChainAddLiqReq);
+
+  await axios
+    .post(`${EXPRESS_APP_URL}/add_liquidity_mm`, onChainAddLiqReq)
+    .then((res) => {
+      let registerMMResponse = res.data.response;
+
+      console.log("registerMMResponse", registerMMResponse);
+
+      if (registerMMResponse.successful) {
+        // ? Store the userData locally
+        storeUserState(user.db, user);
+
+        if (registerMMResponse.position) {
+          if (!user.positionData[baseAsset]) user.positionData[baseAsset] = [];
+          user.positionData[baseAsset].push(registerMMResponse.position);
+        }
+
+        if (registerMMResponse.order_tab) {
+          if (!user.orderTabData[baseAsset]) user.orderTabData[baseAsset] = [];
+          user.orderTabData[baseAsset].push(registerMMResponse.order_tab);
+        }
+
+        if (registerMMResponse.vlp_note) {
+          // TODO: This should be forwarded to the user
+          // let vlpNote = Note.fromGrpcObject(registerMMResponse.vlp_note);
+          // if (!user.noteData[vlpToken]) user.noteData[vlpToken] = [];
+          // user.noteData[vlpToken].push(vlpNote);
+        }
+      } else {
+        let msg =
+          "Failed to submit order with error: \n" +
+          registerMMResponse.error_message;
+        console.log(msg);
+
+        throw new Error(msg);
+      }
+    });
+}
+
+/**
+ * Sends a request to add liquidity to the order tab
+ * ## Params:
+ * @param posTabPubKey the public key of the position/tab
+ * @param vLPToken  the vlp token of the tab
+ * @param indexPrice the index price you want the slippage to be calculated on (only if tab order)
+ * @param slippage the slippage limit in percentage (1 = 1%) (null if limit) (only if tab order)
+ * @param marketId
+ * @param isPerp
+ */
+async function sendOnChainRemoveLiquidityUser(
+  user,
+  posTabPubKey,
+  vlpToken,
+  indexPrice,
+  slippage,
+  marketId,
+  isPerp
+) {
+  if (!isPerp) {
+    let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+
+    indexPrice = indexPrice * 10 ** PRICE_DECIMALS_PER_ASSET[baseToken];
+    slippage = slippage * 100; // slippage: 10_000 = 100% ; 100 = 1%; 1 = 0.01%
+  }
+
+  let grpcMessage = user.removeLiquidityMM(
+    posTabPubKey,
+    vlpToken,
+    indexPrice,
+    slippage,
+    marketId,
+    isPerp
+  );
+
+  storeUserState(user.db, user);
+
+  // ? Send this to the marketMaker
+  return grpcMessage;
+}
+
+async function sendOnChainRemoveLiquidityMM(user, grpcMessage) {
+  //
+
+  let isPerp = !!grpcMessage.position_pub_key;
+
+  let tab_remove_liquidity_req;
+  let position_remove_liquidity_req;
+  let baseAsset;
+  if (isPerp) {
+    // {
+    //   vlp_notes_in,
+    //   collateral_close_order_fields,
+    //   position_pub_key,
+    //   signature,
+    //   market_id,
+    // }
+
+    baseAsset = PERP_MARKET_IDS_2_TOKENS[grpcMessage.market_id];
+
+    let position = user.positionData[baseAsset].find(
+      (pos) =>
+        pos.position_header.position_address.toString() ==
+        grpcMessage.position_pub_key.toString()
+    );
+
+    position_remove_liquidity_req = {
+      collateral_close_order_fields: grpcMessage.collateral_close_order_fields,
+      position: position,
+    };
+  } else {
+    // {
+    //   vlp_notes_in,
+    //   index_price,
+    //   slippage,
+    //   base_close_order_fields,
+    //   quote_close_order_fields,
+    //   tab_pub_key,
+    //   signature,
+    //   market_id,
+    // }
+
+    baseAsset = SPOT_MARKET_IDS_2_TOKENS[grpcMessage.market_id].base;
+
+    let tabPubKey = grpcMessage.tab_pub_key;
+
+    let order_tab = user.orderTabData[baseAsset].find(
+      (tab) => tab.tab_header.pub_key.toString() == tabPubKey.toString()
+    );
+
+    let vlpAmount = grpcMessage.vlp_notes_in.reduce(
+      (acc, note) => acc + note.amount,
+      0
+    );
+    let vlpSupply = order_tab.vlp_supply;
+
+    let baseDecimals = DECIMALS_PER_ASSET[order_tab.tab_header.base_token];
+    let basePriceDecimals =
+      PRICE_DECIMALS_PER_ASSET[order_tab.tab_header.base_token];
+
+    let baseAmount = order_tab.base_amount / 10 ** baseDecimals;
+    let indexPrice = grpcMessage.index_price / 10 ** basePriceDecimals;
+    let quoteAmount = order_tab.quote_amount / 10 ** COLLATERAL_TOKEN_DECIMALS;
+
+    let tabNominal = baseAmount * indexPrice + quoteAmount;
+
+    let base_return_amount =
+      (vlpAmount * tabNominal) / (2 * vlpSupply * indexPrice);
+    base_return_amount = base_return_amount * 10 ** baseDecimals;
+
+    tab_remove_liquidity_req = {
+      base_close_order_fields: grpcMessage.base_close_order_fields,
+      quote_close_order_fields: grpcMessage.quote_close_order_fields,
+      order_tab: order_tab.toGrpcObject(),
+      base_return_amount,
+      index_price: grpcMessage.index_price,
+      slippage: grpcMessage.slippage,
+    };
+  }
+
+  let removeLiqReq = {
+    vlp_notes_in: grpcMessage.vlp_notes_in,
+    base_token: baseAsset,
+    tab_remove_liquidity_req,
+    position_remove_liquidity_req,
+    signature: grpcMessage.signature,
+    market_id: grpcMessage.market_id,
+  };
+
+  // console.log("removeLiqReq", removeLiqReq);
+
+  await axios
+    .post(`${EXPRESS_APP_URL}/remove_liquidity_mm`, removeLiqReq)
+    .then((res) => {
+      let registerMMResponse = res.data.response;
+
+      if (registerMMResponse.successful) {
+        // ? Store the userData locally
+        storeUserState(user.db, user);
+
+        if (registerMMResponse.tab_res) {
+          if (!user.orderTabData[baseAsset]) user.orderTabData[baseAsset] = [];
+          user.orderTabData[baseAsset].push(registerMMResponse.order_tab);
+
+          // Todo: This should be forwarded to the user
+          // let baseReturnNote = Note.fromGrpcObject(registerMMResponse.base_return_note);
+          // let quoteReturnNote = Note.fromGrpcObject(registerMMResponse.quote_return_note);
+        }
+        if (registerMMResponse.position_res) {
+          if (!user.positionData[baseAsset]) user.positionData[baseAsset] = [];
+          user.positionData[baseAsset].push(registerMMResponse.position);
+
+          // Todo: This should be forwarded to the user
+          // let collateralNote = Note.fromGrpcObject(registerMMResponse.collateral_note);
+        }
+      } else {
+        let msg =
+          "Failed to submit order with error: \n" +
+          registerMMResponse.error_message;
         console.log(msg);
 
         throw new Error(msg);
@@ -1249,7 +733,6 @@ async function sendModifyOrderTab(
 
 module.exports = {
   sendSpotOrder,
-  sendBatchOrder,
   sendPerpOrder,
   sendCancelOrder,
   sendDeposit,
@@ -1261,6 +744,11 @@ module.exports = {
   sendOpenOrderTab,
   sendCloseOrderTab,
   sendModifyOrderTab,
+  sendRegisterMm,
+  sendAddLiquidityUser,
+  sendOnChainAddLiquidityMM,
+  sendOnChainRemoveLiquidityUser,
+  sendOnChainRemoveLiquidityMM,
 };
 
 // // ========================

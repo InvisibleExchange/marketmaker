@@ -1,6 +1,6 @@
 const axios = require("axios");
 const User = require("../users/Invisibl3User").default;
-const { Note, trimHash } = require("../users/Notes");
+const { Note, trimHash } = require("../transactions/stateStructs/Notes");
 
 const SERVER_URL = "localhost";
 // const SERVER_URL = "54.212.28.196";

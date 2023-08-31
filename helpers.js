@@ -167,4 +167,5 @@ module.exports = {
   openOrderTab,
   closeOrderTab,
   modifyOrderTab,
+  _loginUser,
 };

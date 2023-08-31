@@ -27,7 +27,7 @@ const {
 } = require("./src/transactions/constructOrders");
 
 const { setupPriceFeeds } = require("./mmPriceFeeds");
-const { trimHash } = require("./src/users/Notes");
+const { trimHash } = require("./src/transactions/stateStructs/Notes");
 const { restoreUserState } = require("./src/helpers/keyRetrieval");
 
 let W3CWebSocket = require("websocket").w3cwebsocket;

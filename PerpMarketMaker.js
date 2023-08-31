@@ -25,7 +25,7 @@ const {
 } = require("./src/transactions/constructOrders");
 
 const { setupPriceFeeds } = require("./mmPriceFeeds");
-const { trimHash } = require("./src/users/Notes");
+const { trimHash } = require("./src/transactions//stateStructs/Notes");
 const { getSizeFromLeverage } = require("./src/helpers/tradePriceCalculations");
 
 let W3CWebSocket = require("websocket").w3cwebsocket;

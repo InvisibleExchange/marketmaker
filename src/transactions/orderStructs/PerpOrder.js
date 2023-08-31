@@ -1,5 +1,5 @@
 const { getKeyPair, sign } = require("starknet").ec;
-const { computeHashOnElements, pedersen } = require("../helpers/pedersen");
+const { computeHashOnElements, pedersen } = require("../../helpers/pedersen");
 
 /* global BigInt */
 class PerpOrder {

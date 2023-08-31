@@ -15,13 +15,16 @@ const {
 } = require("firebase/firestore/lite");
 const bigInt = require("big-integer");
 
-const { Note, trimHash } = require("../../users/Notes.js");
+const { Note, trimHash } = require("../../transactions/stateStructs/Notes.js");
 const { pedersen } = require("../pedersen.js");
 
 const { ec, getKeyPair } = require("starknet").ec; //require("starknet/utils/ellipticCurve.js");
 
 const BN = require("bn.js");
-const { TabHeader, OrderTab } = require("../../transactions/LimitOrder.js");
+const {
+  TabHeader,
+  OrderTab,
+} = require("../../transactions/stateStructs/OrderTab.js");
 
 const PRICE_DECIMALS_PER_ASSET = {
   12345: 6, // BTC
@@ -229,20 +232,38 @@ async function fetchStoredTabs(address, baseBlinding, quoteBlinding) {
       throw "Invalid quote amount and blinding";
     }
 
+    let vlpSupply = 0;
+    if (tabData.vlp_supply_commitment > 0) {
+      let blindingSum = BigInt(baseBlinding) / 2n + BigInt(quoteBlinding) / 2n;
+      let vlpHash8 = trimHash(blindingSum, 64);
+      vlpSupply = Number.parseInt(
+        bigInt(tabData.vlp_supply_hidden_amount).xor(vlpHash8).value
+      );
+
+      if (
+        pedersen([BigInt(vlpSupply), blindingSum]) !=
+        tabData.vlp_supply_commitment
+      ) {
+        throw "Invalid vlp amount and blinding";
+      }
+    }
+
     let tabHeader = new TabHeader(
-      tabData.is_perp,
       tabData.is_smart_contract,
       tabData.base_token,
       tabData.quote_token,
       baseBlinding,
       quoteBlinding,
+      tabData.vlp_token,
+      tabData.max_vlp_supply,
       tabData.pub_key
     );
     let orderTab = new OrderTab(
       tabData.index,
       tabHeader,
       baseAmount,
-      quoteAmount
+      quoteAmount,
+      vlpSupply
     );
 
     orderTabs.push(orderTab);

@@ -3,7 +3,7 @@ const {
   SPOT_MARKET_IDS,
   PERP_MARKET_IDS,
 } = require("../helpers/utils");
-const { Note } = require("../users/Notes");
+const { Note } = require("../transactions/stateStructs/Notes");
 
 function handleLimitOrderResponse(
   user,

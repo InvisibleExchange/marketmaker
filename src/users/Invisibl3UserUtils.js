@@ -2,7 +2,7 @@ const bigInt = require("big-integer");
 const { pedersen, computeHashOnElements } = require("../helpers/pedersen");
 const { getKeyPair, sign } = require("starknet").ec;
 
-const { trimHash } = require("./Notes.js");
+const { trimHash } = require("../transactions/stateStructs/Notes.js");
 const {
   fetchStoredPosition,
   fetchStoredNotes,
@@ -83,13 +83,19 @@ async function fetchPositionData(addressData) {
       }
 
       if (positionData[positions[0].position_header.synthetic_token]) {
-        positionData[positions[0].position_header.synthetic_token].push(positions[0]);
+        positionData[positions[0].position_header.synthetic_token].push(
+          positions[0]
+        );
       } else {
-        positionData[positions[0].position_header.synthetic_token] = [positions[0]];
+        positionData[positions[0].position_header.synthetic_token] = [
+          positions[0],
+        ];
       }
 
       for (let j = 1; j < positions.length; j++) {
-        positionData[positions[j].position_header.synthetic_token].push(positions[j]);
+        positionData[positions[j].position_header.synthetic_token].push(
+          positions[j]
+        );
       }
 
       posPrivKeys[BigInt(addr.getX())] = privKey;
@@ -127,7 +133,6 @@ async function fetchOrderTabData(addressData, privateSeed) {
     fetchStoredTabs(addr, baseBlinding, quoteBlinding).then((tabs) => {
       count++;
 
-
       if (!tabs || tabs.length == 0) {
         emptyTabPrivKeys.push(privKey);
         return;
@@ -142,7 +147,6 @@ async function fetchOrderTabData(addressData, privateSeed) {
       for (let j = 1; j < tabs.length; j++) {
         orderTabData[tabs[j].tab_header.base_token].push(tabs[j]);
       }
-
 
       tabPrivKeys[BigInt(addr)] = privKey;
     });

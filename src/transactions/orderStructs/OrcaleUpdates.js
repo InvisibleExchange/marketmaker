@@ -1,5 +1,5 @@
 const { getKeyPair, sign } = require("starknet").ec;
-const { pedersen, computeHashOnElements } = require("../helpers/pedersen");
+const { pedersen, computeHashOnElements } = require("../../helpers/pedersen");
 
 module.exports = class OracleUpdate {
   constructor(token, price, timestamp) {

@@ -1,4 +1,4 @@
-const { pedersen, computeHashOnElements } = require("../helpers/pedersen");
+const { pedersen, computeHashOnElements } = require("../../helpers/pedersen");
 const bigInt = require("big-integer");
 const { ec, getKeyPair } = require("starknet").ec;
 const BN = require("bn.js");

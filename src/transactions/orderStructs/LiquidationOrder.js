@@ -1,5 +1,5 @@
 const { getKeyPair, sign } = require("starknet").ec;
-const { computeHashOnElements, pedersen } = require("../helpers/pedersen");
+const { computeHashOnElements, pedersen } = require("../../helpers/pedersen");
 
 /* global BigInt */
 class LiquidationOrder {
@@ -46,7 +46,6 @@ class LiquidationOrder {
       this.collateral_amount,
       fields_hash,
     ];
-
 
     let order_hash = computeHashOnElements(hash_inputs);
 

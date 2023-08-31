@@ -1,18 +1,10 @@
-const { LiquidationOrder } = require("../transactions/LiquidationOrder");
+const {
+  LiquidationOrder,
+} = require("../transactions/orderStructs/LiquidationOrder");
 
 const bigInt = require("big-integer");
 const { pedersen, computeHashOnElements } = require("../helpers/pedersen");
-const { ec, getKeyPair } = require("starknet").ec;
-
-const {
-  storeUserData,
-  fetchUserData,
-  storePrivKey,
-  removePrivKey,
-  removeOrderId,
-  fetchUserFills,
-  fetchDeprecatedKeys,
-} = require("../helpers/firebase/firebaseConnection");
+const { sign, getKeyPair } = require("starknet").ec;
 
 const {
   _subaddressPrivKeys,
@@ -22,10 +14,7 @@ const {
   _generateNewBliding,
   fetchNoteData,
   fetchPositionData,
-  getActiveOrders,
   signMarginChange,
-  _restoreKeyData,
-  handlePfrNoteData,
   findNoteCombinations,
   fetchOrderTabData,
 } = require("./Invisibl3UserUtils.js");
@@ -40,32 +29,31 @@ const SPOT_MARKET_IDS_2_TOKENS = {
   11: { base: 12345, quote: 55555 },
   12: { base: 54321, quote: 55555 },
 };
+
 const CHAIN_IDS = {
   "ETH Mainnet": 9090909,
   Starknet: 7878787,
   ZkSync: 5656565,
 };
 
-const { Note, trimHash } = require("./Notes.js");
-// const {
-//   newLimitOrder,
-//   signLimitOrder,
-//   signLimitOrderFfi,
-//   LimitOrderToFfiPointer,
-// } = require("../helpers/FFI");
+const { Note, trimHash } = require("../transactions/stateStructs/Notes.js");
 const {
   LimitOrder,
+
+  SpotNotesInfo,
+} = require("../transactions/orderStructs/LimitOrder");
+const {
   TabHeader,
   OrderTab,
-  SpotNotesInfo,
-} = require("../transactions/LimitOrder");
-const Deposit = require("../transactions/Deposit");
+} = require("../transactions/stateStructs/OrderTab");
+
+const Deposit = require("../transactions/orderStructs/Deposit");
 const {
   OpenOrderFields,
   CloseOrderFields,
   PerpOrder,
-} = require("../transactions/PerpOrder");
-const Withdrawal = require("../transactions/Withdrawal");
+} = require("../transactions/orderStructs/PerpOrder");
+const Withdrawal = require("../transactions/orderStructs/Withdrawal");
 const {
   storeUserState,
   getUserState,
@@ -854,7 +842,6 @@ module.exports = class User {
   }
 
   // ? ORDER TAB ============================================================
-
   openNewOrderTab(baseAmount, quoteAmount, marketId) {
     let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
     let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
@@ -899,14 +886,15 @@ module.exports = class User {
 
     let tabHeader = new TabHeader(
       false,
-      false,
       baseToken,
       quoteToken,
       baseBlinding,
       quoteBlinding,
+      0,
+      0,
       tabAddress.getX().toString()
     );
-    let orderTab = new OrderTab(0, tabHeader, baseAmount, quoteAmount);
+    let orderTab = new OrderTab(0, tabHeader, baseAmount, quoteAmount, 0);
 
     let signature = orderTab.signOpenTabOrder(
       baseNotesIn.map((n) => n.privKey),
@@ -1079,6 +1067,377 @@ module.exports = class User {
         quoteCloseOrderFields,
         signature,
       };
+    }
+  }
+
+  // ? ONCHAIN ORDER INTERACTIONS ============================================
+  onchainRegisterMM(
+    baseAsset,
+    vlpToken,
+    max_vlp_supply,
+    posTabAddress,
+    isPerp,
+    marketId
+  ) {
+    //
+
+    let privKey;
+    let order_tab;
+    let position;
+    if (isPerp) {
+      for (let pos of this.positionData[baseAsset]) {
+        if (pos.position_header.position_address == posTabAddress) {
+          position = pos;
+          break;
+        }
+      }
+
+      privKey = this.positionPrivKeys[posTabAddress];
+    } else {
+      for (let tab of this.orderTabData[baseAsset]) {
+        if (tab.tab_header.pub_key == posTabAddress) {
+          order_tab = tab;
+          break;
+        }
+      }
+
+      privKey = this.tabPrivKeys[posTabAddress];
+    }
+
+    let { KoR, koR, ytR } = this.getDestReceivedAddresses(vlpToken);
+    this.notePrivKeys[KoR.getX().toString()] = koR;
+
+    let vlp_close_order_fields = new CloseOrderFields(KoR, ytR);
+
+    let posTabHash = order_tab ? order_tab.hash : position.hash;
+
+    let hashInputs = [
+      posTabAddress,
+      posTabHash,
+      vlpToken,
+      max_vlp_supply,
+      vlp_close_order_fields.hash(),
+    ];
+    let hash = computeHashOnElements(hashInputs);
+
+    const keyPair = getKeyPair(BigInt(privKey));
+    let signature = sign(keyPair, "0x" + hash.toString(16));
+
+    console.log(position);
+    let grpcMessage = {
+      order_tab: order_tab ? order_tab.toGrpcObject() : null,
+      position: position,
+      vlp_token: vlpToken,
+      max_vlp_supply: max_vlp_supply,
+      vlp_close_order_fields: vlp_close_order_fields.toGrpcObject(),
+      signature: {
+        r: signature[0].toString(),
+        s: signature[1].toString(),
+      },
+      market_id: marketId,
+      base_token: baseAsset,
+    };
+
+    return grpcMessage;
+  }
+
+  addLiquidityMM(
+    posTabPubKey,
+    vLPToken,
+    baseAmount,
+    quoteAmount,
+    collateralAmount,
+    marketId,
+    isPerp
+  ) {
+    //
+
+    if (isPerp) {
+      let {
+        notesIn: collateral_notes_in,
+        refundAmount: collateralRefundAmount,
+      } = this.getNotesInAndRefundAmount(COLLATERAL_TOKEN, collateralAmount);
+
+      let pkSum = collateral_notes_in.reduce((a, b) => a + b.privKey, 0n);
+
+      collateral_notes_in = collateral_notes_in.map((n) => n.note);
+
+      let collateralRefundNote;
+      if (collateralRefundAmount > DUST_AMOUNT_PER_ASSET[COLLATERAL_TOKEN]) {
+        let {
+          KoR: KoR2,
+          koR: koR2,
+          ytR: ytR2,
+        } = this.getDestReceivedAddresses(COLLATERAL_TOKEN);
+        this.notePrivKeys[KoR2.getX().toString()] = koR2;
+
+        collateralRefundNote = new Note(
+          KoR2,
+          COLLATERAL_TOKEN,
+          collateralRefundAmount,
+          ytR2,
+          collateral_notes_in[0].index
+        );
+      }
+
+      let { KoR, koR, ytR } = this.getDestReceivedAddresses(vLPToken);
+      this.notePrivKeys[KoR.getX().toString()] = koR;
+
+      let vlp_close_order_fields = new CloseOrderFields(KoR, ytR);
+
+      // & header_hash = H({pos_address, refund_hash, close_fields_hash})
+      let hashInputs = [
+        posTabPubKey,
+        collateralRefundNote ? collateralRefundNote.hash : 0n,
+        vlp_close_order_fields.hash(),
+      ];
+      let hash = computeHashOnElements(hashInputs);
+
+      const keyPair = getKeyPair(BigInt(pkSum));
+      let signature = sign(keyPair, "0x" + hash.toString(16));
+
+      // {
+      //   collateral_notes_in,
+      //   collateral_refund_note,
+      //   tab_pub_key,
+      //   vlp_close_order_fields,
+      //   signature,
+      //   market_id,
+      // }
+
+      let grpcMessage = {
+        collateral_notes_in: collateral_notes_in.map((note) =>
+          note.toGrpcObject()
+        ),
+        collateral_refund_note: collateralRefundNote
+          ? collateralRefundNote.toGrpcObject()
+          : null,
+        pos_address: posTabPubKey.toString(),
+        vlp_close_order_fields: vlp_close_order_fields.toGrpcObject(),
+        signature: {
+          r: signature[0].toString(),
+          s: signature[1].toString(),
+        },
+        market_id: marketId,
+      };
+
+      return grpcMessage;
+    } else {
+      let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+      let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+      let { notesIn: base_notes_in, refundAmount: baseRefundAmount } =
+        this.getNotesInAndRefundAmount(baseToken, baseAmount);
+
+      let { notesIn: quote_notes_in, refundAmount: quoteRefundAmount } =
+        this.getNotesInAndRefundAmount(quoteToken, quoteAmount);
+
+      let pkSum1 = base_notes_in.reduce((a, b) => a + b.privKey, 0n);
+      let pkSum2 = quote_notes_in.reduce((a, b) => a + b.privKey, 0n);
+      let pkSum = pkSum1 + pkSum2;
+
+      base_notes_in = base_notes_in.map((n) => n.note);
+      quote_notes_in = quote_notes_in.map((n) => n.note);
+
+      let { KoR, koR, ytR } = this.getDestReceivedAddresses(vLPToken);
+      this.notePrivKeys[KoR.getX().toString()] = koR;
+
+      let vlp_close_order_fields = new CloseOrderFields(KoR, ytR);
+
+      // & header_hash = H({tab_pub_key, base_refund_hash, quote_refund_hash, vlp_close_order_fields_hash})
+
+      let baseRefundNote;
+      if (baseRefundAmount > DUST_AMOUNT_PER_ASSET[baseToken]) {
+        let {
+          KoR: KoR2,
+          koR: koR2,
+          ytR: ytR2,
+        } = this.getDestReceivedAddresses(baseToken);
+        this.notePrivKeys[KoR2.getX().toString()] = koR2;
+
+        baseRefundNote = new Note(
+          KoR2,
+          baseToken,
+          baseRefundAmount,
+          ytR2,
+          base_notes_in[0].index
+        );
+      }
+
+      let quoteRefundNote;
+      if (quoteRefundAmount > DUST_AMOUNT_PER_ASSET[quoteToken]) {
+        let {
+          KoR: KoR2,
+          koR: koR2,
+          ytR: ytR2,
+        } = this.getDestReceivedAddresses(quoteToken);
+        this.notePrivKeys[KoR2.getX().toString()] = koR2;
+
+        quoteRefundNote = new Note(
+          KoR2,
+          quoteToken,
+          quoteRefundAmount,
+          ytR2,
+          quote_notes_in[0].index
+        );
+      }
+
+      let hashInputs = [
+        posTabPubKey,
+        baseRefundNote.hash,
+        quoteRefundNote.hash,
+        vlp_close_order_fields.hash(),
+      ];
+      let hash = computeHashOnElements(hashInputs);
+
+      const keyPair = getKeyPair(BigInt(pkSum));
+
+      let signature = sign(keyPair, "0x" + hash.toString(16));
+
+      // {
+      //   base_notes_in,
+      //   quote_notes_in,
+      //   base_refund_note,
+      //   quote_refund_note,
+      //   tab_pub_key,
+      //   vlp_close_order_fields,
+      //   signature,
+      //   market_id,
+      // }
+
+      let grpcMessage = {
+        base_notes_in: base_notes_in.map((note) => note.toGrpcObject()),
+        quote_notes_in: quote_notes_in.map((note) => note.toGrpcObject()),
+        base_refund_note: baseRefundNote.toGrpcObject(),
+        quote_refund_note: quoteRefundNote.toGrpcObject(),
+        tab_pub_key: posTabPubKey.toString(),
+        vlp_close_order_fields: vlp_close_order_fields.toGrpcObject(),
+        signature: {
+          r: signature[0].toString(),
+          s: signature[1].toString(),
+        },
+        market_id: marketId,
+      };
+
+      return grpcMessage;
+    }
+  }
+
+  removeLiquidityMM(
+    posTabPubKey,
+    vlpToken,
+    indexPrice,
+    slippage,
+    marketId,
+    isPerp
+  ) {
+    let vlpBalance = this.getAvailableAmount(vlpToken);
+    if (vlpBalance <= 0) return;
+
+    let { notesIn: vlp_notes_in } = this.getNotesInAndRefundAmount(
+      vlpToken,
+      vlpBalance
+    );
+
+    let pkSum = vlp_notes_in.reduce((a, b) => a + b.privKey, 0n);
+    vlp_notes_in = vlp_notes_in.map((n) => n.note);
+
+    if (isPerp) {
+      let { KoR, koR, ytR } = this.getDestReceivedAddresses(COLLATERAL_TOKEN);
+      this.notePrivKeys[KoR.getX().toString()] = koR;
+
+      let collateral_close_order_fields = new CloseOrderFields(KoR, ytR);
+
+      // & hash = H({collateral_close_order_fields_hash, position_address})
+      let hash_inputs = [collateral_close_order_fields.hash(), posTabPubKey];
+
+      let hash = computeHashOnElements(hash_inputs);
+      const keyPair = getKeyPair(BigInt(pkSum));
+
+      let signature = sign(keyPair, "0x" + hash.toString(16));
+
+      // {
+      //   vlp_notes_in,
+      //   collateral_close_order_fields,
+      //   position_pub_key,
+      //   signature,
+      //   market_id,
+      // }
+
+      let grpcMessage = {
+        vlp_notes_in: vlp_notes_in.map((note) => note.toGrpcObject()),
+        collateral_close_order_fields:
+          collateral_close_order_fields.toGrpcObject(),
+        position_pub_key: posTabPubKey.toString(),
+        signature: {
+          r: signature[0].toString(),
+          s: signature[1].toString(),
+        },
+        market_id: marketId,
+      };
+
+      return grpcMessage;
+    } else {
+      let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+      let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+      let {
+        KoR: base_KoR,
+        koR: base_koR,
+        ytR: base_ytR,
+      } = this.getDestReceivedAddresses(baseToken);
+      this.notePrivKeys[base_KoR.getX().toString()] = base_koR;
+
+      let {
+        KoR: quote_KoR,
+        koR: quote_koR,
+        ytR: quote_ytR,
+      } = this.getDestReceivedAddresses(quoteToken);
+      this.notePrivKeys[quote_KoR.getX().toString()] = quote_koR;
+
+      let base_close_order_fields = new CloseOrderFields(base_KoR, base_ytR);
+      let quote_close_order_fields = new CloseOrderFields(quote_KoR, quote_ytR);
+
+      // & header_hash = H({index_price, slippage, base_close_order_fields_hash, quote_close_order_fields_hash, pub_key})
+      let hash_inputs = [
+        indexPrice,
+        slippage,
+        base_close_order_fields.hash(),
+        quote_close_order_fields.hash(),
+        posTabPubKey,
+      ];
+
+      let hash = computeHashOnElements(hash_inputs);
+      const keyPair = getKeyPair(BigInt(pkSum));
+
+      let signature = sign(keyPair, "0x" + hash.toString(16));
+
+      // {
+      //   vlp_notes_in,
+      //   index_price,
+      //   slippage,
+      //   base_close_order_fields,
+      //   quote_close_order_fields,
+      //   tab_pub_key,
+      //   signature,
+      //   market_id,
+      // }
+
+      let grpcMessage = {
+        vlp_notes_in: vlp_notes_in.map((note) => note.toGrpcObject()),
+        index_price: indexPrice,
+        slippage: slippage,
+        base_close_order_fields: base_close_order_fields.toGrpcObject(),
+        quote_close_order_fields: quote_close_order_fields.toGrpcObject(),
+        tab_pub_key: posTabPubKey.toString(),
+        signature: {
+          r: signature[0].toString(),
+          s: signature[1].toString(),
+        },
+        market_id: marketId,
+      };
+
+      return grpcMessage;
     }
   }
 
@@ -1267,6 +1626,8 @@ module.exports = class User {
   //* TESTS =======================================================
 
   static fromPrivKey(privKey_) {
+    privKey_ = privKey_.toString();
+
     try {
       if (!privKey_.startsWith("0x")) privKey_ = "0x" + privKey_;
 
@@ -1286,6 +1647,7 @@ module.exports = class User {
 
       return user;
     } catch (e) {
+      console.log(e);
       throw Error("Enter a hexademical private key");
     }
   }
