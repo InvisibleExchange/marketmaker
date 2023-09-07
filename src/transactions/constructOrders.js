@@ -1,9 +1,5 @@
 const axios = require("axios");
 
-const { getKeyPair } = require("starknet").ec;
-
-const { computeHashOnElements } = require("../helpers/pedersen");
-
 const {
   SERVER_URL,
   COLLATERAL_TOKEN_DECIMALS,
@@ -69,7 +65,7 @@ async function sendSpotOrder(
   isMarket,
   ACTIVE_ORDERS
 ) {
-  return _sendSpotOrderInner(
+  return await _sendSpotOrderInner(
     user,
     order_side,
     expirationTime,
@@ -94,7 +90,7 @@ async function sendSpotOrder(
  * This constructs a perpetual swap and sends it to the backend
  * ## Params:
  * @param  order_side "Long"/"Short"
- * @param  expirationTime expiration time in hours
+ * @param  expirationTime expiration time in seconds
  * @param  position_effect_type "Open"/"Modify"/"Close"
  * @param  positionAddress the address of the position to be modified/closed (null if open)
  * @param  syntheticToken the token of the position to be opened
@@ -120,7 +116,7 @@ async function sendPerpOrder(
   isMarket,
   ACTIVE_ORDERS
 ) {
-  _sendPerpOrderInner(
+  return await _sendPerpOrderInner(
     user,
     order_side,
     expirationTime,
@@ -156,7 +152,7 @@ async function sendLiquidationOrder(
   initial_margin,
   slippage
 ) {
-  return _sendLiquidationOrderInner(
+  return await _sendLiquidationOrderInner(
     user,
     position,
     price,
@@ -284,7 +280,7 @@ async function sendChangeMargin(
   amount,
   direction
 ) {
-  return _sendChangeMarginInner(
+  return await  _sendChangeMarginInner(
     user,
     positionAddress,
     syntheticToken,
@@ -358,7 +354,9 @@ async function sendRegisterMm(
   isPerp,
   marketId
 ) {
-  let baseAsset = PERP_MARKET_IDS_2_TOKENS[marketId];
+  let baseAsset = isPerp
+    ? PERP_MARKET_IDS_2_TOKENS[marketId]
+    : SPOT_MARKET_IDS_2_TOKENS[marketId].base;
 
   maxVlpSupply = maxVlpSupply * 10 ** COLLATERAL_TOKEN_DECIMALS;
 
@@ -702,6 +700,8 @@ async function sendOnChainRemoveLiquidityMM(user, grpcMessage) {
       let registerMMResponse = res.data.response;
 
       if (registerMMResponse.successful) {
+        console.log("registerMMResponse", registerMMResponse);
+
         // ? Store the userData locally
         storeUserState(user.db, user);
 

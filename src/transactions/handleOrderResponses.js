@@ -421,23 +421,7 @@ function handleMarginChangeResponse(
         pos.bankruptcy_price = bankruptcyPrice;
         pos.liquidation_price = liquidationPrice;
 
-        let hash = computeHashOnElements([
-          pos.order_side == "Long"
-            ? pos.position_header.allow_partial_liquidations
-              ? 3
-              : 2
-            : pos.position_header.allow_partial_liquidations
-            ? 1
-            : 0,
-          pos.position_header.synthetic_token,
-          pos.position_size,
-          pos.entry_price,
-          pos.liquidation_price,
-          pos.position_header.position_address,
-          pos.last_funding_idx,
-        ]);
-
-        pos.hash = hash.toString();
+        pos.hash = pos.hash();
 
         return pos;
       } else {

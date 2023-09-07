@@ -42,7 +42,7 @@ let MM_CONFIG, activeMarkets;
 dotenv.config();
 
 // How often do we refresh entire state (to prevent bugs and have a fresh version of the state)
-const REFRESH_PERIOD = 3600_000; // 1 hour
+const REFRESH_PERIOD = 10_800_000; // 1 hour
 // How often do we send liquidity indications (orders that make the market)
 const LIQUIDITY_INDICATION_PERIOD = 5_000; // 5 seconds
 // Cancel all orders and send new ones
@@ -168,20 +168,6 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
     addableValue * getPrice(syntheticAsset) >= 10 &&
     unfilledUsdAmount >= 10
   ) {
-    //   user,
-    // order_side,
-    // expirationTime,
-    // position_effect_type,
-    // positionAddress,
-    // syntheticToken,
-    // syntheticAmount_,
-    // price,
-    // initial_margin,
-    // feeLimit,
-    // slippage,
-    // isMarket,
-    // ACTIVE_ORDERS
-
     sendPerpOrder(
       marketMaker,
       otherSide == "s" ? "Long" : "Short",

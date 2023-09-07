@@ -5,46 +5,6 @@ const { Note, trimHash } = require("../transactions/stateStructs/Notes");
 const SERVER_URL = "localhost";
 // const SERVER_URL = "54.212.28.196";
 
-// const SYMBOLS_TO_IDS = {
-//   BTC: 12345,
-//   ETH: 54321,
-//   USDC: 55555,
-// };
-// const IDS_TO_SYMBOLS = {
-//   12345: "BTC",
-//   54321: "ETH",
-//   55555: "USDC",
-// };
-
-// const CHAIN_IDS = {
-//   "ETH Mainnet": 9090909,
-//   Starknet: 7878787,
-//   ZkSync: 5656565,
-// };
-
-// const DECIMALS_PER_ASSET = {
-//   12345: 9, // BTC
-//   54321: 9, // ETH
-//   55555: 6, // USDC
-// };
-
-// const PRICE_DECIMALS_PER_ASSET = {
-//   12345: 6, // BTC
-//   54321: 6, // ETH
-// };
-
-// const DUST_AMOUNT_PER_ASSET = {
-//   12345: 2500, // BTC ~ 5c
-//   54321: 25000, // ETH ~ 5c
-//   55555: 50000, // USDC ~ 5c
-// };
-
-// const MAX_LEVERAGE = 15;
-
-// const LEVERAGE_DECIMALS = 6;
-// const COLLATERAL_TOKEN_DECIMALS = 6;
-// const COLLATERAL_TOKEN = 55555;
-
 const SYMBOLS_TO_IDS = {
   BTC: 12345,
   ETH: 54321,

@@ -86,12 +86,17 @@ async function addLiquidity() {
 
   // ? USER
   let userConfig = {
-    MM_CONFIG: { privKey: 1204328589235690189323590324128569235023416n },
+    MM_CONFIG: { privKey: 22222n },
   };
 
   // await makeDeposits([55555], [5_000], userConfig);
 
   let user = await _loginUser(userConfig);
+  if (user.getAvailableAmount(55555) == 0) {
+    await makeDeposits([55555], [5_000], userConfig);
+
+    user = await _loginUser(userConfig);
+  }
 
   console.log("user quote amount", user.getAvailableAmount(55555));
 
@@ -127,7 +132,7 @@ async function removeLiquidity() {
 
   // ? USER
   let userConfig = {
-    MM_CONFIG: { privKey: 1204328589235690189323590324128569235023416n },
+    MM_CONFIG: { privKey: 22222n },
   };
   let user = await _loginUser(userConfig);
 
@@ -136,31 +141,27 @@ async function removeLiquidity() {
   let vlpBalance = user.getAvailableAmount(vlpToken);
   console.log("user vlp balance", vlpBalance);
 
-  // let grpcMessage = await sendOnChainRemoveLiquidityUser(
-  //   user,
-  //   position.position_header.position_address,
-  //   vlpToken,
-  //   null,
-  //   null,
-  //   22,
-  //   true
-  // );
+  let grpcMessage = await sendOnChainRemoveLiquidityUser(
+    user,
+    position.position_header.position_address,
+    vlpToken,
+    null,
+    null,
+    22,
+    true
+  );
 
   // console.log("grpcMessage", grpcMessage);
 
-  // await sendOnChainRemoveLiquidityMM(marketMaker, grpcMessage);
+  await sendOnChainRemoveLiquidityMM(marketMaker, grpcMessage);
 }
 
 async function main() {
   // await initMM();
-
   // await initPosition();
-
   // await registerMM();
-
   // await addLiquidity();
-
-  await removeLiquidity();
+  // await removeLiquidity();
 }
 
 main();

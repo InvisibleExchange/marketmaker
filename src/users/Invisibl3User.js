@@ -1123,7 +1123,6 @@ module.exports = class User {
     const keyPair = getKeyPair(BigInt(privKey));
     let signature = sign(keyPair, "0x" + hash.toString(16));
 
-    console.log(position);
     let grpcMessage = {
       order_tab: order_tab ? order_tab.toGrpcObject() : null,
       position: position,

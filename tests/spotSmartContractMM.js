@@ -17,7 +17,7 @@ const {
 
 async function initMM() {
   let config = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950952n },
+    MM_CONFIG: { privKey: 1111n },
   };
 
   //
@@ -26,32 +26,21 @@ async function initMM() {
 
 async function initOrderTab() {
   let config = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950952n },
+    MM_CONFIG: { privKey: 1111n },
   };
 
   await openOrderTab(12, config);
 }
 
-async function initPerpMM() {
-  let config = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950952n },
-  };
-
-  //
-  await makeDeposits([55555], [20_000], config);
-}
-
 async function registerMM() {
   let config = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950952n },
+    MM_CONFIG: { privKey: 1111n },
   };
 
   let marketMaker = await _loginUser(config);
 
   let baseToken = SPOT_MARKET_IDS_2_TOKENS[12].base;
   let orderTab = marketMaker.orderTabData[baseToken][0];
-
-  //console.log("orderTab before", orderTab);
 
   let vlpToken = 13579;
   let maxVlpSupply = 1_000_000;
@@ -71,7 +60,7 @@ async function registerMM() {
 async function addLiquidity() {
   // ? MARKET MAKER
   let mmConfig = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950952n },
+    MM_CONFIG: { privKey: 1111n },
   };
   let marketMaker = await _loginUser(mmConfig);
 
@@ -84,9 +73,15 @@ async function addLiquidity() {
     MM_CONFIG: { privKey: 1204328589235690189326590324128569235023415n },
   };
 
-  // await makeDeposits([55555, baseToken], [10_000, 5], userConfig);
-
   let user = await _loginUser(userConfig);
+  if (
+    user.getAvailableAmount(baseToken) == 0 ||
+    user.getAvailableAmount(55555) == 0
+  ) {
+    await makeDeposits([55555, baseToken], [10_000, 5], userConfig);
+
+    user = await _loginUser(userConfig);
+  }
 
   console.log("user base amount", user.getAvailableAmount(baseToken));
   console.log("user quote amount", user.getAvailableAmount(55555));
@@ -114,7 +109,7 @@ async function addLiquidity() {
 
 async function removeLiquidity() {
   let config = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950952n },
+    MM_CONFIG: { privKey: 1111n },
   };
   let marketMaker = await _loginUser(config);
 
@@ -133,27 +128,27 @@ async function removeLiquidity() {
   let vlpBalance = user.getAvailableAmount(vlpToken);
   console.log("user vlp balance", vlpBalance);
 
-  let grpcMessage = await sendOnChainRemoveLiquidityUser(
-    user,
-    orderTab.tab_header.pub_key,
-    vlpToken,
-    2000.0,
-    1,
-    12,
-    false
-  );
+  // let grpcMessage = await sendOnChainRemoveLiquidityUser(
+  //   user,
+  //   orderTab.tab_header.pub_key,
+  //   vlpToken,
+  //   2000.0,
+  //   1,
+  //   12,
+  //   false
+  // );
 
-  // console.log("grpcMessage", grpcMessage);
+  // // console.log("grpcMessage", grpcMessage);
 
-  await sendOnChainRemoveLiquidityMM(marketMaker, grpcMessage);
+  // await sendOnChainRemoveLiquidityMM(marketMaker, grpcMessage);
 }
 
 async function main() {
   // await initMM();
   // await initOrderTab();
-  await registerMM();
+  // await registerMM();
   // await addLiquidity();
-  // await removeLiquidity();
+  await removeLiquidity();
 }
 
 main();

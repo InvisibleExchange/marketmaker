@@ -8,11 +8,13 @@ const {
   fetchLiquidity,
   DECIMALS_PER_ASSET,
   CHAIN_IDS,
+  COLLATERAL_TOKEN,
 } = require("../src/helpers/utils");
 const {
   sendSpotOrder,
   sendDeposit,
   sendSplitOrder,
+  sendPerpOrder,
 } = require("../src/transactions/constructOrders");
 const User = require("../src/users/Invisibl3User");
 const { trimHash } = require("../src/transactions/stateStructs/Notes");
@@ -34,63 +36,68 @@ const { trimHash } = require("../src/transactions/stateStructs/Notes");
 //
 
 class Environemnt {
-  constructor(user, baseAsset, quoteAsset) {
+  constructor(user, syntheticAsset, maxLeverage) {
     this.user = user;
-    this.baseAsset = baseAsset;
-    this.quoteAsset = quoteAsset;
+    this.syntheticAsset = syntheticAsset;
+    this.maxLeverage = maxLeverage;
   }
 
-  async sendRandomOrder(user, side) {
-    let spentToken = side == "Buy" ? this.quoteAsset : this.baseAsset;
+  async sendRandomOrder(side) {
+    let position = this.user.positionData[this.syntheticAsset][0];
 
-    let availableBalance =
-      user.getAvailableAmount(spentToken) /
-      10 ** DECIMALS_PER_ASSET[spentToken];
+    let posSize =
+      position.position_size / 10 ** DECIMALS_PER_ASSET[this.syntheticAsset];
+    let margin = position.margin / 10 ** DECIMALS_PER_ASSET[COLLATERAL_TOKEN];
+
+    let marketPrice = getMarketPrice(this.syntheticAsset);
+    let maxSize = (this.maxLeverage * margin) / marketPrice;
+
+    let maxBuySize =
+      position.order_side == "Long" ? maxSize - posSize : maxSize + posSize;
+    let maxSellSize =
+      position.order_side == "Short" ? maxSize - posSize : maxSize + posSize;
 
     // ? get random amount between 0.05 and 0.20 of available balance
     let amountRatio = Math.random() * (0.2 - 0.05) + 0.05;
-    let spentAmount = Number(availableBalance) * amountRatio;
 
-    if (spentAmount == 0) return;
+    let tradeAmount =
+      position.order_side == "Long"
+        ? Number(maxBuySize) * amountRatio
+        : Number(maxSellSize) * amountRatio;
+
+    if (tradeAmount == 0) return;
 
     let isMarket = Math.random() > 0.3;
 
     let price;
     if (isMarket) {
-      price = getMarketPrice(this.baseAsset);
+      price = marketPrice;
     } else {
-      let marketPrice = getMarketPrice(this.baseAsset);
-
       price =
         side == "Buy"
-          ? marketPrice * (Math.random() * (1.05 - 0.75) + 0.75)
-          : marketPrice * (Math.random() * (1.25 - 0.95) + 0.95);
+          ? marketPrice * (Math.random() * (1.02 - 0.9) + 0.9)
+          : marketPrice * (Math.random() * (1.1 - 0.98) + 0.98);
     }
 
     // console.log(
-    //   "sending order",
+    //   "sending perp order",
     //   side,
-    //   spentAmount.toFixed(2),
+    //   tradeAmount.toFixed(2),
     //   price.toFixed(2),
     //   isMarket
     // );
 
-    let tokenSpent = side == "Sell" ? this.baseAsset : this.quoteAsset;
-    await sendSplitOrder(user, tokenSpent, spentAmount).catch((e) => {
-      console.log("error splitting notes", e);
-    });
-
-    sendSpotOrder(
-      user,
+    await sendPerpOrder(
+      this.user,
       side,
-      3_600_000,
-      this.baseAsset,
-      this.quoteAsset,
-      spentAmount,
-      spentAmount,
+      300,
+      "Modify",
+      position.position_header.position_address,
+      this.syntheticAsset,
+      tradeAmount,
       price,
-      0.07,
       null,
+      0.07,
       3,
       isMarket,
       null
@@ -100,41 +107,22 @@ class Environemnt {
   }
 
   async runEnvironment() {
-    let liq_ = await fetchLiquidity(this.baseAsset, false);
+    let liq_ = await fetchLiquidity(this.syntheticAsset, true);
     let liq = {};
-    liq[this.baseAsset] = liq_;
-    setLiquidity(liq);
+    liq[this.syntheticAsset] = liq_;
+    setPerpLiquidity(liq);
 
     listenToWebSocket(this.user);
 
-    let count = 0;
-    setInterval(() => {
+    setInterval(async () => {
       // ? every 10 seconds 3-5 random users create random orders (limit/market) for amounts and prices within a random deviation of the current price
 
-      if (count == 10) {
-        count = 0;
-        let availableBase = this.user.getAvailableAmount(this.baseAsset);
-        let availableQuote = this.user.getAvailableAmount(this.quoteAsset);
+      let randCount = Math.floor(Math.random() * 3) + 3;
 
-        sendSplitOrder(this.user, this.baseAsset, availableBase).catch((e) => {
-          console.log("error splitting notes", e);
-        });
+      for (let i = 0; i < randCount; i++) {
+        let randomSide = Math.random() > 0.5 ? "Long" : "Short";
 
-        sendSplitOrder(this.user, this.quoteAsset, availableQuote).catch(
-          (e) => {
-            console.log("error splitting notes", e);
-          }
-        );
-      } else {
-        let randCount = Math.floor(Math.random() * 3) + 3;
-
-        for (let i = 0; i < randCount; i++) {
-          let randomSide = Math.random() > 0.5 ? "Buy" : "Sell";
-
-          this.sendRandomOrder(this.user, randomSide);
-        }
-
-        count++;
+        await this.sendRandomOrder(randomSide);
       }
     }, 10_000);
 
@@ -157,7 +145,7 @@ const setPerpLiquidity = (liq) => {
 };
 
 function getMarketPrice(token) {
-  let { bidQueue, askQueue } = liquidity[token];
+  let { bidQueue, askQueue } = perpLiquidity[token];
 
   let topBidPrice = bidQueue[0]?.price ?? 0;
   let topAskPrice = askQueue[askQueue.length - 1]?.price ?? 0;
@@ -245,6 +233,8 @@ const listenToWebSocket = (user) => {
       case "PERPETUAL_SWAP":
         handlePerpSwapResult(user, msg.order_id, msg.swap_response);
 
+        console.log("PERP SWAP sucessful: ");
+
         break;
 
       default:
@@ -284,47 +274,54 @@ const initAccountState = async (privKey) => {
 
 // * ================================================================================================
 
-async function executeDeposits(user, baseAsset, quoteAsset) {
-  let baseAmount = user.getAvailableAmount(baseAsset);
-  let quoteAmount = user.getAvailableAmount(quoteAsset);
+async function openPosition(user, syntheticAsset) {
+  let positionData = user.positionData[syntheticAsset];
 
-  // ? base deposits
-  if (baseAmount < 0.05) {
-    for (let i = 0; i < 3; i++) {
-      let amount = 0.3;
+  if (!positionData || positionData.length == 0) {
+    let amount = 8000;
 
-      let depositId = CHAIN_IDS["ETH Mainnet"] * 2 ** 32 + 1111111111;
-      await sendDeposit(user, depositId, amount, baseAsset, 123456789);
-    }
-  }
+    let depositId = CHAIN_IDS["Starknet"] * 2 ** 32 + 222222222;
+    await sendDeposit(user, depositId, amount, COLLATERAL_TOKEN, 123456789);
 
-  // ? Qoute deposits
-  if (quoteAmount < 1000) {
-    for (let i = 0; i < 3; i++) {
-      let amount = 8000;
+    let dummyPrice = 25_000;
 
-      let depositId = CHAIN_IDS["Starknet"] * 2 ** 32 + 1111111111;
-      await sendDeposit(user, depositId, amount, quoteAsset, 123456789);
-    }
+    // ? open position
+    await sendPerpOrder(
+      user,
+      "Long",
+      10,
+      "Open",
+      null,
+      syntheticAsset,
+      0.001,
+      dummyPrice,
+      amount,
+      0.07,
+      99,
+      true,
+      null
+    ).catch((e) => {
+      console.log("error sending order", e);
+    });
   }
 }
 
 // * ================================================================================================
 
 let testPks = [
-  197832656235823563829582375723952365712349238592307124122352355n,
-  1237523869523685923982374237858237859235723893753275235235325253n,
-  238956235723698534092357923562389523957235235352238752357923589n,
-  2375623569823525723895327598235230895235790283343652352322352355n,
-  23785982394723950872395723589326572385972385235786239852893586923n,
-  829356238582375982365823579236523759292352352353252353253252350n,
-  239852370523582376596235629359293527359023573285723952635236895n,
-  9074238795623523695947913289562395972385235689235238952309238523n,
-  9623856923572358923562357293738562378956238527385152783915712985n,
-  1578962935501829562753941528019526579150235289562137509382561235n,
-  2859692377893264157123803591237569123750235349051283523158925235n,
-  2356917525235781924563487521735601347568023653479150235678235341n,
-  728394563457893645791572305734856341902387562183573408512353543n,
+  1978326562358235638295823757239235352523523532523523523523522352355n,
+  1237523535235235235235235235858237859235723893753275235235325253n,
+  238956235723698534092357923562323523523523546547458768457357923589n,
+  23756235698234977967996538674756346327150283211111243652352322352355n,
+  23785982394723950872392576585326134645835683565235786239852893586923n,
+  82935623858237598236582357923652375929223465685675456252353253252350n,
+  239852370523582376596257345457457457547547457573285723952635236895n,
+  9074238795623523695947134763898078054976587678035689235238952309238523n,
+  96238569235723589235623794357463547879637546547527385152783915712985n,
+  469805796795780569659805870528019526579150235289562137509382561235n,
+  2859692377893264157123803591237569578078507804832345378499087087087935n,
+  235691752523578192456348752173560134756802578098760967957807607805078n,
+  722948237502357238952355791572305734856341902387562183573408512353543n,
 ];
 
 async function main() {
@@ -332,19 +329,14 @@ async function main() {
   let privKey = testPks[idx % 13];
 
   let baseAsset = 12345;
-  let quoteAsset = 55555;
 
   let user = await initAccountState(privKey);
 
-  console.log(
-    "user",
-    user.noteData[baseAsset]?.length,
-    user.noteData[quoteAsset]?.length
-  );
+  console.log("user initialized: ", user.positionData[baseAsset]);
 
-  await executeDeposits(user, baseAsset, quoteAsset);
+  await openPosition(user, baseAsset);
 
-  let env = new Environemnt(user, baseAsset, quoteAsset);
+  let env = new Environemnt(user, baseAsset, 3.0);
 
   await env.runEnvironment();
 }

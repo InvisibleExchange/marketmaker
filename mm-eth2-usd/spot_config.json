@@ -1,0 +1,18 @@
+{
+    "cryptowatchApiKey": "NJGF99I137C71MXD26PF",
+    "privKey": "0x11111111111111111111111111111111111111111111111111111111114",
+    "SERVER_URL": "localhost",
+    "EXPIRATION_TIME": 10,
+    "pairs": {
+        "12": {
+            "symbol": "ETH-USDC",
+            "priceFeedPrimary": "cryptowatch:588",
+            "priceFeedSecondary": "cryptowatch:68",
+            "slippageRate": 7e-4,
+            "maxSize": 100,
+            "minSize": 0.0003,
+            "minSpread": 0.0008,
+            "active": true
+        }
+    }
+}

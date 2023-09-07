@@ -25,6 +25,9 @@ const {
   TabHeader,
   OrderTab,
 } = require("../../transactions/stateStructs/OrderTab.js");
+const {
+  PerpPosition,
+} = require("../../transactions/stateStructs/PerpPosition.js");
 
 const PRICE_DECIMALS_PER_ASSET = {
   12345: 6, // BTC
@@ -106,7 +109,9 @@ async function fetchStoredPosition(address) {
 
   let positions = [];
   querySnapshot.forEach((doc) => {
-    let position = doc.data();
+    // let position = doc.data();
+
+    let position = PerpPosition.fromGrpcObject(doc.data());
 
     positions.push(position);
   });
@@ -127,24 +132,20 @@ async function checkPositionExistance(address) {
 async function fetchIndividualPosition(address, index) {
   // returns the position at this address from the db
 
-  const positionData = await getDoc(
+  const doc = await getDoc(
     doc(db, `positions/${address}/indexes`, index.toString())
   );
 
-  if (!positionData.exists()) {
+  if (!doc.exists()) {
     return null;
   }
 
-  let position = positionData.data();
+  let position = PerpPosition.fromGrpcObject(doc.data());
 
   return position;
 }
 
 async function getLiquidatablePositions(indexPrice, token) {
-  // "liquidation_price": &position.liquidation_price,
-  // "synthetic_token": &position.synthetic_token,
-  // "order_side": &position.order_side,
-
   indexPrice = indexPrice * 10 ** PRICE_DECIMALS_PER_ASSET[token];
 
   // ? if long and liquidation_price >= indexPrice
@@ -234,7 +235,10 @@ async function fetchStoredTabs(address, baseBlinding, quoteBlinding) {
 
     let vlpSupply = 0;
     if (tabData.vlp_supply_commitment > 0) {
-      let blindingSum = BigInt(baseBlinding) / 2n + BigInt(quoteBlinding) / 2n;
+      let b1 = BigInt(baseBlinding) % 2n ** 128n;
+      let b2 = BigInt(quoteBlinding) % 2n ** 128n;
+
+      let blindingSum = b1 + b2;
       let vlpHash8 = trimHash(blindingSum, 64);
       vlpSupply = Number.parseInt(
         bigInt(tabData.vlp_supply_hidden_amount).xor(vlpHash8).value
