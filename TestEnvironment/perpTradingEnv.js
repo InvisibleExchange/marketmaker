@@ -11,9 +11,7 @@ const {
   COLLATERAL_TOKEN,
 } = require("../src/helpers/utils");
 const {
-  sendSpotOrder,
   sendDeposit,
-  sendSplitOrder,
   sendPerpOrder,
 } = require("../src/transactions/constructOrders");
 const User = require("../src/users/Invisibl3User");
@@ -114,15 +112,74 @@ class Environemnt {
 
     listenToWebSocket(this.user);
 
+    let count = 0;
     setInterval(async () => {
-      // ? every 10 seconds 3-5 random users create random orders (limit/market) for amounts and prices within a random deviation of the current price
+      if (count == 10) {
+        count = 0;
 
-      let randCount = Math.floor(Math.random() * 3) + 3;
+        let position = this.user.positionData[this.syntheticAsset][0];
+        let side = position.order_side == "Long" ? "Short" : "Long";
 
-      for (let i = 0; i < randCount; i++) {
-        let randomSide = Math.random() > 0.5 ? "Long" : "Short";
+        let prevPositionHash = position.hash;
 
-        await this.sendRandomOrder(randomSide);
+        // ? Close position
+        await sendPerpOrder(
+          this.user,
+          side,
+          300,
+          "Close",
+          position.position_header.position_address,
+          this.syntheticAsset,
+          position.position_size /
+            10 ** DECIMALS_PER_ASSET[this.syntheticAsset],
+          getMarketPrice(this.syntheticAsset),
+          null,
+          0.07,
+          3,
+          true,
+          null
+        ).catch((e) => {
+          console.log("error sending order", e);
+        });
+
+        // ? Open new Position
+        await sendPerpOrder(
+          this.user,
+          side,
+          300,
+          "Open",
+          null,
+          this.syntheticAsset,
+          position.position_size /
+            10 ** DECIMALS_PER_ASSET[this.syntheticAsset],
+          getMarketPrice(this.syntheticAsset),
+          this.user.getAvailableAmount(COLLATERAL_TOKEN) /
+            10 ** DECIMALS_PER_ASSET[COLLATERAL_TOKEN],
+          0.07,
+          3,
+          true,
+          null
+        ).catch((e) => {
+          console.log("error sending order", e);
+        });
+
+        if (
+          this.user.positionData[this.syntheticAsset][0].hash ==
+          prevPositionHash
+        ) {
+          this.user.positionData[this.syntheticAsset].splice(idx, 1);
+        }
+      } else {
+        // ? every 10 seconds 3-5 random users create random orders (limit/market) for amounts and prices within a random deviation of the current price
+        let randCount = Math.floor(Math.random() * 3) + 3;
+
+        for (let i = 0; i < randCount; i++) {
+          let randomSide = Math.random() > 0.5 ? "Long" : "Short";
+
+          await this.sendRandomOrder(randomSide);
+        }
+
+        count++;
       }
     }, 10_000);
 
@@ -233,7 +290,7 @@ const listenToWebSocket = (user) => {
       case "PERPETUAL_SWAP":
         handlePerpSwapResult(user, msg.order_id, msg.swap_response);
 
-        console.log("PERP SWAP sucessful: ");
+        console.log("PERP SWAP sucessful: ", msg.swap_response.qty);
 
         break;
 

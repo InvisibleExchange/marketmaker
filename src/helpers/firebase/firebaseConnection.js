@@ -1,7 +1,6 @@
 const { db } = require("./firebaseConfig.js");
 const {
   collection,
-  addDoc,
   getDocs,
   getDoc,
   doc,
@@ -18,16 +17,13 @@ const bigInt = require("big-integer");
 const { Note, trimHash } = require("../../transactions/stateStructs/Notes.js");
 const { pedersen } = require("../pedersen.js");
 
-const { ec, getKeyPair } = require("starknet").ec; //require("starknet/utils/ellipticCurve.js");
+const { ec } = require("starknet").ec; //require("starknet/utils/ellipticCurve.js");
 
 const BN = require("bn.js");
 const {
   TabHeader,
   OrderTab,
 } = require("../../transactions/stateStructs/OrderTab.js");
-const {
-  PerpPosition,
-} = require("../../transactions/stateStructs/PerpPosition.js");
 
 const PRICE_DECIMALS_PER_ASSET = {
   12345: 6, // BTC
@@ -111,7 +107,7 @@ async function fetchStoredPosition(address) {
   querySnapshot.forEach((doc) => {
     // let position = doc.data();
 
-    let position = PerpPosition.fromGrpcObject(doc.data());
+    let position = doc.data(); //PerpPosition.fromGrpcObject(doc.data());
 
     positions.push(position);
   });
@@ -140,7 +136,7 @@ async function fetchIndividualPosition(address, index) {
     return null;
   }
 
-  let position = PerpPosition.fromGrpcObject(doc.data());
+  let position = doc.data(); //PerpPosition.fromGrpcObject(doc.data());
 
   return position;
 }

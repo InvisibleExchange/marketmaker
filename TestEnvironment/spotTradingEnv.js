@@ -261,7 +261,7 @@ const listenToWebSocket = (user) => {
 
 // * ================================================================================================
 
-const initAccountState = async (privKey) => {
+const initAccountState = async (privKey, baseAsset, quoteAsset) => {
   let user_ = User.fromPrivKey(privKey.toString(16));
 
   let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
@@ -278,6 +278,16 @@ const initAccountState = async (privKey) => {
     emptyPrivKeys,
     emptyPositionPrivKeys
   );
+
+  let availableBase = user_.getAvailableAmount(baseAsset);
+  await sendSplitOrder(user_, baseAsset, availableBase).catch((e) => {
+    console.log("error splitting notes", e);
+  });
+
+  let availableQuote = user_.getAvailableAmount(quoteAsset);
+  await sendSplitOrder(user_, quoteAsset, availableQuote).catch((e) => {
+    console.log("error splitting notes", e);
+  });
 
   return user_;
 };
@@ -334,7 +344,7 @@ async function main() {
   let baseAsset = 12345;
   let quoteAsset = 55555;
 
-  let user = await initAccountState(privKey);
+  let user = await initAccountState(privKey, baseAsset, quoteAsset);
 
   console.log(
     "user",
