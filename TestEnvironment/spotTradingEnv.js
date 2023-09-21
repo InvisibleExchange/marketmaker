@@ -8,6 +8,7 @@ const {
   fetchLiquidity,
   DECIMALS_PER_ASSET,
   CHAIN_IDS,
+  COLLATERAL_TOKEN,
 } = require("../src/helpers/utils");
 const {
   sendSpotOrder,
@@ -67,6 +68,11 @@ class Environemnt {
           : marketPrice * (Math.random() * (1.25 - 0.95) + 0.95);
     }
 
+    let tokenSpent = side == "Sell" ? this.baseAsset : this.quoteAsset;
+    await sendSplitOrder(user, tokenSpent, spentAmount).catch((e) => {
+      console.log("error splitting notes", e);
+    });
+
     // console.log(
     //   "sending order",
     //   side,
@@ -74,12 +80,6 @@ class Environemnt {
     //   price.toFixed(2),
     //   isMarket
     // );
-
-    let tokenSpent = side == "Sell" ? this.baseAsset : this.quoteAsset;
-    await sendSplitOrder(user, tokenSpent, spentAmount).catch((e) => {
-      console.log("error splitting notes", e);
-    });
-
     sendSpotOrder(
       user,
       side,
@@ -105,10 +105,8 @@ class Environemnt {
     liq[this.baseAsset] = liq_;
     setLiquidity(liq);
 
-    listenToWebSocket(this.user);
-
     let count = 0;
-    setInterval(() => {
+    setInterval(async () => {
       // ? every 10 seconds 3-5 random users create random orders (limit/market) for amounts and prices within a random deviation of the current price
 
       if (count == 10) {
@@ -128,15 +126,17 @@ class Environemnt {
       } else {
         let randCount = Math.floor(Math.random() * 3) + 3;
 
+        console.log("sending", randCount, "random orders");
+
         for (let i = 0; i < randCount; i++) {
           let randomSide = Math.random() > 0.5 ? "Buy" : "Sell";
 
-          this.sendRandomOrder(this.user, randomSide);
+          await this.sendRandomOrder(this.user, randomSide);
         }
 
         count++;
       }
-    }, 10_000);
+    }, 300_000);
 
     //
 
@@ -173,6 +173,7 @@ const listenToWebSocket = (user) => {
 
   client.onopen = function () {
     const ID = trimHash(user.userId, 64);
+
     client.send(
       JSON.stringify({ user_id: ID.toString(), config_code: CONFIG_CODE })
     );
@@ -254,7 +255,7 @@ const listenToWebSocket = (user) => {
 
   client.onclose = function () {
     setTimeout(() => {
-      listenToWebSocket();
+      listenToWebSocket(user);
     }, 5000);
   };
 };
@@ -322,41 +323,47 @@ async function executeDeposits(user, baseAsset, quoteAsset) {
 // * ================================================================================================
 
 let testPks = [
-  197832656235823563829582375723952365712349238592307124122352355n,
-  1237523869523685923982374237858237859235723893753275235235325253n,
-  238956235723698534092357923562389523957235235352238752357923589n,
-  2375623569823525723895327598235230895235790283343652352322352355n,
-  23785982394723950872395723589326572385972385235786239852893586923n,
-  829356238582375982365823579236523759292352352353252353253252350n,
-  239852370523582376596235629359293527359023573285723952635236895n,
-  9074238795623523695947913289562395972385235689235238952309238523n,
-  9623856923572358923562357293738562378956238527385152783915712985n,
-  1578962935501829562753941528019526579150235289562137509382561235n,
-  2859692377893264157123803591237569123750235349051283523158925235n,
-  2356917525235781924563487521735601347568023653479150235678235341n,
-  728394563457893645791572305734856341902387562183573408512353543n,
+  19783265623582356382958237572395236571234923859230712412235235512n,
+  123752386952368592398237423785823785923572389375327523523532525312n,
+  23895623572369853409235792356238952395723523535223875235792358912n,
+  237562356982352572389532759823523089523579028334365235232235235512n,
+  2378598239472395087239572358932657238597238523578623985289358692312n,
+  82935623858237598236582357923652375929235235235325235325325235012n,
+  23985237052358237659623562935929352735902357328572395263523689512n,
+  907423879562352369594791328956239597238523568923523895230923852312n,
+  962385692357235892356235729373856237895623852738515278391571298512n,
+  157896293550182956275394152801952657915023528956213750938256123512n,
+  285969237789326415712380359123756912375023534905128352315892523512n,
+  235691752523578192456348752173560134756802365347915023567823534112n,
+  72839456345789364579157230573485634190238756218357340851235354312n,
 ];
 
 async function main() {
-  const idx = process.argv[2] ?? 1;
-  let privKey = testPks[idx % 13];
+  const startIdx = process.argv[2] ?? 0;
 
-  let baseAsset = 12345;
-  let quoteAsset = 55555;
+  let baseAssets = [12345, 54321];
 
-  let user = await initAccountState(privKey, baseAsset, quoteAsset);
+  let nUsers = 2;
 
-  console.log(
-    "user",
-    user.noteData[baseAsset]?.length,
-    user.noteData[quoteAsset]?.length
-  );
+  for (let i = 0; i < nUsers; i++) {
+    let privKey = testPks[(startIdx + i) % 13];
 
-  await executeDeposits(user, baseAsset, quoteAsset);
+    let user = await initAccountState(privKey);
 
-  let env = new Environemnt(user, baseAsset, quoteAsset);
+    listenToWebSocket(user);
 
-  await env.runEnvironment();
+    for (let i = 0; i < baseAssets.length; i++) {
+      const baseAsset = baseAssets[i];
+
+      await executeDeposits(user, baseAsset, COLLATERAL_TOKEN);
+
+      let env = new Environemnt(user, baseAsset, COLLATERAL_TOKEN);
+
+      env.runEnvironment();
+    }
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 800_000_000));
 }
 
 main();

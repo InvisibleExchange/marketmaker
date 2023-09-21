@@ -110,8 +110,6 @@ class Environemnt {
     liq[this.syntheticAsset] = liq_;
     setPerpLiquidity(liq);
 
-    listenToWebSocket(this.user);
-
     let count = 0;
     setInterval(async () => {
       if (count == 10) {
@@ -181,7 +179,7 @@ class Environemnt {
 
         count++;
       }
-    }, 10_000);
+    }, 300_000);
 
     //
 
@@ -382,20 +380,31 @@ let testPks = [
 ];
 
 async function main() {
-  const idx = process.argv[2] ?? 1;
-  let privKey = testPks[idx % 13];
+  const startIdx = process.argv[2] ?? 0;
 
-  let baseAsset = 12345;
+  let baseAssets = [12345];
 
-  let user = await initAccountState(privKey);
+  let nUsers = 2;
 
-  console.log("user initialized: ", user.positionData[baseAsset]);
+  for (let i = 0; i < nUsers; i++) {
+    let privKey = testPks[(startIdx + i) % 13];
 
-  await openPosition(user, baseAsset);
+    let user = await initAccountState(privKey);
 
-  let env = new Environemnt(user, baseAsset, 3.0);
+    listenToWebSocket(user);
 
-  await env.runEnvironment();
+    for (let i = 0; i < baseAssets.length; i++) {
+      const baseAsset = baseAssets[i];
+
+      await openPosition(user, baseAsset);
+
+      let env = new Environemnt(user, baseAsset, 3.0);
+
+      env.runEnvironment();
+    }
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 800_000_000));
 }
 
 main();
