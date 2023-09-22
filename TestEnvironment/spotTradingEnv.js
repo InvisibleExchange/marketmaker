@@ -59,8 +59,10 @@ class Environemnt {
     let price;
     if (isMarket) {
       price = getMarketPrice(this.baseAsset);
+      if (!price) return;
     } else {
       let marketPrice = getMarketPrice(this.baseAsset);
+      if (!price) return;
 
       price =
         side == "Buy"
@@ -73,13 +75,13 @@ class Environemnt {
       console.log("error splitting notes", e);
     });
 
-    // console.log(
-    //   "sending order",
-    //   side,
-    //   spentAmount.toFixed(2),
-    //   price.toFixed(2),
-    //   isMarket
-    // );
+    console.log(
+      "sending order",
+      side,
+      spentAmount.toFixed(2),
+      price.toFixed(2),
+      isMarket
+    );
     sendSpotOrder(
       user,
       side,
@@ -105,10 +107,10 @@ class Environemnt {
     liq[this.baseAsset] = liq_;
     setLiquidity(liq);
 
-    let count = 0;
-    setInterval(async () => {
-      // ? every 10 seconds 3-5 random users create random orders (limit/market) for amounts and prices within a random deviation of the current price
+    let count = 1;
 
+    await this.executeOrders();
+    setInterval(async () => {
       if (count == 10) {
         count = 0;
         let availableBase = this.user.getAvailableAmount(this.baseAsset);
@@ -124,23 +126,28 @@ class Environemnt {
           }
         );
       } else {
-        let randCount = Math.floor(Math.random() * 3) + 3;
-
-        console.log("sending", randCount, "random orders");
-
-        for (let i = 0; i < randCount; i++) {
-          let randomSide = Math.random() > 0.5 ? "Buy" : "Sell";
-
-          await this.sendRandomOrder(this.user, randomSide);
-        }
-
+        await this.executeOrders();
         count++;
       }
-    }, 300_000);
+    }, 120_000);
 
     //
 
     //
+  }
+
+  async executeOrders() {
+    // ? every 10 seconds 3-5 random users create random orders (limit/market) for amounts and prices within a random deviation of the current price
+
+    let randCount = Math.floor(Math.random() * 3) + 3;
+
+    console.log("sending", randCount, "random orders");
+
+    for (let i = 0; i < randCount; i++) {
+      let randomSide = Math.random() > 0.5 ? "Buy" : "Sell";
+
+      await this.sendRandomOrder(this.user, randomSide);
+    }
   }
 }
 
@@ -157,6 +164,7 @@ const setPerpLiquidity = (liq) => {
 };
 
 function getMarketPrice(token) {
+  if (!liquidity[token]) return;
   let { bidQueue, askQueue } = liquidity[token];
 
   let topBidPrice = bidQueue[0]?.price ?? 0;
@@ -169,6 +177,8 @@ let W3CWebSocket = require("websocket").w3cwebsocket;
 let client;
 const listenToWebSocket = (user) => {
   let SERVER_URL = "localhost";
+  // let SERVER_URL = "54.212.28.196";
+
   client = new W3CWebSocket(`ws://${SERVER_URL}:50053`);
 
   client.onopen = function () {
@@ -343,7 +353,7 @@ async function main() {
 
   let baseAssets = [12345, 54321];
 
-  let nUsers = 2;
+  let nUsers = 1;
 
   for (let i = 0; i < nUsers; i++) {
     let privKey = testPks[(startIdx + i) % 13];

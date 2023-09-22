@@ -48,6 +48,7 @@ class Environemnt {
     let margin = position.margin / 10 ** DECIMALS_PER_ASSET[COLLATERAL_TOKEN];
 
     let marketPrice = getMarketPrice(this.syntheticAsset);
+    if (!marketPrice) return;
     let maxSize = (this.maxLeverage * margin) / marketPrice;
 
     let maxBuySize =
@@ -110,9 +111,10 @@ class Environemnt {
     liq[this.syntheticAsset] = liq_;
     setPerpLiquidity(liq);
 
-    let count = 0;
+    let count = 1;
+    await this.executeOrders();
     setInterval(async () => {
-      if (count == 10) {
+      if (count == 2) {
         count = 0;
 
         let position = this.user.positionData[this.syntheticAsset][0];
@@ -162,28 +164,35 @@ class Environemnt {
         });
 
         if (
+          this.user.positionData[this.syntheticAsset].length > 0 &&
           this.user.positionData[this.syntheticAsset][0].hash ==
-          prevPositionHash
+            prevPositionHash
         ) {
           this.user.positionData[this.syntheticAsset].splice(idx, 1);
         }
+
+        console.log(
+          "new position: ",
+          this.user.positionData[this.syntheticAsset][0]
+        );
       } else {
-        // ? every 10 seconds 3-5 random users create random orders (limit/market) for amounts and prices within a random deviation of the current price
-        let randCount = Math.floor(Math.random() * 3) + 3;
-
-        for (let i = 0; i < randCount; i++) {
-          let randomSide = Math.random() > 0.5 ? "Long" : "Short";
-
-          await this.sendRandomOrder(randomSide);
-        }
-
+        await this.executeOrders();
         count++;
       }
-    }, 300_000);
+    }, 120_000);
 
     //
+  }
 
-    //
+  async executeOrders() {
+    // ? every 10 seconds 3-5 random users create random orders (limit/market) for amounts and prices within a random deviation of the current price
+    let randCount = Math.floor(Math.random() * 3) + 3;
+
+    for (let i = 0; i < randCount; i++) {
+      let randomSide = Math.random() > 0.5 ? "Long" : "Short";
+
+      await this.sendRandomOrder(randomSide);
+    }
   }
 }
 
@@ -200,6 +209,7 @@ const setPerpLiquidity = (liq) => {
 };
 
 function getMarketPrice(token) {
+  if (!perpLiquidity[token]) return;
   let { bidQueue, askQueue } = perpLiquidity[token];
 
   let topBidPrice = bidQueue[0]?.price ?? 0;
@@ -211,7 +221,9 @@ function getMarketPrice(token) {
 let W3CWebSocket = require("websocket").w3cwebsocket;
 let client;
 const listenToWebSocket = (user) => {
-  let SERVER_URL = "localhost";
+  const SERVER_URL = "localhost";
+  // const SERVER_URL = "54.212.28.196";
+
   client = new W3CWebSocket(`ws://${SERVER_URL}:50053`);
 
   client.onopen = function () {
@@ -382,7 +394,7 @@ let testPks = [
 async function main() {
   const startIdx = process.argv[2] ?? 0;
 
-  let baseAssets = [12345];
+  let baseAssets = [12345, 54321];
 
   let nUsers = 2;
 
