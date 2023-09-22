@@ -83,7 +83,7 @@ class Environemnt {
     await sendPerpOrder(
       this.user,
       side,
-      300,
+      3600,
       "Modify",
       position.position_header.position_address,
       this.syntheticAsset,
@@ -345,7 +345,7 @@ async function openPosition(user, syntheticAsset) {
     await sendPerpOrder(
       user,
       "Long",
-      10,
+      3600,
       "Open",
       null,
       syntheticAsset,

@@ -79,7 +79,7 @@ class Environemnt {
     sendSpotOrder(
       user,
       side,
-      3_600_000,
+      3600,
       this.baseAsset,
       this.quoteAsset,
       spentAmount,
