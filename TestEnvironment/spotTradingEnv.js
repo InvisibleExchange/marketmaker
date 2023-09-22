@@ -75,13 +75,7 @@ class Environemnt {
       console.log("error splitting notes", e);
     });
 
-    console.log(
-      "sending order",
-      side,
-      spentAmount.toFixed(2),
-      price.toFixed(2),
-      isMarket
-    );
+    console.log("sending", isMarket, "order");
     sendSpotOrder(
       user,
       side,
@@ -140,8 +134,6 @@ class Environemnt {
     // ? every 10 seconds 3-5 random users create random orders (limit/market) for amounts and prices within a random deviation of the current price
 
     let randCount = Math.floor(Math.random() * 3) + 3;
-
-    console.log("sending", randCount, "random orders");
 
     for (let i = 0; i < randCount; i++) {
       let randomSide = Math.random() > 0.5 ? "Buy" : "Sell";

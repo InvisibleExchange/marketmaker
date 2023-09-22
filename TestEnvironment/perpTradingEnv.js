@@ -78,13 +78,7 @@ class Environemnt {
           : marketPrice * (Math.random() * (1.1 - 0.98) + 0.98);
     }
 
-    // console.log(
-    //   "sending perp order",
-    //   side,
-    //   tradeAmount.toFixed(2),
-    //   price.toFixed(2),
-    //   isMarket
-    // );
+    console.log("sending", isMarket, "order");
 
     await sendPerpOrder(
       this.user,
@@ -168,13 +162,8 @@ class Environemnt {
           this.user.positionData[this.syntheticAsset][0].hash ==
             prevPositionHash
         ) {
-          this.user.positionData[this.syntheticAsset].splice(idx, 1);
+          this.user.positionData[this.syntheticAsset].splice(0, 1);
         }
-
-        console.log(
-          "new position: ",
-          this.user.positionData[this.syntheticAsset][0]
-        );
       } else {
         await this.executeOrders();
         count++;
