@@ -295,8 +295,8 @@ const initAccountState = async (privKey, baseAsset, quoteAsset) => {
     });
   }
 
-  console.log(user_.noteData[baseAsset].length, "base notes");
-  console.log(user_.noteData[quoteAsset].length, "quote notes");
+  console.log(user_.noteData[baseAsset]?.length, "base notes");
+  console.log(user_.noteData[quoteAsset]?.length, "quote notes");
 
   return user_;
 };
