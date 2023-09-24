@@ -43,6 +43,8 @@ class Environemnt {
   async sendRandomOrder(side) {
     let position = this.user.positionData[this.syntheticAsset][0];
 
+    if (!position) return;
+
     let posSize =
       position.position_size / 10 ** DECIMALS_PER_ASSET[this.syntheticAsset];
     let margin = position.margin / 10 ** DECIMALS_PER_ASSET[COLLATERAL_TOKEN];
@@ -112,6 +114,9 @@ class Environemnt {
         count = 0;
 
         let position = this.user.positionData[this.syntheticAsset][0];
+
+        if (!position) return;
+
         let side = position.order_side == "Long" ? "Short" : "Long";
 
         let prevPositionHash = position.hash;
@@ -168,7 +173,7 @@ class Environemnt {
         await this.executeOrders();
         count++;
       }
-    }, 120_000);
+    }, 30_000);
 
     //
   }
