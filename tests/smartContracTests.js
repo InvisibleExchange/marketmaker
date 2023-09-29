@@ -147,8 +147,6 @@ async function delegatedWithdrawal() {
   const _approvedProxy =
     "0x942Ef51016ddc0CFee3bBbcd42D8FBCc8c7d87F6".toLowerCase();
 
-  let abiEncoder = new ethers.utils.AbiCoder();
-
   // * ERC20 SIGNATURE --------------------------------
   const ercProxyFee = 10000000000000000000n;
   const messageHashErc = ethers.utils.solidityKeccak256(
