@@ -247,8 +247,20 @@ async function sendDeposit(user, depositId, amount, token, pubKey) {
 
 // * ======================================================================
 
-async function sendWithdrawal(user, amount, token, starkKey) {
-  return await _sendWithdrawalInner(user, amount, token, starkKey);
+async function sendWithdrawal(
+  user,
+  withdrawalChainId,
+  amount,
+  token,
+  starkKey
+) {
+  return await _sendWithdrawalInner(
+    user,
+    withdrawalChainId,
+    amount,
+    token,
+    starkKey
+  );
 }
 
 // * ======================================================================
@@ -280,7 +292,7 @@ async function sendChangeMargin(
   amount,
   direction
 ) {
-  return await  _sendChangeMarginInner(
+  return await _sendChangeMarginInner(
     user,
     positionAddress,
     syntheticToken,

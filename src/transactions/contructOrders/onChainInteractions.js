@@ -38,15 +38,26 @@ async function _sendDepositInner(user, depositId, amount, token, pubKey) {
     });
 }
 
-async function _sendWithdrawalInner(user, amount, token, starkKey) {
-  if (!user || !amount || !token || !starkKey) {
+async function _sendWithdrawalInner(
+  user,
+  withdrawalChainId,
+  amount,
+  token,
+  starkKey
+) {
+  if (!user || !amount || !token || !withdrawalChainId || !starkKey) {
     throw new Error("Invalid input");
   }
 
   let tokenDecimals = DECIMALS_PER_ASSET[token];
   amount = amount * 10 ** tokenDecimals;
 
-  let withdrawal = user.makeWithdrawalOrder(amount, token, starkKey);
+  let withdrawal = user.makeWithdrawalOrder(
+    amount,
+    token,
+    starkKey,
+    withdrawalChainId
+  );
 
   await axios
     .post(`${EXPRESS_APP_URL}/execute_withdrawal`, withdrawal.toGrpcObject())

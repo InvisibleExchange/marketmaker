@@ -647,13 +647,14 @@ module.exports = class User {
 
   // ? ONCHAIN INTERACTIONS ============================================================
   makeDepositOrder(depositId, depositAmount, depositToken, starkKey) {
+    // TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     let depositStarkKey = this.getDepositStarkKey(depositToken);
     let privKey = this._getDepositStarkPrivKey(depositToken);
 
-    // TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // if (starkKey != depositStarkKey) {
     //   throw new Error("Unknown stark key");
     // }
+    // TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     let chainId = Number.parseInt(BigInt(depositId) / 2n ** 32n);
     if (!Object.values(CHAIN_IDS).includes(chainId)) {
@@ -681,7 +682,12 @@ module.exports = class User {
     return deposit;
   }
 
-  makeWithdrawalOrder(withdrawAmount, withdrawToken, withdrawStarkKey) {
+  makeWithdrawalOrder(
+    withdrawAmount,
+    withdrawToken,
+    withdrawStarkKey,
+    withdrawalChainId
+  ) {
     // ? Get the notesIn and priv keys for these notes
     let { notesIn, refundAmount } = this.getNotesInAndRefundAmount(
       withdrawToken,
@@ -707,10 +713,12 @@ module.exports = class User {
       notesIn,
       privKeys,
       refundNote,
-      withdrawStarkKey
+      withdrawStarkKey,
+      withdrawalChainId
     );
 
     let withdrawal = new Withdrawal(
+      withdrawalChainId,
       withdrawToken,
       withdrawAmount,
       withdrawStarkKey,

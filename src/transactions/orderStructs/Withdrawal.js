@@ -5,6 +5,7 @@ const { pedersen, computeHashOnElements } = require("../../helpers/pedersen");
 
 module.exports = class Withdrawal {
   constructor(
+    withdrawal_chain_id,
     withdrawal_token,
     withdrawal_amount,
     stark_key,
@@ -12,6 +13,7 @@ module.exports = class Withdrawal {
     refund_note,
     signature
   ) {
+    this.withdrawal_chain_id = withdrawal_chain_id;
     this.withdrawal_token = withdrawal_token;
     this.withdrawal_amount = withdrawal_amount;
     this.stark_key = stark_key;
@@ -22,6 +24,7 @@ module.exports = class Withdrawal {
 
   toGrpcObject() {
     return {
+      withdrawal_chain_id: this.withdrawal_chain_id,
       withdrawal_token: this.withdrawal_token.toString(),
       withdrawal_amount: this.withdrawal_amount.toString(),
       stark_key: this.stark_key.toString(),
@@ -34,12 +37,13 @@ module.exports = class Withdrawal {
     };
   }
 
-  static signWithdrawal(notes, pks, refund_note, starkKey) {
+  static signWithdrawal(notes, pks, refund_note, starkKey, chainId) {
     let hashes = notes.map((n) => n.hashNote());
     let refundNoteHash = refund_note.hashNote();
 
-    hashes.unshift(refundNoteHash);
-    hashes.unshift(starkKey);
+    hashes.push(refundNoteHash);
+    hashes.push(starkKey);
+    hashes.push(chainId);
 
     let withdrawal_hash = computeHashOnElements(hashes);
 
