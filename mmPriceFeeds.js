@@ -24,18 +24,18 @@ const MM_CONFIG = [
   },
 ];
 
-async function priceUpdate(PRICE_FEEDS, MM_CONFIG) {
+async function priceUpdate(PRICE_FEEDS, _MM_CONFIG) {
   // get a random number between 0 and 4
   let randIdx = Math.floor(Math.random() * 5);
 
   try {
-    _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, randIdx);
+    await _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, randIdx);
   } catch (_) {
     try {
-      _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, (randIdx + 2) % 5);
+      await _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, (randIdx + 2) % 5);
     } catch (_) {
       try {
-        _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, (randIdx + 4) % 5);
+        await _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, (randIdx + 4) % 5);
       } catch (error) {
         console.log("Error fetching prices:", error);
       }
@@ -53,7 +53,7 @@ async function _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, idx) {
   }
 }
 
-async function fetchCoinmarketCapPrices(PRICE_FEEDS) {
+async function fetchCoinmarketCapPrices(PRICE_FEEDS, MM_CONFIG) {
   let coinmarketcapIds = []; //BTC, ETH, SOL
 
   for (let config of MM_CONFIG) {
@@ -95,7 +95,7 @@ async function fetchCoinmarketCapPrices(PRICE_FEEDS) {
   // console.log("coinmarketcap", PRICE_FEEDS);
 }
 
-async function fetchCoinGeckoPrices(PRICE_FEEDS) {
+async function fetchCoinGeckoPrices(PRICE_FEEDS, MM_CONFIG) {
   let coingeckoIds = []; //BTC, ETH, SOL
 
   for (let config of MM_CONFIG) {
@@ -128,15 +128,17 @@ async function fetchCoinGeckoPrices(PRICE_FEEDS) {
   // console.log("coingecko", PRICE_FEEDS);
 }
 
-async function fetchCoinCapPrices(PRICE_FEEDS) {
+async function fetchCoinCapPrices(PRICE_FEEDS, MM_CONFIG) {
   const url = "https://api.coincap.io/v2/assets";
   const headers = {
     "Accept-Encoding": "gzip",
     Authorization: "Bearer " + process.env.CC_API_KEY.toString(),
     Accept: "application/json",
   };
+
+  const idsString = MM_CONFIG.map((config) => config.name).join(",");
   const params = {
-    ids: "bitcoin,ethereum,solana",
+    ids: idsString,
   };
 
   let response = await axios
@@ -155,8 +157,6 @@ async function fetchCoinCapPrices(PRICE_FEEDS) {
       price,
     };
   }
-
-  // console.log("coincap ", PRICE_FEEDS);
 }
 
 // fetchCoinmarketCapPrices({});
