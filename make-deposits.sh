@@ -1,25 +1,30 @@
 ## MAKE BTC DEPOSITS
-node ./mm-btc-usd/spotDeposit.js
-node ./mm-btc-usd/spotDeposit.js 
+cd ./mm-btc-usd
+node ./spotDeposit.js
+node ./spotDeposit.js 
 
-node ./mm-btc-usd/perpDeposit.js
-node ./mm-btc-usd/perpDeposit.js
+node ./perpDeposit.js
+node ./perpDeposit.js
+
+node ./orderTabUpdates.js 
 
 
 ## MAKE ETH DEPOSITS
-node ./mm-eth-usd/spotDeposit.js
-node ./mm-eth-usd/spotDeposit.js
+cd ../mm-eth-usd
 
-node ./mm-eth-usd/perpDeposit.js
-node ./mm-eth-usd/perpDeposit.js
+node ./spotDeposit.js
+node ./spotDeposit.js
+
+node ./perpDeposit.js
+node ./perpDeposit.js
+
+node ./orderTabUpdates.js 
 
 
 ## MAKE SOL DEPOSITS
-node ./mm-sol-usd/perpDeposit.js
-node ./mm-sol-usd/perpDeposit.js
+cd ../mm-sol-usd
 
-sleep 3
+node ./perpDeposit.js
+node ./perpDeposit.js
 
-## OPEN ORDER TABS
-node ./mm-btc-usd/orderTabUpdates.js 
-node ./mm-eth-usd/orderTabUpdates.js 
+

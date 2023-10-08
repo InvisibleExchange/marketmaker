@@ -37,11 +37,11 @@ let MM_CONFIG, activeMarkets;
 // How often do we refresh entire state (to prevent bugs and have a fresh version of the state)
 const REFRESH_PERIOD = 20_000_000; // 2 hour
 // How often do we send liquidity indications (orders that make the market)
-const LIQUIDITY_INDICATION_PERIOD = 30_000; // 5 seconds
+const LIQUIDITY_INDICATION_PERIOD = 5_000; // 5 seconds
 // Cancel all orders and send new ones
 const REFRESH_ORDERS_PERIOD = 300_000; // 5 minutes
 // How often do we check if any orders can be filled
-const FILL_ORDERS_PERIOD = 5_000; // 5 seconds
+const FILL_ORDERS_PERIOD = 3_000; // 5 seconds
 // How often do we update the price (less for testing)
 const PRICE_UPDATE_PERIOD = 30_000; // 5 seconds
 
