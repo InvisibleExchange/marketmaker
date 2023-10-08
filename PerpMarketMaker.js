@@ -1,7 +1,3 @@
-const fs = require("fs");
-const dotenv = require("dotenv");
-dotenv.config();
-
 const {
   SERVER_URL,
   COLLATERAL_TOKEN,
@@ -24,7 +20,7 @@ const {
   sendPerpOrder,
 } = require("./src/transactions/constructOrders");
 
-const { setupPriceFeeds } = require("./mmPriceFeeds");
+const { priceUpdate } = require("./mmPriceFeeds");
 const { trimHash } = require("./src/transactions//stateStructs/Notes");
 const { getSizeFromLeverage } = require("./src/helpers/tradePriceCalculations");
 
@@ -33,22 +29,21 @@ let client;
 
 const path = require("path");
 const { restoreUserState } = require("./src/helpers/keyRetrieval");
-const configPath = path.join(__dirname, "perp_config.json");
 
 let errorCounter = 0;
 
 let MM_CONFIG, activeMarkets;
 
-dotenv.config();
-
 // How often do we refresh entire state (to prevent bugs and have a fresh version of the state)
-const REFRESH_PERIOD = 10_800_000; // 1 hour
+const REFRESH_PERIOD = 20_000_000; // 2 hour
 // How often do we send liquidity indications (orders that make the market)
-const LIQUIDITY_INDICATION_PERIOD = 5_000; // 5 seconds
+const LIQUIDITY_INDICATION_PERIOD = 30_000; // 5 seconds
 // Cancel all orders and send new ones
-const REFRESH_ORDERS_PERIOD = 123_000; // 2 minutes
+const REFRESH_ORDERS_PERIOD = 300_000; // 5 minutes
 // How often do we check if any orders can be filled
-const FILL_ORDERS_PERIOD = 1_000; // 5 seconds
+const FILL_ORDERS_PERIOD = 5_000; // 5 seconds
+// How often do we update the price (less for testing)
+const PRICE_UPDATE_PERIOD = 30_000; // 5 seconds
 
 // Globals
 const PRICE_FEEDS = {};
@@ -111,9 +106,7 @@ async function sendFillRequest(otherOrder, otherSide, marketId) {
 
   let syntheticAsset = PERP_MARKET_IDS_2_TOKENS[marketId];
 
-  const midPrice = mmConfig.invert
-    ? 1 / PRICE_FEEDS[mmConfig.priceFeedPrimary]
-    : PRICE_FEEDS[mmConfig.priceFeedPrimary];
+  const midPrice = PRICE_FEEDS[mmConfig.symbol]?.price;
   if (!midPrice) return;
 
   const baseQuantity =
@@ -250,9 +243,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
       continue;
     }
 
-    const midPrice = mmConfig.invert
-      ? 1 / PRICE_FEEDS[mmConfig.priceFeedPrimary]
-      : PRICE_FEEDS[mmConfig.priceFeedPrimary];
+    const midPrice = PRICE_FEEDS[mmConfig.symbol]?.price;
     if (!midPrice) continue;
 
     // if (
@@ -625,9 +616,7 @@ function genQuote(baseAsset, side, baseQuantity) {
     throw new Error("badside");
   }
 
-  const primaryPrice = mmConfig.invert
-    ? 1 / PRICE_FEEDS[mmConfig.priceFeedPrimary]
-    : PRICE_FEEDS[mmConfig.priceFeedPrimary];
+  const primaryPrice = PRICE_FEEDS[mmConfig.symbol]?.price;
   if (!primaryPrice) throw new Error("badprice");
 
   const SPREAD = mmConfig.minSpread + baseQuantity * mmConfig.slippageRate;
@@ -649,35 +638,35 @@ function genQuote(baseAsset, side, baseQuantity) {
 }
 
 function validatePriceFeed(baseAsset) {
-  const mmConfig = MM_CONFIG.pairs[PERP_MARKET_IDS[baseAsset]];
+  // const mmConfig = MM_CONFIG.pairs[PERP_MARKET_IDS[baseAsset]];
 
-  const primaryPriceFeedId = mmConfig.priceFeedPrimary;
-  const secondaryPriceFeedId = mmConfig.priceFeedSecondary;
+  // const primaryPriceFeedId = mmConfig.priceFeedPrimary;
+  // const secondaryPriceFeedId = mmConfig.priceFeedSecondary;
 
-  // Constant mode checks
-  const [mode, price] = primaryPriceFeedId.split(":");
-  if (mode === "constant") {
-    if (price > 0) return true;
-    else throw new Error("No initPrice available");
-  }
+  // // Constant mode checks
+  // const [mode, price] = primaryPriceFeedId.split(":");
+  // if (mode === "constant") {
+  //   if (price > 0) return true;
+  //   else throw new Error("No initPrice available");
+  // }
 
-  // Check if primary price exists
-  const primaryPrice = PRICE_FEEDS[primaryPriceFeedId];
-  if (!primaryPrice) throw new Error("Primary price feed unavailable");
+  // // Check if primary price exists
+  // const primaryPrice = PRICE_FEEDS[primaryPriceFeedId];
+  // if (!primaryPrice) throw new Error("Primary price feed unavailable");
 
-  // If there is no secondary price feed, the price auto-validates
-  if (!secondaryPriceFeedId) return true;
+  // // If there is no secondary price feed, the price auto-validates
+  // if (!secondaryPriceFeedId) return true;
 
-  // Check if secondary price exists
-  const secondaryPrice = PRICE_FEEDS[secondaryPriceFeedId];
-  if (!secondaryPrice) throw new Error("Secondary price feed unavailable");
+  // // Check if secondary price exists
+  // const secondaryPrice = PRICE_FEEDS[secondaryPriceFeedId];
+  // if (!secondaryPrice) throw new Error("Secondary price feed unavailable");
 
-  // If the secondary price feed varies from the primary price feed by more than 1%, assume something is broken
-  const percentDiff = Math.abs(primaryPrice - secondaryPrice) / primaryPrice;
-  if (percentDiff > 0.03) {
-    console.error("Primary and secondary price feeds do not match!");
-    throw new Error("Circuit breaker triggered");
-  }
+  // // If the secondary price feed varies from the primary price feed by more than 1%, assume something is broken
+  // const percentDiff = Math.abs(primaryPrice - secondaryPrice) / primaryPrice;
+  // if (percentDiff > 0.03) {
+  //   console.error("Primary and secondary price feeds do not match!");
+  //   throw new Error("Circuit breaker triggered");
+  // }
 
   return true;
 }
@@ -687,7 +676,7 @@ const getPrice = (token) => {
     return 1;
   }
 
-  return PRICE_FEEDS[MM_CONFIG.pairs[PERP_MARKET_IDS[token]].priceFeedPrimary];
+  return PRICE_FEEDS[MM_CONFIG.pairs[PERP_MARKET_IDS[token]].symbol].price;
 };
 
 // * INITIALIZATION ==========================================================================================================
@@ -850,9 +839,7 @@ const initPositions = async () => {
       continue;
     }
 
-    const midPrice = mmConfig.invert
-      ? 1 / PRICE_FEEDS[mmConfig.priceFeedPrimary]
-      : PRICE_FEEDS[mmConfig.priceFeedPrimary];
+    const midPrice = PRICE_FEEDS[mmConfig.symbol]?.price;
     if (!midPrice) continue;
 
     if (!marketMaker.positionData[syntheticAsset]) {
@@ -897,7 +884,15 @@ async function run(config) {
     activeMarkets = config.activeMarkets;
 
     // Setup price feeds
-    await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
+    let priceFeedInterval;
+    try {
+      await priceUpdate(PRICE_FEEDS, MM_CONFIG);
+      priceFeedInterval = setInterval(async () => {
+        await priceUpdate(PRICE_FEEDS, MM_CONFIG);
+      }, PRICE_UPDATE_PERIOD);
+    } catch (error) {
+      console.log("Error setting up price feeds: ", error);
+    }
 
     // Setup the market maker
     await runWithTimeout(initAccountState, 30000);
@@ -927,7 +922,8 @@ async function run(config) {
         clearInterval(brodcastInterval);
         clearInterval(errorInterval);
         clearInterval(refreshInterval);
-        reject("Too many errors. Restarting...");
+        clearInterval(priceFeedInterval);
+        reject(Error("Too many errors. Restarting..."));
       }
 
       errorCounter = 0;
@@ -944,6 +940,7 @@ async function run(config) {
     clearInterval(brodcastInterval);
     clearInterval(errorInterval);
     clearInterval(refreshInterval);
+    clearInterval(priceFeedInterval);
 
     resolve();
   });

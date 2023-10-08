@@ -9,13 +9,13 @@ const SYMBOLS_TO_IDS = {
   BTC: 12345,
   ETH: 54321,
   USDC: 55555,
-  PEPE: 66666,
+  SOL: 66666,
 };
 const IDS_TO_SYMBOLS = {
   12345: "BTC",
   54321: "ETH",
   55555: "USDC",
-  66666: "PEPE",
+  66666: "SOL",
 };
 
 const CHAIN_IDS = {
@@ -25,29 +25,29 @@ const CHAIN_IDS = {
 };
 
 const DECIMALS_PER_ASSET = {
-  12345: 9, // BTC
-  54321: 9, // ETH
+  12345: 8, // BTC
+  54321: 8, // ETH
   55555: 6, // USDC
-  66666: 0, // PEPE
+  66666: 8, // SOL
 };
 
 const PRICE_DECIMALS_PER_ASSET = {
   12345: 6, // BTC
   54321: 6, // ETH
-  66666: 10, // PEPE
+  66666: 6, // SOL
 };
 
 const DUST_AMOUNT_PER_ASSET = {
-  12345: 2500, // BTC ~ 5c
-  54321: 25000, // ETH ~ 5c
-  55555: 50000, // USDC ~ 5c
-  66666: 50000, // PEPE ~ 5c
+  12345: 250, // BTC ~ 5c
+  54321: 2500, // ETH ~ 5c
+  55555: 50_000, // USDC ~ 5c
+  66666: 250_000, // SOL ~ 5c
 };
 
 const LEVERAGE_BOUNDS_PER_ASSET = {
   12345: [1.5, 30.0], // BTC
   54321: [15.0, 150.0], // ETH
-  66666: [1_000_000_000, 140_000_000_000.0], // PEPE
+  66666: [1000.0, 10000.0], // SOL
 };
 
 const LEVERAGE_DECIMALS = 4;

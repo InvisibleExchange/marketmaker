@@ -1,251 +1,168 @@
 const WebSocket = require("ws");
-const ethers = require("ethers");
-const fetch = require("node-fetch");
-const fs = require("fs");
-const { default: axios } = require("axios");
-const { setInterval } = require("timers/promises");
+// const fetch = require("node-fetch");
+const axios = require("axios");
 
-async function setupPriceFeeds(MM_CONFIG, PRICE_FEEDS) {
-  const cryptowatch = [],
-    cryptowatch2 = [];
-  for (let market in MM_CONFIG.pairs) {
-    const pairConfig = MM_CONFIG.pairs[market];
-    if (!pairConfig.active) {
-      continue;
-    }
+const path = require("path");
+const dotenv = require("dotenv");
+dotenv.config({ path: path.join(__dirname, "./.env") });
 
-    if (pairConfig.mode == "constant") {
-      const initPrice = pairConfig.initPrice;
-      pairConfig["priceFeedPrimary"] = "constant:" + initPrice.toString();
-    }
-    const primaryPriceFeed = pairConfig.priceFeedPrimary;
-    const secondaryPriceFeed = pairConfig.priceFeedSecondary;
+const MM_CONFIG = [
+  {
+    symbol: "BTC",
+    name: "bitcoin",
+    coinmarketcapId: 1,
+  },
+  {
+    symbol: "ETH",
+    name: "ethereum",
+    coinmarketcapId: 1027,
+  },
+  {
+    symbol: "SOL",
+    name: "solana",
+    coinmarketcapId: 5426,
+  },
+];
 
-    // parse keys to lower case to match later PRICE_FEED keys
-    if (primaryPriceFeed) {
-      MM_CONFIG.pairs[market].priceFeedPrimary = primaryPriceFeed.toLowerCase();
-    }
-    if (secondaryPriceFeed) {
-      MM_CONFIG.pairs[market].priceFeedSecondary =
-        secondaryPriceFeed.toLowerCase();
-    }
-    [primaryPriceFeed, secondaryPriceFeed].forEach((priceFeed) => {
-      if (!priceFeed) {
-        return;
-      }
-      const [provider, id] = priceFeed.split(":");
-      switch (provider.toLowerCase()) {
-        case "cryptowatch":
-          if (!cryptowatch.includes(id)) {
-            cryptowatch.push(id);
-          }
-          break;
-        case "cryptowatch2":
-          if (!cryptowatch2.includes(id)) {
-            cryptowatch2.push(id);
-          }
-
-          break;
-        case "constant":
-          PRICE_FEEDS["constant:" + id] = parseFloat(id);
-          break;
-        default:
-          throw new Error(
-            "Price feed provider " + provider + " is not available."
-          );
-      }
-    });
-  }
-  // if (chainlink.length > 0) await chainlinkSetup(chainlink, PRICE_FEEDS);
-  // if (uniswapV3.length > 0) await uniswapV3Setup(uniswapV3, PRICE_FEEDS);
+async function priceUpdate(PRICE_FEEDS, MM_CONFIG) {
+  // get a random number between 0 and 4
+  let randIdx = Math.floor(Math.random() * 5);
 
   try {
-    if (cryptowatch.length > 0) {
-      await cryptowatchWsSetup(cryptowatch, PRICE_FEEDS, MM_CONFIG);
+    _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, randIdx);
+  } catch (_) {
+    try {
+      _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, (randIdx + 2) % 5);
+    } catch (_) {
+      try {
+        _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, (randIdx + 4) % 5);
+      } catch (error) {
+        console.log("Error fetching prices:", error);
+      }
     }
-
-    if (cryptowatch2.length > 0) {
-      await cryptowatch2WsSetup(cryptowatch2, PRICE_FEEDS, MM_CONFIG);
-    }
-  } catch (error) {
-    console.log("error: ", error);
   }
 }
 
-let cryptowatch_ws;
-async function cryptowatchWsSetup(
-  cryptowatchMarketIds,
-  PRICE_FEEDS,
-  MM_CONFIG
-) {
-  if (cryptowatch_ws) {
-    cryptowatch_ws.close();
-    cryptowatch_ws = null;
+async function _priceUpdateInner(PRICE_FEEDS, MM_CONFIG, idx) {
+  if (idx === 0) {
+    await fetchCoinmarketCapPrices(PRICE_FEEDS, MM_CONFIG);
+  } else if (idx === 2) {
+    await fetchCoinGeckoPrices(PRICE_FEEDS, MM_CONFIG);
+  } else {
+    await fetchCoinCapPrices(PRICE_FEEDS, MM_CONFIG);
+  }
+}
 
-    return;
+async function fetchCoinmarketCapPrices(PRICE_FEEDS) {
+  let coinmarketcapIds = []; //BTC, ETH, SOL
+
+  for (let config of MM_CONFIG) {
+    coinmarketcapIds.push(config.coinmarketcapId);
   }
 
-  // Set initial prices
-  const cryptowatchApiKey =
-    process.env.CRYPTOWATCH_API_KEY || MM_CONFIG
-      ? MM_CONFIG.cryptowatchApiKey
-      : "";
-
-  let cryptowatchMarkets = [];
-  let cryptowatchMarketPrices = [];
-  try {
-    cryptowatchMarkets = await fetch(
-      "https://api.cryptowat.ch/markets?apikey=" + cryptowatchApiKey
-    )
-      .then((r) => r.json())
-      .catch((e) => {
-        console.log("error setting price feeds:", e);
-      });
-
-    cryptowatchMarketPrices = await fetch(
-      "https://api.cryptowat.ch/markets/prices?apikey=" + cryptowatchApiKey
-    )
-      .then((r) => r.json())
-      .catch((e) => {
-        console.log("error setting price feeds:", e);
-      });
-  } catch (error) {
-    console.error("Could not fetch cryptowatch markets");
-  }
-
-  for (let i in cryptowatchMarketIds) {
-    const cryptowatchMarketId = cryptowatchMarketIds[i];
-
-    try {
-      const cryptowatchMarket = cryptowatchMarkets.result.find(
-        (row) => row.id == cryptowatchMarketId
-      );
-
-      const exchange = cryptowatchMarket.exchange;
-      const pair = cryptowatchMarket.pair;
-      const key = `market:${exchange}:${pair}`;
-
-      PRICE_FEEDS["cryptowatch:" + cryptowatchMarketId] =
-        cryptowatchMarketPrices.result[key];
-    } catch (e) {
-      console.log(e);
-      console.log("cryptowatchMarketIds", cryptowatchMarketIds);
-      console.error(
-        "Could not set price feed for cryptowatch:" + cryptowatchMarketId
-      );
-    }
-  }
-
-  const subscriptionMsg = {
-    subscribe: {
-      subscriptions: [],
-    },
+  const url =
+    "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest";
+  const headers = {
+    "X-CMC_PRO_API_KEY": process.env.CMC_API_KEY.toString(),
+    Accept: "application/json",
   };
-  for (let i in cryptowatchMarketIds) {
-    const cryptowatchMarketId = cryptowatchMarketIds[i];
+  const params = {
+    id: coinmarketcapIds.join(","),
+    convert: "USD",
+  };
 
-    // first get initial price info
+  let response = await axios
+    .get(url, { headers, params })
+    .then((r) => r.data.data)
+    .catch((e) => console.log(e));
 
-    subscriptionMsg.subscribe.subscriptions.push({
-      streamSubscription: {
-        resource: `markets:${cryptowatchMarketId}:book:spread`,
-      },
-    });
+  for (let cmId of coinmarketcapIds) {
+    let assetRes = response[cmId];
+
+    let x = assetRes.quote.USD;
+
+    let price = Number(x.price);
+    let percentage = Number(x.percent_change_24h);
+    let absolute = Number(price * (percentage / 100));
+
+    PRICE_FEEDS[assetRes.symbol] = {
+      percentage,
+      absolute,
+      price,
+    };
   }
 
-  cryptowatch_ws = new WebSocket(
-    "wss://stream.cryptowat.ch/connect?apikey=" + cryptowatchApiKey
-  );
-
-  cryptowatch_ws.on("open", onopen);
-  cryptowatch_ws.on("message", onmessage);
-  cryptowatch_ws.on("close", onclose);
-  cryptowatch_ws.on("error", (err) => {
-    console.log("cryptowatch ws error", err);
-    cryptowatch_ws.close();
-  });
-
-  function onopen() {
-    cryptowatch_ws.send(JSON.stringify(subscriptionMsg));
-  }
-
-  function onmessage(data) {
-    const msg = JSON.parse(data);
-    if (!msg.marketUpdate) return;
-
-    const marketId = "cryptowatch:" + msg.marketUpdate.market.marketId;
-    let ask = msg.marketUpdate.orderBookSpreadUpdate.ask.priceStr;
-    let bid = msg.marketUpdate.orderBookSpreadUpdate.bid.priceStr;
-    let price = ask / 2 + bid / 2;
-    PRICE_FEEDS[marketId] = price;
-  }
-  function onclose() {
-    setTimeout(() => {
-      cryptowatchWsSetup(cryptowatchMarketIds, PRICE_FEEDS, MM_CONFIG);
-    }, 1000);
-  }
+  // console.log("coinmarketcap", PRICE_FEEDS);
 }
 
-let priceInterval;
-async function cryptowatch2WsSetup(
-  cryptowatchMarketIds,
-  PRICE_FEEDS,
-  MM_CONFIG
-) {
-  if (priceInterval) {
-    clearInterval(priceInterval);
+async function fetchCoinGeckoPrices(PRICE_FEEDS) {
+  let coingeckoIds = []; //BTC, ETH, SOL
 
-    return;
+  for (let config of MM_CONFIG) {
+    coingeckoIds.push(config.name);
   }
 
-  // Set initial prices
-  const cryptowatchApiKey =
-    process.env.CRYPTOWATCH_API_KEY || MM_CONFIG
-      ? MM_CONFIG.cryptowatchApiKey
-      : "";
+  let idString = coingeckoIds.join("%2C");
+  const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${idString}&order=market_cap_desc&locale=en`;
+  const headers = {
+    Accept: "application/json",
+  };
 
-  // ? start price update interval
-  await _fetchPrice(cryptowatchMarketIds, PRICE_FEEDS, cryptowatchApiKey);
-  priceInterval = setInterval(
-    async () =>
-      _fetchPrice(cryptowatchMarketIds, PRICE_FEEDS, cryptowatchApiKey),
-    1000
-  );
-}
+  let response = await axios
+    .get(url, { headers })
+    .then((r) => r.data)
+    .catch((e) => console.log(e));
 
-async function _fetchPrice(
-  cryptowatchMarketIds,
-  PRICE_FEEDS,
-  cryptowatchApiKey
-) {
-  for (let id of cryptowatchMarketIds) {
-    let [exchange, pair] = id.split("-");
+  for (let assetRes of response) {
+    let price = Number(assetRes.current_price);
+    let absolute = Number(assetRes.price_change_24h);
+    let percentage = Number(assetRes.price_change_percentage_24h);
 
-    let summary;
-    try {
-      summary = await axios
-        .get(
-          `https://api.cryptowat.ch/markets/${exchange}/${pair}/summary?apikey=` +
-            cryptowatchApiKey
-        )
-        .then((r) => r.data.result)
-        .catch((e) => console.log(e));
-    } catch (error) {
-      console.error("Could not fetch cryptowatch markets", error);
-    }
-
-    if (!summary) {
-      return;
-    }
-
-    // let [base, _] = config.symbol.split("/");
-
-    const marketId = "cryptowatch2:" + id;
-
-    PRICE_FEEDS[marketId] = summary.price.last;
+    PRICE_FEEDS[assetRes.symbol.toUpperCase()] = {
+      percentage,
+      absolute,
+      price,
+    };
   }
+
+  // console.log("coingecko", PRICE_FEEDS);
 }
+
+async function fetchCoinCapPrices(PRICE_FEEDS) {
+  const url = "https://api.coincap.io/v2/assets";
+  const headers = {
+    "Accept-Encoding": "gzip",
+    Authorization: "Bearer " + process.env.CC_API_KEY.toString(),
+    Accept: "application/json",
+  };
+  const params = {
+    ids: "bitcoin,ethereum,solana",
+  };
+
+  let response = await axios
+    .get(url, { headers, params })
+    .then((r) => r.data.data)
+    .catch((e) => console.log(e));
+
+  for (let assetRes of response) {
+    let price = Number(assetRes.priceUsd);
+    let percentage = Number(assetRes.changePercent24Hr);
+    let absolute = Number(price * (percentage / 100));
+
+    PRICE_FEEDS[assetRes.symbol.toUpperCase()] = {
+      percentage,
+      absolute,
+      price,
+    };
+  }
+
+  // console.log("coincap ", PRICE_FEEDS);
+}
+
+// fetchCoinmarketCapPrices({});
+// fetchCoinGeckoPrices({});
+// fetchCoinCapPrices({});
 
 module.exports = {
-  setupPriceFeeds,
+  priceUpdate,
 };

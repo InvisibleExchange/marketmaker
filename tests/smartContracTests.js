@@ -1,11 +1,17 @@
 // Test 1
 
 const { ethers, Wallet } = require("ethers");
-const { DECIMALS_PER_ASSET, CHAIN_IDS } = require("../src/helpers/utils");
+const {
+  DECIMALS_PER_ASSET,
+  CHAIN_IDS,
+  SPOT_MARKET_IDS_2_TOKENS,
+} = require("../src/helpers/utils");
 const {
   sendDeposit,
   sendSpotOrder,
   sendWithdrawal,
+  sendOpenOrderTab,
+  sendRegisterMm,
 } = require("../src/transactions/constructOrders");
 const User = require("../src/users/Invisibl3User");
 
@@ -177,7 +183,57 @@ async function delegatedWithdrawal() {
   console.log("erc signature: ", ethSig.v, ethSig.r, ethSig.s);
 }
 
+async function testOpenTab() {
+  let privKey = 1234n;
+  let user = User.fromPrivKey(privKey);
+
+  await user.login();
+
+  let marketId = "12";
+
+  let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+  let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
+
+  let baseAmount = user.getAvailableAmount(baseToken);
+  let quoteAmount = user.getAvailableAmount(quoteToken);
+
+  await sendOpenOrderTab(user, baseAmount, quoteAmount, marketId, 3600_000);
+
+  console.log(user.orderTabData[0]);
+}
+
+async function testRegisterMm() {
+  let privKey = 1234n;
+  let user = User.fromPrivKey(privKey);
+
+  await user.login();
+
+  let marketId = "12";
+
+  let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
+
+  let orderTab = user.orderTabData[baseToken][0];
+
+  let vlpToken = 1122334455;
+  let maxVlpSupply = 1_000_000;
+
+  console.log("orderTab before register", orderTab);
+
+  await sendRegisterMm(
+    user,
+    vlpToken,
+    maxVlpSupply,
+    orderTab.tab_header.pub_key,
+    false,
+    marketId
+  );
+
+  console.log("orderTab after register", orderTab);
+}
+
 // makeDeposits();
 // makeTestSwaps();
 // makeWithdrawal();
-delegatedWithdrawal();
+// delegatedWithdrawal();
+// testOpenTab();
+testRegisterMm();
