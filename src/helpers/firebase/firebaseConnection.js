@@ -34,21 +34,40 @@ const PRICE_DECIMALS_PER_ASSET = {
 
 /* global BigInt */
 
-// ---- NOTES ---- //
-async function fetchStoredNotes(address, blinding) {
-  // Address should be the x coordinate of the address in decimal format
-
+async function getAddressIndexes(address) {
   const querySnapshot = await getDocs(
-    collection(db, `notes/${address}/indexes`)
+    collection(db, `addr2idx/addresses/${address}`)
   );
 
   if (querySnapshot.empty) {
     return [];
   }
 
-  let notes = [];
+  let indexes = [];
   querySnapshot.forEach((doc) => {
-    let noteData = doc.data();
+    let index = doc.id;
+
+    indexes.push(index);
+  });
+
+  return indexes;
+}
+
+// ---- NOTES ---- //
+async function fetchStoredNotes(address, blinding) {
+  // Address should be the x coordinate of the address in decimal format
+
+  let indexes = await getAddressIndexes(address);
+
+  let notes = [];
+  for (let index of indexes) {
+    const noteDoc = await getDoc(doc(db, `notes`, index.toString()));
+
+    if (!noteDoc.exists()) {
+      continue;
+    }
+
+    let noteData = noteDoc.data();
 
     let addr = ec
       .keyFromPublic({
@@ -76,7 +95,7 @@ async function fetchStoredNotes(address, blinding) {
     );
 
     notes.push(note);
-  });
+  }
 
   return notes;
 }
@@ -84,61 +103,53 @@ async function fetchStoredNotes(address, blinding) {
 async function checkNoteExistance(address) {
   // Address should be the x coordinate of the address in decimal format
 
-  const querySnapshot = await getDocs(
-    collection(db, `notes/${address}/indexes`)
-  );
+  const indexes = await getAddressIndexes(address);
 
-  return !querySnapshot.empty;
+  return indexes && indexes.length > 0;
 }
 
 // ---- POSITIONS ---- //
 async function fetchStoredPosition(address) {
   // returns the position at this address from the db
 
-  const querySnapshot = await getDocs(
-    collection(db, `positions/${address}/indexes`)
-  );
-
-  if (querySnapshot.empty) {
-    return [];
-  }
+  let indexes = await getAddressIndexes(address);
 
   let positions = [];
-  querySnapshot.forEach((doc) => {
-    // let position = doc.data();
+  for (let index of indexes) {
+    const positionDoc = await getDoc(doc(db, `positions`, index.toString()));
 
-    let position = doc.data(); //PerpPosition.fromGrpcObject(doc.data());
+    if (!positionDoc.exists()) {
+      continue;
+    }
+
+    let position = positionDoc.data();
 
     positions.push(position);
-  });
+  }
 
   return positions;
-}
-
-async function checkPositionExistance(address) {
-  // Address should be the x coordinate of the address in decimal format
-
-  const querySnapshot = await getDocs(
-    collection(db, `positions/${address}/indexes`)
-  );
-
-  return !querySnapshot.empty;
 }
 
 async function fetchIndividualPosition(address, index) {
   // returns the position at this address from the db
 
-  const doc = await getDoc(
-    doc(db, `positions/${address}/indexes`, index.toString())
-  );
+  const positionData = await getDoc(doc(db, `positions/`, index.toString()));
 
-  if (!doc.exists()) {
+  if (!positionData.exists()) {
     return null;
   }
 
-  let position = doc.data(); //PerpPosition.fromGrpcObject(doc.data());
+  let position = positionData.data();
 
   return position;
+}
+
+async function checkPositionExistance(address) {
+  // Address should be the x coordinate of the address in decimal format
+
+  const indexes = await getAddressIndexes(address);
+
+  return indexes && indexes.length > 0;
 }
 
 async function getLiquidatablePositions(indexPrice, token) {
@@ -195,18 +206,17 @@ async function getLiquidatablePositions(indexPrice, token) {
 async function fetchStoredTabs(address, baseBlinding, quoteBlinding) {
   // Address should be the x coordinate of the address in decimal format
 
-  const querySnapshot = await getDocs(
-    collection(db, `order_tabs/${address}/indexes`)
-  );
-
-  if (querySnapshot.empty) {
-    return [];
-  }
+  let indexes = await getAddressIndexes(address);
 
   let orderTabs = [];
+  for (let index of indexes) {
+    const tabDoc = await getDoc(doc(db, `order_tabs`, index.toString()));
 
-  querySnapshot.forEach((doc) => {
-    let tabData = doc.data();
+    if (!tabDoc.exists()) {
+      continue;
+    }
+
+    let tabData = tabDoc.data();
 
     let base_hash8 = trimHash(baseBlinding, 64);
     let baseAmount = Number.parseInt(
@@ -267,7 +277,7 @@ async function fetchStoredTabs(address, baseBlinding, quoteBlinding) {
     );
 
     orderTabs.push(orderTab);
-  });
+  }
 
   return orderTabs;
 }
@@ -275,11 +285,9 @@ async function fetchStoredTabs(address, baseBlinding, quoteBlinding) {
 async function checkOrderTabExistance(address) {
   // Address should be the x coordinate of the address in decimal format
 
-  const querySnapshot = await getDocs(
-    collection(db, `order_tabs/${address}/indexes`)
-  );
+  let indexes = await getAddressIndexes(address);
 
-  return !querySnapshot.empty;
+  return indexes && indexes.length > 0;
 }
 
 // ---- USER INFO ---- //

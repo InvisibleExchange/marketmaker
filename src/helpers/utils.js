@@ -5,55 +5,32 @@ const { Note, trimHash } = require("../transactions/stateStructs/Notes");
 const SERVER_URL = "localhost";
 // const SERVER_URL = "54.212.28.196";
 
-const SYMBOLS_TO_IDS = {
-  BTC: 12345,
-  ETH: 54321,
-  USDC: 55555,
-  SOL: 66666,
-};
-const IDS_TO_SYMBOLS = {
-  12345: "BTC",
-  54321: "ETH",
-  55555: "USDC",
-  66666: "SOL",
-};
+const EXCHANGE_CONFIG = require("../../exchange-config.json");
 
-const CHAIN_IDS = {
-  "ETH Mainnet": 9090909,
-  Starknet: 7878787,
-  ZkSync: 5656565,
-};
+const SYMBOLS_TO_IDS = EXCHANGE_CONFIG["SYMBOLS_TO_IDS"];
+const IDS_TO_SYMBOLS = EXCHANGE_CONFIG["IDS_TO_SYMBOLS"];
 
-const DECIMALS_PER_ASSET = {
-  12345: 8, // BTC
-  54321: 8, // ETH
-  55555: 6, // USDC
-  66666: 8, // SOL
-};
+const CHAIN_IDS = EXCHANGE_CONFIG["CHAIN_IDS"];
 
-const PRICE_DECIMALS_PER_ASSET = {
-  12345: 6, // BTC
-  54321: 6, // ETH
-  66666: 6, // SOL
-};
+const DECIMALS_PER_ASSET = EXCHANGE_CONFIG["DECIMALS_PER_ASSET"];
 
-const DUST_AMOUNT_PER_ASSET = {
-  12345: 250, // BTC ~ 5c
-  54321: 2500, // ETH ~ 5c
-  55555: 50_000, // USDC ~ 5c
-  66666: 250_000, // SOL ~ 5c
-};
+const PRICE_DECIMALS_PER_ASSET = EXCHANGE_CONFIG["PRICE_DECIMALS_PER_ASSET"];
 
-const LEVERAGE_BOUNDS_PER_ASSET = {
-  12345: [1.5, 30.0], // BTC
-  54321: [15.0, 150.0], // ETH
-  66666: [1000.0, 10000.0], // SOL
-};
+const DUST_AMOUNT_PER_ASSET = EXCHANGE_CONFIG["DUST_AMOUNT_PER_ASSET"];
 
-const LEVERAGE_DECIMALS = 4;
-const COLLATERAL_TOKEN_DECIMALS = 6;
-const COLLATERAL_TOKEN = 55555;
-const MAX_LEVERAGE = 15;
+const LEVERAGE_DECIMALS = EXCHANGE_CONFIG["LEVERAGE_DECIMALS"];
+const COLLATERAL_TOKEN_DECIMALS = EXCHANGE_CONFIG["COLLATERAL_TOKEN_DECIMALS"];
+const COLLATERAL_TOKEN = EXCHANGE_CONFIG["COLLATERAL_TOKEN"];
+
+const MAX_LEVERAGE = EXCHANGE_CONFIG["MAX_LEVERAGE"];
+
+const SPOT_MARKET_IDS = EXCHANGE_CONFIG["SPOT_MARKET_IDS"];
+
+const PERP_MARKET_IDS = EXCHANGE_CONFIG["PERP_MARKET_IDS"];
+
+const SPOT_MARKET_IDS_2_TOKENS = EXCHANGE_CONFIG["SPOT_MARKET_IDS_2_TOKENS"];
+
+const PERP_MARKET_IDS_2_TOKENS = EXCHANGE_CONFIG["PERP_MARKET_IDS_2_TOKENS"];
 
 const EXPRESS_APP_URL = `http://${SERVER_URL}:4000`;
 
@@ -73,32 +50,6 @@ function get_max_leverage(token, amount) {
 
   return maxLev;
 }
-
-/// Things we keep track of
-/// Index prices
-/// Orderbooks
-
-const SPOT_MARKET_IDS = {
-  12345: 11,
-  54321: 12,
-};
-
-const PERP_MARKET_IDS = {
-  12345: 21,
-  54321: 22,
-  66666: 23,
-};
-
-const SPOT_MARKET_IDS_2_TOKENS = {
-  11: { base: 12345, quote: 55555 },
-  12: { base: 54321, quote: 55555 },
-};
-
-const PERP_MARKET_IDS_2_TOKENS = {
-  21: 12345,
-  22: 54321,
-  23: 66666,
-};
 
 /**
  * gets the order book entries for a given market

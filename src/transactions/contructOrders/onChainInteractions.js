@@ -13,7 +13,7 @@ async function _sendDepositInner(user, depositId, amount, token, pubKey) {
   }
 
   let tokenDecimals = DECIMALS_PER_ASSET[token];
-  amount = amount * 10 ** tokenDecimals;
+  amount = Number.parseInt(amount * 10 ** tokenDecimals);
 
   let deposit = user.makeDepositOrder(depositId, amount, token, pubKey);
 
@@ -50,7 +50,7 @@ async function _sendWithdrawalInner(
   }
 
   let tokenDecimals = DECIMALS_PER_ASSET[token];
-  amount = amount * 10 ** tokenDecimals;
+  amount = Number.parseInt(amount * 10 ** tokenDecimals);
 
   let withdrawal = user.makeWithdrawalOrder(
     amount,

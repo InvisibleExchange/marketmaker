@@ -13,7 +13,7 @@ const {
   sendPerpOrder,
 } = require("../src/transactions/constructOrders");
 const User = require("../src/users/Invisibl3User");
-const { setupPriceFeeds } = require("../mmPriceFeeds");
+const { setupPriceFeeds, priceUpdate } = require("../mmPriceFeeds");
 
 const path = require("path");
 
@@ -28,21 +28,26 @@ async function main() {
   await user.login();
 
   // Setup price feeds
-  await setupPriceFeeds(MM_CONFIG, PRICE_FEEDS);
+  try {
+    await priceUpdate(PRICE_FEEDS, MM_CONFIG);
+    setInterval(async () => {
+      await priceUpdate(PRICE_FEEDS, MM_CONFIG);
+    }, 10_000);
+  } catch (error) {
+    console.log("Error setting up price feeds: ", error);
+  }
 
   // console.log("available_amount: ", user.positionData);
-  console.log("available_amount: ", user.getAvailableAmount(55555));
+  // console.log("available_amount: ", user.getAvailableAmount(55555));
 
   setInterval(async () => {
     for (let pair of Object.values(MM_CONFIG.pairs)) {
-      // let midPrice = pair.invert
-      //   ? 1 / PRICE_FEEDS[pair.priceFeedPrimary]
-      //   : PRICE_FEEDS[pair.priceFeedPrimary];
-      // if (!midPrice) continue;
-
       let token = SYMBOLS_TO_IDS[pair.symbol.split("-")[0]];
 
-      let midPrice = 35600.5;
+      const midPrice = PRICE_FEEDS[pair.symbol]?.price;
+      if (!midPrice) continue;
+
+      console.log("midPrice: ", midPrice);
 
       let positions;
       try {
