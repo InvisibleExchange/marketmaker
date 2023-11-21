@@ -12,7 +12,7 @@ const {
   PERP_MARKET_IDS_2_TOKENS,
 } = require("./src/helpers/utils");
 
-const User = require("./src/users/Invisibl3User");
+const UserState = require("./src/users/Invisibl3User");
 
 const {
   sendAmendOrder,
@@ -785,7 +785,7 @@ const listenToWebSocket = () => {
 
 const initAccountState = async () => {
   try {
-    let user_ = User.fromPrivKey(MM_CONFIG.privKey);
+    let user_ = UserState.fromPrivKey(MM_CONFIG.privKey);
     let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
 
     let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =

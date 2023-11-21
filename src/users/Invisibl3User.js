@@ -59,6 +59,7 @@ const {
   getUserState,
   initDb,
 } = require("../helpers/localStorage");
+const { restoreUserState } = require("../helpers/keyRetrieval.js");
 
 /* global BigInt */
 
@@ -77,7 +78,7 @@ const SPEND_KEY_MASK =
 // TODO: Make a function that calculates the aproximate amount of margin left for position based on entry and OB price
 // TODO: A function that calculates the max leverage for a token and amount
 
-module.exports = class User {
+module.exports = class UserState {
   // Each user has a class where he stores all his information (should never be shared with anyone)
   // private keys should be 240 bits
   constructor(_privViewKey, _privSpendKey) {
@@ -165,10 +166,13 @@ module.exports = class User {
         ? userData.privKeys.map((pk) => getKeyPair(pk))
         : [];
 
-    let { emptyPrivKeys, noteData, notePrivKeys } = await fetchNoteData(
+    let { emptyPrivKeys, noteData, notePrivKeys, error } = await fetchNoteData(
       keyPairs,
       this.privateSeed
     );
+    if (error) {
+      restoreUserState(this, true, false).catch(console.log);
+    }
 
     // ? Get Position Data ============================================
     let addressData =
@@ -178,8 +182,15 @@ module.exports = class User {
           })
         : [];
 
-    let { emptyPositionPrivKeys, positionData, posPrivKeys } =
-      await fetchPositionData(addressData);
+    let {
+      emptyPositionPrivKeys,
+      positionData,
+      posPrivKeys,
+      error: error2,
+    } = await fetchPositionData(addressData);
+    if (error2) {
+      restoreUserState(this, false, true).catch(console.log);
+    }
 
     // ? Get Position Data ============================================
     let tabPkData =

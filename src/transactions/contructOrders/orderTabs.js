@@ -27,6 +27,8 @@ async function _sendOpenOrderTabInner(user, baseAmount, quoteAmount, marketId) {
         if (!user.orderTabData[baseToken]) user.orderTabData[baseToken] = [];
 
         user.orderTabData[baseToken].push(grpcMessage.order_tab);
+
+        return grpcMessage.order_tab;
       } else {
         let msg =
           "Failed to submit order with error: \n" +

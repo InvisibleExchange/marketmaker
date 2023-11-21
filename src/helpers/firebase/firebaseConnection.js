@@ -11,7 +11,7 @@ const {
   query,
   orderBy,
   limit,
-} = require("firebase/firestore/lite");
+} = require("firebase/firestore");
 const bigInt = require("big-integer");
 
 const { Note, trimHash } = require("../../transactions/stateStructs/Notes.js");
@@ -29,8 +29,6 @@ const PRICE_DECIMALS_PER_ASSET = {
   12345: 6, // BTC
   54321: 6, // ETH
 };
-
-// TODO: fetch deposit ids on login and remove them if they've been used
 
 /* global BigInt */
 

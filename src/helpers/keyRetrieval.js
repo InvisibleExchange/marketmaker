@@ -1,6 +1,10 @@
-const User = require("../users/Invisibl3User");
+const UserState = require("../users/Invisibl3User");
 
-const { IDS_TO_SYMBOLS, PRICE_DECIMALS_PER_ASSET } = require("./utils");
+const EXCHANGE_CONFIG = require("../../exchange-config.json");
+
+const PRICE_DECIMALS_PER_ASSET = EXCHANGE_CONFIG["PRICE_DECIMALS_PER_ASSET"];
+const IDS_TO_SYMBOLS = EXCHANGE_CONFIG["IDS_TO_SYMBOLS"];
+
 const {
   checkNoteExistance,
   checkPositionExistance,
@@ -12,7 +16,7 @@ const { storeUserState } = require("./localStorage");
 
 /**
  *
- * @param {User} user
+ * @param {UserState} user
  * @param {"note"|"position"|"order_tab"} type
  * @param {number[]} tokens
  */
@@ -80,7 +84,7 @@ async function restoreKeyData(
       }
 
       return positionPrivKeys;
-    case "order_tab":
+    case "order_tabs":
       let tabPrivKeys = {};
       for (let token of tokens) {
         if (!IDS_TO_SYMBOLS[token]) continue;
@@ -94,7 +98,7 @@ async function restoreKeyData(
           checkOrderTabExistance(tabAddress.getX().toString()).then(
             (keyExists) => {
               if (keyExists) {
-                tabPrivKeys[KoR.getX().toString()] = tabPrivKey;
+                tabPrivKeys[tabAddress.getX().toString()] = tabPrivKey;
               }
 
               counter++;
@@ -116,7 +120,7 @@ async function restoreKeyData(
 
 /**
  *
- * @param {User} user
+ * @param {UserState} user
  * @param {boolean} restoreNotes  - if true retrieve note keys
  * @param {boolean} restorePositions - if true retrieve position keys
  */

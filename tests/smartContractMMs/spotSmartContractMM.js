@@ -1,9 +1,9 @@
-const { makeDeposits, openOrderTab, _loginUser } = require("../helpers");
+const { makeDeposits, openOrderTab, _loginUser } = require("../../helpers");
 const {
   SPOT_MARKET_IDS_2_TOKENS,
   DECIMALS_PER_ASSET,
   COLLATERAL_TOKEN_DECIMALS,
-} = require("../src/helpers/utils");
+} = require("../../src/helpers/utils");
 const {
   sendRegisterMm,
   sendAddLiquidityUser,
@@ -11,7 +11,7 @@ const {
   sendOnChainRemoveLiquidityUser,
   sendOnChainRemoveLiquidityMM,
   sendPerpOrder,
-} = require("../src/transactions/constructOrders");
+} = require("../../src/transactions/constructOrders");
 
 //
 
@@ -148,7 +148,7 @@ async function main() {
   // await initOrderTab();
   // await registerMM();
   // await addLiquidity();
-  await removeLiquidity();
+  // await removeLiquidity();
 }
 
 main();

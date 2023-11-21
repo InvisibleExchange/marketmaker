@@ -2,6 +2,7 @@ const axios = require("axios");
 
 const { SERVER_URL, DECIMALS_PER_ASSET } = require("../../helpers/utils");
 const { handleDepositResponse } = require("../handleOrderResponses");
+const { restoreUserState } = require("../../helpers/keyRetrieval");
 
 const EXPRESS_APP_URL = `http://${SERVER_URL}:4000`; // process.env.EXPRESS_APP_URL;
 
@@ -30,7 +31,7 @@ async function _sendDepositInner(user, depositId, amount, token, pubKey) {
         console.log(msg);
 
         if (deposit_response.error_message.includes("Note does not exist")) {
-          // todo: restoreUserState(user, true, false);
+          restoreUserState(user, true, false);
         }
 
         throw new Error(msg);
@@ -79,7 +80,7 @@ async function _sendWithdrawalInner(
         console.log(msg);
 
         if (withdrawal_response.error_message.includes("Note does not exist")) {
-          // todo: restoreUserState(user, true, false);
+          restoreUserState(user, true, false);
         }
 
         throw new Error(msg);

@@ -271,8 +271,8 @@ async function sendWithdrawal(
  * @param token - token to restructure notes for
  * @param newAmounts - array of new amounts
  */
-async function sendSplitOrder(user, token, newAmount) {
-  return await _sendSplitOrderInner(user, token, newAmount);
+async function sendSplitOrder(user, token, newAmounts) {
+  return await _sendSplitOrderInner(user, token, newAmounts);
 }
 
 // * ======================================================================

@@ -15,7 +15,7 @@ const {
   sendDeposit,
   sendSplitOrder,
 } = require("../src/transactions/constructOrders");
-const User = require("../src/users/Invisibl3User");
+const UserState = require("../src/users/Invisibl3User");
 const { trimHash } = require("../src/transactions/stateStructs/Notes");
 
 //
@@ -264,7 +264,7 @@ const listenToWebSocket = (user) => {
 // * ================================================================================================
 
 const initAccountState = async (privKey, baseAsset, quoteAsset) => {
-  let user_ = User.fromPrivKey(privKey.toString(16));
+  let user_ = UserState.fromPrivKey(privKey.toString(16));
 
   let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
 

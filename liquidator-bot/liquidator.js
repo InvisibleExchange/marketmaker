@@ -47,8 +47,6 @@ async function main() {
       const midPrice = PRICE_FEEDS[pair.symbol]?.price;
       if (!midPrice) continue;
 
-      console.log("midPrice: ", midPrice);
-
       let positions;
       try {
         positions = await getLiquidatablePositions(midPrice, token);

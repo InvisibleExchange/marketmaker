@@ -1,5 +1,5 @@
 const axios = require("axios");
-const User = require("../users/Invisibl3User").default;
+const UserState = require("../users/Invisibl3User").default;
 const { Note, trimHash } = require("../transactions/stateStructs/Notes");
 
 const SERVER_URL = "localhost";
@@ -498,7 +498,7 @@ async function loginUser(signer) {
 
   let pk = keyDerivation.getPrivateKeyFromEthSignature(sig);
 
-  let user = User.fromPrivKey(pk);
+  let user = UserState.fromPrivKey(pk);
 
   let { emptyPrivKeys, emptyPositionPrivKeys, emptyTabPrivKeys } =
     await user.login();

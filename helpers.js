@@ -12,6 +12,7 @@ const {
   sendCloseOrderTab,
   sendModifyOrderTab,
 } = require("./src/transactions/constructOrders");
+const { restoreUserState } = require("./src/helpers/keyRetrieval");
 
 const SPOT_MARKET_IDS_2_TOKENS = {
   11: { base: 12345, quote: 55555 },

@@ -53,6 +53,9 @@ class PerpPosition {
   ) {
     // & hash = H({header_hash, order_side, position_size, entry_price, liquidation_price, current_funding_idx, vlp_supply})
 
+    if (typeof order_side === "string") {
+      order_side = order_side === "Long" ? 1n : 0n;
+    }
     let hashInputs = [
       header_hash,
       order_side,

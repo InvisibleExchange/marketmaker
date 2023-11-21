@@ -1,14 +1,11 @@
-const User = require("./src/users/Invisibl3User");
+const UserState = require("./src/users/Invisibl3User");
 
 const dotenv = require("dotenv");
 dotenv.config();
 
 const {
-  SERVER_URL,
   COLLATERAL_TOKEN,
-  COLLATERAL_TOKEN_DECIMALS,
   DECIMALS_PER_ASSET,
-  handleNoteSplit,
   SPOT_MARKET_IDS_2_TOKENS,
   SYMBOLS_TO_IDS,
   SPOT_MARKET_IDS,
@@ -782,7 +779,7 @@ const listenToWebSocket = () => {
 
 const initAccountState = async () => {
   try {
-    let user_ = User.fromPrivKey(MM_CONFIG.privKey);
+    let user_ = UserState.fromPrivKey(MM_CONFIG.privKey);
 
     let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
 
@@ -934,12 +931,6 @@ async function safeRun(config) {
     await safeRun(config);
   }
 }
-
-//
-//
-//
-//
-//
 
 const refreshOrders = async (fillInterval, brodcastInterval) => {
   clearInterval(fillInterval);

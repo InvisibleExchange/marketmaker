@@ -5,19 +5,19 @@ const {
   DECIMALS_PER_ASSET,
   CHAIN_IDS,
   SPOT_MARKET_IDS_2_TOKENS,
-} = require("../src/helpers/utils");
+} = require("../../src/helpers/utils");
 const {
   sendDeposit,
   sendSpotOrder,
   sendWithdrawal,
   sendOpenOrderTab,
   sendRegisterMm,
-} = require("../src/transactions/constructOrders");
-const User = require("../src/users/Invisibl3User");
+} = require("../../src/transactions/constructOrders");
+const UserState = require("../../src/users/Invisibl3User");
 
 async function makeDeposits() {
   let privKey = 1234n;
-  let user = User.fromPrivKey(privKey);
+  let user = UserState.fromPrivKey(privKey);
 
   await user.login();
 
@@ -56,7 +56,7 @@ async function makeDeposits() {
 
 async function makeTestSwaps() {
   let privKey = 1234n;
-  let user = User.fromPrivKey(privKey);
+  let user = UserState.fromPrivKey(privKey);
 
   await user.login();
 
@@ -109,7 +109,7 @@ async function makeTestSwaps() {
 
 async function makeWithdrawal() {
   let privKey = 1234n;
-  let user = User.fromPrivKey(privKey);
+  let user = UserState.fromPrivKey(privKey);
 
   await user.login();
 
@@ -185,7 +185,7 @@ async function delegatedWithdrawal() {
 
 async function testOpenTab() {
   let privKey = 1234n;
-  let user = User.fromPrivKey(privKey);
+  let user = UserState.fromPrivKey(privKey);
 
   await user.login();
 
@@ -204,7 +204,7 @@ async function testOpenTab() {
 
 async function testRegisterMm() {
   let privKey = 1234n;
-  let user = User.fromPrivKey(privKey);
+  let user = UserState.fromPrivKey(privKey);
 
   await user.login();
 
