@@ -1661,7 +1661,7 @@ module.exports = class UserState {
         240
       );
 
-      let user = new User(privViewKey, privSpendKey);
+      let user = new UserState(privViewKey, privSpendKey);
 
       return user;
     } catch (e) {

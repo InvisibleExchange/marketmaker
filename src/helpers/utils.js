@@ -123,7 +123,7 @@ function handleLiquidityUpdate(
   perpLiquidity,
   setPerpLiquidity
 ) {
-  for (let update of result.liquidity) {
+  for (let update of result.liquidity_updates) {
     let askQueue = update.ask_liquidity.map((item) => {
       return {
         price: item[0],
@@ -150,15 +150,14 @@ function handleLiquidityUpdate(
       let token = PERP_MARKET_IDS_2_TOKENS[update.market];
 
       perpLiquidity[token] = pairLiquidity;
+      setPerpLiquidity(perpLiquidity);
     } else {
       let token = SPOT_MARKET_IDS_2_TOKENS[update.market].base;
 
       liquidity[token] = pairLiquidity;
+      setLiquidity(liquidity);
     }
   }
-
-  setLiquidity(liquidity);
-  setPerpLiquidity(perpLiquidity);
 }
 
 /**
