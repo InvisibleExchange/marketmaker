@@ -1,8 +1,10 @@
-import { LiquidationOrder } from "../transactions/orderStructs/LiquidationOrder.js";
-import { pedersen, computeHashOnElements } from "../helpers/pedersen.js";
-import { sign, getKeyPair } from "starknet.js";
+const {
+  LiquidationOrder,
+} = require("../transactions/orderStructs/LiquidationOrder");
+const { pedersen, computeHashOnElements } = require("../helpers/pedersen");
+const { sign, getKeyPair } = require("starknet");
 
-import {
+const {
   _subaddressPrivKeys,
   _oneTimeAddressPrivKey,
   _hideValuesForRecipient,
@@ -13,28 +15,31 @@ import {
   signMarginChange,
   findNoteCombinations,
   fetchOrderTabData,
-} from "./Invisibl3UserUtils.js";
+} = require("./Invisibl3UserUtils");
 
-import { Note, trimHash } from "../transactions/stateStructs/Notes.js";
-import {
+const { Note, trimHash } = require("../transactions/stateStructs/Notes");
+const {
   LimitOrder,
   SpotNotesInfo,
-} from "../transactions/orderStructs/LimitOrder.js";
-import { TabHeader, OrderTab } from "../transactions/stateStructs/OrderTab.js";
+} = require("../transactions/orderStructs/LimitOrder");
+const {
+  TabHeader,
+  OrderTab,
+} = require("../transactions/stateStructs/OrderTab");
 
-import Deposit from "../transactions/orderStructs/Deposit.js";
-import {
+const Deposit = require("../transactions/orderStructs/Deposit");
+const {
   OpenOrderFields,
   CloseOrderFields,
   PerpOrder,
-} from "../transactions/orderStructs/PerpOrder.js";
-import Withdrawal from "../transactions/orderStructs/Withdrawal.js";
-import {
+} = require("../transactions/orderStructs/PerpOrder");
+const Withdrawal = require("../transactions/orderStructs/Withdrawal");
+const {
   storeUserState,
   getUserState,
   initDb,
-} from "../helpers/localStorage.js";
-import { restoreUserState } from "../helpers/keyRetrieval.js";
+} = require("../helpers/localStorage");
+const { restoreUserState } = require("../helpers/keyRetrieval");
 
 /* global BigInt */
 
@@ -1659,6 +1664,27 @@ module.exports = class UserState {
       console.log(e);
       throw Error("Enter a hexademical private key");
     }
+  }
+
+  static async loginUser(privKey_) {
+    let user = UserState.fromPrivKey(MM_CONFIG.privKey);
+
+    let { emptyPrivKeys, emptyPositionPrivKeys } = await user.login();
+
+    let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
+      await getActiveOrders(user.orderIds, user.perpetualOrderIds);
+
+    await user.handleActiveOrders(
+      badOrderIds,
+      orders,
+      badPerpOrderIds,
+      perpOrders,
+      pfrNotes,
+      emptyPrivKeys,
+      emptyPositionPrivKeys
+    );
+
+    return user;
   }
 
   static getkeyPairsFromPrivKeys(privKeys) {
