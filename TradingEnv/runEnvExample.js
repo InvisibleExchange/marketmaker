@@ -7,11 +7,11 @@ async function main() {
   let configPath = path.join(__dirname, "perp_config.json");
   let MM_CONFIG = loadMMConfig(configPath).MM_CONFIG;
 
-  let marketmaker = _loginUser({ MM_CONFIG });
+  let marketmaker = await _loginUser({ MM_CONFIG });
 
   let config = {
     SERVER_URL: "localhost",
-    RELAY_WS_URL: "localhost",
+    RELAY_WS_URL: `ws://localhost:4040`,
     CONFIG_CODE: 0,
     PERIODS: {
       REFRESH_PERIOD: 300_000,

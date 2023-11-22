@@ -23,6 +23,7 @@ function _listenToWebSocket(
   ACTIVE_ORDERS
 ) {
   let client;
+
   if (CONFIG_CODE && CONFIG_CODE != 0) {
     client = new W3CWebSocket(`ws://${SERVER_URL}:50053`);
 
@@ -37,7 +38,7 @@ function _listenToWebSocket(
       console.log("WebSocket Client Connected");
     };
   } else {
-    let client = new W3CWebSocket(RELAY_WS_URL);
+    client = new W3CWebSocket(RELAY_WS_URL);
 
     client.onopen = function () {
       console.log("WebSocket Client Connected");
@@ -85,6 +86,7 @@ async function _cancelLiquidity(marketId, marketmaker, isPerp) {
   if (isPerp) {
     let syntheticAsset = PERP_MARKET_IDS_2_TOKENS[marketId];
 
+    console.log(marketmaker);
     let promises = marketmaker.perpetualOrders
       .filter((ord) => ord.synthetic_token == syntheticAsset)
       .map((order) => {

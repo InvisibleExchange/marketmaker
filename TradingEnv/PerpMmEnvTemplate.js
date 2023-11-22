@@ -192,8 +192,8 @@ module.exports = class TradingEnvironment {
       this.SERVER_URL,
       this.RELAY_WS_URL,
       this.marketmaker,
-      this.liquidity,
-      this.setLiquidity,
+      null,
+      null,
       this.perpLiquidity,
       this.setPerpLiquidity,
       this.ACTIVE_ORDERS
