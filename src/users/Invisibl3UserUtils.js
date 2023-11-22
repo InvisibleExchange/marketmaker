@@ -123,7 +123,7 @@ async function fetchOrderTabData(addressData, privateSeed) {
       BigInt(privateSeed) + 2n
     );
 
-    fetchStoredTabs(addr, baseBlinding, quoteBlinding)
+    return fetchStoredTabs(addr, baseBlinding, quoteBlinding)
       .then((tabs) => {
         if (!tabs || tabs.length == 0) {
           emptyTabPrivKeys.push(privKey);

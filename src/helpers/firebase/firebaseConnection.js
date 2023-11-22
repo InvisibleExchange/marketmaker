@@ -204,7 +204,9 @@ async function getLiquidatablePositions(indexPrice, token) {
 async function fetchStoredTabs(address, baseBlinding, quoteBlinding) {
   // Address should be the x coordinate of the address in decimal format
 
-  let indexes = await getAddressIndexes(address);
+  let indexes = await getAddressIndexes(address).catch((e) => {
+    console.log(e);
+  });
 
   let orderTabs = [];
   for (let index of indexes) {

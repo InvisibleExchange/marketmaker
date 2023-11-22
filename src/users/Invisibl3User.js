@@ -1,12 +1,8 @@
-const {
-  LiquidationOrder,
-} = require("../transactions/orderStructs/LiquidationOrder");
+import { LiquidationOrder } from "../transactions/orderStructs/LiquidationOrder.js";
+import { pedersen, computeHashOnElements } from "../helpers/pedersen.js";
+import { sign, getKeyPair } from "starknet.js";
 
-const bigInt = require("big-integer");
-const { pedersen, computeHashOnElements } = require("../helpers/pedersen");
-const { sign, getKeyPair } = require("starknet").ec;
-
-const {
+import {
   _subaddressPrivKeys,
   _oneTimeAddressPrivKey,
   _hideValuesForRecipient,
@@ -17,7 +13,30 @@ const {
   signMarginChange,
   findNoteCombinations,
   fetchOrderTabData,
-} = require("./Invisibl3UserUtils.js");
+} from "./Invisibl3UserUtils.js";
+
+import { Note, trimHash } from "../transactions/stateStructs/Notes.js";
+import {
+  LimitOrder,
+  SpotNotesInfo,
+} from "../transactions/orderStructs/LimitOrder.js";
+import { TabHeader, OrderTab } from "../transactions/stateStructs/OrderTab.js";
+
+import Deposit from "../transactions/orderStructs/Deposit.js";
+import {
+  OpenOrderFields,
+  CloseOrderFields,
+  PerpOrder,
+} from "../transactions/orderStructs/PerpOrder.js";
+import Withdrawal from "../transactions/orderStructs/Withdrawal.js";
+import {
+  storeUserState,
+  getUserState,
+  initDb,
+} from "../helpers/localStorage.js";
+import { restoreUserState } from "../helpers/keyRetrieval.js";
+
+/* global BigInt */
 
 const DUST_AMOUNT_PER_ASSET = {
   12345: 2500, // BTC ~ 5c
@@ -36,33 +55,6 @@ const CHAIN_IDS = {
   ZkSync: 5656565,
 };
 
-const { Note, trimHash } = require("../transactions/stateStructs/Notes.js");
-const {
-  LimitOrder,
-
-  SpotNotesInfo,
-} = require("../transactions/orderStructs/LimitOrder");
-const {
-  TabHeader,
-  OrderTab,
-} = require("../transactions/stateStructs/OrderTab");
-
-const Deposit = require("../transactions/orderStructs/Deposit");
-const {
-  OpenOrderFields,
-  CloseOrderFields,
-  PerpOrder,
-} = require("../transactions/orderStructs/PerpOrder");
-const Withdrawal = require("../transactions/orderStructs/Withdrawal");
-const {
-  storeUserState,
-  getUserState,
-  initDb,
-} = require("../helpers/localStorage");
-const { restoreUserState } = require("../helpers/keyRetrieval.js");
-
-/* global BigInt */
-
 const USER_ID_MASK =
   172815432917432758348972343289652348293569370432238525823094893243n;
 const PRIVATE_SEED_MASK =
@@ -77,7 +69,6 @@ const SPEND_KEY_MASK =
 // TODOS !!!!!!!!!!!!!!!!!!!!!!!!!!!
 // TODO: Make a function that calculates the aproximate amount of margin left for position based on entry and OB price
 // TODO: A function that calculates the max leverage for a token and amount
-
 module.exports = class UserState {
   // Each user has a class where he stores all his information (should never be shared with anyone)
   // private keys should be 240 bits
@@ -1661,7 +1652,7 @@ module.exports = class UserState {
         240
       );
 
-      let user = new User(privViewKey, privSpendKey);
+      let user = new UserState(privViewKey, privSpendKey);
 
       return user;
     } catch (e) {
