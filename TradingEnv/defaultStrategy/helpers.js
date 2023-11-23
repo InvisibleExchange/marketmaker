@@ -11,8 +11,7 @@ const {
 //
 
 function isOrderFillable(order, side, baseAsset, MM_CONFIG, PRICE_FEEDS) {
-  let marketId = PERP_MARKET_IDS[baseAsset];
-  const mmConfig = MM_CONFIG.pairs[marketId];
+  const mmConfig = MM_CONFIG.config;
   const mmSide = mmConfig.side ? mmConfig.side : "d";
   // if (!market) return { fillable: false, reason: "badmarket" };
   if (!mmConfig.active) return { fillable: false, reason: "inactivemarket" };
@@ -49,7 +48,7 @@ function genQuote(baseAsset, side, baseQuantity, MM_CONFIG, PRICE_FEEDS) {
   if (!["b", "s"].includes(side)) throw new Error("badside");
   if (baseQuantity <= 0) throw new Error("badquantity");
 
-  const mmConfig = MM_CONFIG.pairs[PERP_MARKET_IDS[baseAsset]];
+  const mmConfig = MM_CONFIG.config;
   const mmSide = mmConfig.side || "d";
   if (mmSide !== "d" && mmSide === side) {
     throw new Error("badside");
@@ -81,7 +80,7 @@ const getPrice = (token, MM_CONFIG, PRICE_FEEDS) => {
     return 1;
   }
 
-  return PRICE_FEEDS[MM_CONFIG.pairs[PERP_MARKET_IDS[token]].symbol].price;
+  return PRICE_FEEDS[MM_CONFIG.config.symbol].price;
 };
 
 module.exports = { isOrderFillable, genQuote, getPrice };

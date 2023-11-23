@@ -172,7 +172,6 @@ async function sendLiquidationOrder(
  * @param orderSide true-Bid, false-Ask
  * @param isPerp
  * @param marketId market id of the order
- * @param errorCounter
  * @param dontUpdateState -if cancelling a batch order you dont want to update the state
  */
 async function sendCancelOrder(
@@ -181,7 +180,6 @@ async function sendCancelOrder(
   orderSide,
   isPerp,
   marketId,
-  errorCounter,
   dontUpdateState = false
 ) {
   return await _sendCancelOrderInner(
@@ -190,7 +188,7 @@ async function sendCancelOrder(
     orderSide,
     isPerp,
     marketId,
-    errorCounter,
+    0,
     dontUpdateState
   );
 }
@@ -221,8 +219,7 @@ async function sendAmendOrder(
   newExpirationTime,
   tabAddress,
   match_only,
-  ACTIVE_ORDERS,
-  errorCounter
+  ACTIVE_ORDERS
 ) {
   return await _sendAmendOrderInner(
     user,
@@ -235,7 +232,7 @@ async function sendAmendOrder(
     tabAddress,
     match_only,
     ACTIVE_ORDERS,
-    errorCounter
+    0
   );
 }
 

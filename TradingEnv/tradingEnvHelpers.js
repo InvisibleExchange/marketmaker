@@ -48,8 +48,6 @@ function _listenToWebSocket(
   client.onmessage = function (e) {
     let msg = JSON.parse(e.data);
 
-    // TODO: see docs
-
     switch (msg.message_id) {
       case "LIQUIDITY_UPDATE":
         handleLiquidityUpdate(

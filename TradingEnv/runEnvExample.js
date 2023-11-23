@@ -4,10 +4,11 @@ const TradingEnvironment = require("./PerpMmEnvTemplate");
 const path = require("path");
 
 async function main() {
-  let configPath = path.join(__dirname, "perp_config.json");
+  let configPath = path.join(__dirname, "config.json");
   let MM_CONFIG = loadMMConfig(configPath).MM_CONFIG;
 
-  let marketmaker = await _loginUser({ MM_CONFIG });
+  let privKey = "0x1234";
+  let marketmaker = await _loginUser(privKey);
 
   let config = {
     SERVER_URL: "localhost",

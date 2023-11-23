@@ -7,9 +7,9 @@ const {
   fillOpenOrders,
   indicateLiquidity,
   initPositions,
-} = require("./utils/order");
+} = require("./defaultStrategy/order");
 
-const { priceUpdate } = require("./utils/mmPriceFeeds");
+const { priceUpdate } = require("./defaultStrategy/mmPriceFeeds");
 
 const { restoreUserState } = require("../src/helpers/keyRetrieval");
 

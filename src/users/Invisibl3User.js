@@ -1643,6 +1643,27 @@ module.exports = class UserState {
 
   //* TESTS =======================================================
 
+  static async loginUser(privKey_) {
+    let user = UserState.fromPrivKey(privKey_);
+
+    let { emptyPrivKeys, emptyPositionPrivKeys } = await user.login();
+
+    let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
+      await getActiveOrders(user.orderIds, user.perpetualOrderIds);
+
+    await user.handleActiveOrders(
+      badOrderIds,
+      orders,
+      badPerpOrderIds,
+      perpOrders,
+      pfrNotes,
+      emptyPrivKeys,
+      emptyPositionPrivKeys
+    );
+
+    return user;
+  }
+
   static fromPrivKey(privKey_) {
     privKey_ = privKey_.toString();
 

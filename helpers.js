@@ -119,10 +119,8 @@ async function modifyOrderTab(marketId, config) {
 
 // HELPERS  ===================================================================
 
-async function _loginUser(config) {
-  let MM_CONFIG = config.MM_CONFIG;
-
-  let marketMaker = User.fromPrivKey(MM_CONFIG.privKey);
+async function _loginUser(privKey) {
+  let marketMaker = User.fromPrivKey(privKey);
 
   let { emptyPrivKeys, emptyPositionPrivKeys } = await marketMaker.login();
 

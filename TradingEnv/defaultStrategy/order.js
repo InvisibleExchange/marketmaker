@@ -89,8 +89,8 @@ async function sendFillRequest(
   ACTIVE_ORDERS,
   errorCounter
 ) {
-  const mmConfig = MM_CONFIG.pairs[marketId];
-  if (!mmConfig || !mmConfig.active) return;
+  const mmConfig = MM_CONFIG.config;
+  if (!mmConfig?.active) return;
 
   let syntheticAsset = PERP_MARKET_IDS_2_TOKENS[marketId];
 
@@ -223,8 +223,8 @@ async function indicateLiquidity(
   ACTIVE_ORDERS,
   errorCounter
 ) {
-  const mmConfig = MM_CONFIG.pairs[marketId];
-  if (!mmConfig || !mmConfig.active) return;
+  const mmConfig = MM_CONFIG.config;
+  if (!mmConfig?.active) return;
 
   let syntheticAsset = PERP_MARKET_IDS_2_TOKENS[marketId];
 
@@ -499,8 +499,8 @@ async function initPositions(
   ACTIVE_ORDERS,
   errorCounter
 ) {
-  const mmConfig = MM_CONFIG.pairs[marketId];
-  if (!mmConfig || !mmConfig.active) return;
+  const mmConfig = MM_CONFIG.config;
+  if (!mmConfig.active) return;
 
   let syntheticAsset = PERP_MARKET_IDS_2_TOKENS[marketId];
 
