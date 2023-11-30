@@ -4,12 +4,11 @@ const {
   PERP_MARKET_IDS_2_TOKENS,
   handleLiquidityUpdate,
   handlePerpSwapResult,
-} = require("../src/helpers/utils");
-const { sendCancelOrder } = require("../src/transactions/constructOrders");
-const { trimHash } = require("../src/transactions/stateStructs/Notes");
+} = require("invisible-sdk/src/utils");
+const { sendCancelOrder } = require("invisible-sdk/src/transactions");
+const { trimHash } = require("invisible-sdk/src/transactions");
 
 let W3CWebSocket = require("websocket").w3cwebsocket;
-let client;
 
 function _listenToWebSocket(
   CONFIG_CODE,

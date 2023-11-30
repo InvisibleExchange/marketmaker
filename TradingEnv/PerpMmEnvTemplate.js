@@ -11,7 +11,7 @@ const {
 
 const { priceUpdate } = require("./defaultStrategy/mmPriceFeeds");
 
-const { restoreUserState } = require("../src/helpers/keyRetrieval");
+const { restoreUserState } = require("invisible-sdk/src/utils");
 
 // * =============================================================================================================
 
@@ -23,7 +23,7 @@ module.exports = class TradingEnvironment {
     this.CONFIG_CODE = config.CONFIG_CODE ? Number(config.CONFIG_CODE) : null;
     this.SERVER_URL = config.SERVER_URL;
     this.RELAY_WS_URL = config.RELAY_WS_URL;
-    this.marketId = Number(config.MARKET_ID);
+    this.marketId = Number(config.marketId);
     this.PERIODS = config.PERIODS;
     this.MM_CONFIG = config.MM_CONFIG;
     // ! Globals
@@ -57,7 +57,8 @@ module.exports = class TradingEnvironment {
     // TODO: ===================================================
     //
     //
-    //
+
+    // ====================================================================
     // NOTE: AN EXAMPLE OF HOW TO USE THE MARKET MAKER ==================
 
     return new Promise(async (resolve, reject) => {
@@ -87,10 +88,17 @@ module.exports = class TradingEnvironment {
       );
 
       // Check for fillable orders
-      let fillInterval = setInterval(
-        fillOpenOrders,
-        this.PERIODS.FILL_ORDERS_PERIOD
-      );
+      let fillInterval = setInterval(async () => {
+        await fillOpenOrders(
+          this.marketId,
+          this.perpLiquidity,
+          this.marketmaker,
+          this.MM_CONFIG,
+          this.PRICE_FEEDS,
+          this.ACTIVE_ORDERS,
+          errorCounter
+        );
+      }, this.PERIODS.FILL_ORDERS_PERIOD);
 
       console.log("Starting market making: ", this.marketmaker.positionData);
 
@@ -229,7 +237,17 @@ module.exports = class TradingEnvironment {
       this.PERIODS.LIQUIDITY_INDICATION_PERIOD
     );
 
-    fillInterval = setInterval(fillOpenOrders, this.PERIODS.FILL_ORDERS_PERIOD);
+    fillInterval = setInterval(async () => {
+      await fillOpenOrders(
+        this.marketId,
+        this.perpLiquidity,
+        this.marketmaker,
+        this.MM_CONFIG,
+        this.PRICE_FEEDS,
+        this.ACTIVE_ORDERS,
+        errorCounter
+      );
+    }, this.PERIODS.FILL_ORDERS_PERIOD);
 
     return { fillInterval, brodcastInterval };
   }

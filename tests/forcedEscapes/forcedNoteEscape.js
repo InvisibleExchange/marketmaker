@@ -22,20 +22,16 @@ const SERVER_URL = "localhost:50052";
 let client = new engine.Engine(SERVER_URL, grpc.credentials.createInsecure());
 
 async function initMM() {
-  let config = {
-    MM_CONFIG: { privKey: 12124823957273895723878239580315125238950951n },
-  };
+  let privKey = 12124823957273895723878239580315125238950951n;
 
   //
-  await makeDeposits([55555, 54321], [2_000, 1], config);
+  await makeDeposits([55555, 54321], [2_000, 1], privKey);
 }
 
 async function tryInvalidNoteEscape() {
-  let config = {
-    MM_CONFIG: { privKey: 12124823957273895723878239580315125238950951n },
-  };
+  let privKey = 12124823957273895723878239580315125238950951n;
 
-  let marketMaker = await _loginUser(config);
+  let marketMaker = await _loginUser(privKey);
 
   // await restoreUserState(marketMaker, true, false);
 
@@ -75,11 +71,9 @@ async function tryInvalidNoteEscape() {
 }
 
 async function tryValidNoteEscape() {
-  let config = {
-    MM_CONFIG: { privKey: 12124823957273895723878239580315125238950951n },
-  };
+  let privKey = 12124823957273895723878239580315125238950951n;
 
-  let marketMaker = await _loginUser(config);
+  let marketMaker = await _loginUser(privKey);
 
   // await restoreUserState(marketMaker, true, false);
 
@@ -93,6 +87,8 @@ async function tryValidNoteEscape() {
     close_order_tab_req: null,
     close_position_message: null,
   };
+
+  console.log("escapeMessage", escapeMessage);
 
   client.execute_escape(escapeMessage, function (err, response) {
     if (err) {
@@ -109,8 +105,10 @@ async function tryValidNoteEscape() {
 
 async function main() {
   // await initMM();
+
   // await tryInvalidNoteEscape();
-  // await tryValidNoteEscape();
+
+  await tryValidNoteEscape();
 }
 
 main();

@@ -1,5 +1,5 @@
-const runMarketmaker  = require("../PerpMarketMaker");
-const { loadMMConfig } = require("../helpers");
+const runMarketmaker = require("../src/PerpMarketMaker");
+const { loadMMConfig } = require("../src/helpers");
 
 const path = require("path");
 

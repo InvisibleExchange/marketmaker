@@ -1,5 +1,5 @@
-const runMarketmaker = require("../SpotMarketMaker");
-const { loadMMConfig } = require("../helpers");
+const runMarketmaker = require("../src/SpotMarketMaker");
+const { loadMMConfig } = require("../src/helpers");
 
 const path = require("path");
 

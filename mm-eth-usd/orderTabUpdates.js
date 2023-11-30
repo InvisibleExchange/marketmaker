@@ -3,14 +3,14 @@ const {
   openOrderTab,
   modifyOrderTab,
   closeOrderTab,
-} = require("../helpers");
+} = require("../src/helpers");
 
 const path = require("path");
 
 async function runOpenOrderTab() {
   let configPath = path.join(__dirname, "spot_config.json");
 
-  let config = loadMMConfig(configPath);
+  let config = loadMMConfig(configPath).MM_CONFIG.privKey;
 
   let marketId = "12";
 
@@ -20,7 +20,7 @@ async function runOpenOrderTab() {
 async function runCloseOrderTab() {
   let configPath = path.join(__dirname, "spot_config.json");
 
-  let config = loadMMConfig(configPath);
+  let config = loadMMConfig(configPath).MM_CONFIG.privKey;
 
   let marketId = "12";
 
@@ -30,7 +30,7 @@ async function runCloseOrderTab() {
 async function runModifiyOrderTab() {
   let configPath = path.join(__dirname, "spot_config.json");
 
-  let config = loadMMConfig(configPath);
+  let config = loadMMConfig(configPath).MM_CONFIG.privKey;
 
   let marketId = "12";
 

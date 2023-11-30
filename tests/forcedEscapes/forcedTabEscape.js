@@ -37,22 +37,18 @@ const SERVER_URL = "localhost:50052";
 let client = new engine.Engine(SERVER_URL, grpc.credentials.createInsecure());
 
 async function initMM() {
-  let config = {
-    MM_CONFIG: { privKey: 12124823957273895723878239580315125238950951n },
-  };
+  let privKey = 12124823957273895723878239580315125238950951n;
 
   //
-  await makeDeposits([55555, 54321], [2_000, 1], config);
+  await makeDeposits([55555, 54321], [2_000, 1], privKey);
 }
 
 async function initOrderTab() {
-  let config = {
-    MM_CONFIG: { privKey: 12124823957273895723878239580315125238950951n },
-  };
+  let privKey = 12124823957273895723878239580315125238950951n;
 
   let marketId = "12";
 
-  await openOrderTab(marketId, config);
+  await openOrderTab(marketId, privKey);
 }
 
 async function tryInvalidTabEscape() {
@@ -88,11 +84,9 @@ async function tryInvalidTabEscape() {
 }
 
 async function tryValidTabEscape() {
-  let config = {
-    MM_CONFIG: { privKey: 12124823957273895723878239580315125238950951n },
-  };
+  let privKey = 12124823957273895723878239580315125238950951n;
 
-  let marketMaker = await _loginUser(config);
+  let marketMaker = await _loginUser(privKey);
 
   await restoreUserState(marketMaker, false, false, true);
 

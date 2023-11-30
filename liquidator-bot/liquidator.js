@@ -1,21 +1,19 @@
-const { loadMMConfig } = require("../helpers");
-const {
-  getLiquidatablePositions,
-} = require("../src/helpers/firebase/firebaseConnection");
+const { loadMMConfig } = require("../src/helpers");
+const { getLiquidatablePositions } = require("invisible-sdk/src/utils");
 const {
   SYMBOLS_TO_IDS,
   COLLATERAL_TOKEN,
   COLLATERAL_TOKEN_DECIMALS,
   DECIMALS_PER_ASSET,
-} = require("../src/helpers/utils");
+} = require("invisible-sdk/src/utils");
 const {
   sendLiquidationOrder,
   sendPerpOrder,
-} = require("../src/transactions/constructOrders");
-const User = require("../src/users/Invisibl3User");
-const { setupPriceFeeds, priceUpdate } = require("../mmPriceFeeds");
+} = require("invisible-sdk/src/transactions");
+const { setupPriceFeeds, priceUpdate } = require("../src/mmPriceFeeds");
 
 const path = require("path");
+const { UserState } = require("invisible-sdk/src/users");
 
 const PRICE_FEEDS = {};
 
@@ -24,7 +22,7 @@ async function main() {
 
   let MM_CONFIG = loadMMConfig(configPath).MM_CONFIG;
 
-  let user = User.fromPrivKey(MM_CONFIG.privKey);
+  let user = UserState.fromPrivKey(MM_CONFIG.privKey);
   await user.login();
 
   // Setup price feeds

@@ -1,34 +1,32 @@
 const {
-  SERVER_URL,
+  restoreUserState,
   COLLATERAL_TOKEN,
   COLLATERAL_TOKEN_DECIMALS,
   DECIMALS_PER_ASSET,
-  getActiveOrders,
   IDS_TO_SYMBOLS,
   handleLiquidityUpdate,
   handlePerpSwapResult,
   DUST_AMOUNT_PER_ASSET,
   PERP_MARKET_IDS,
   PERP_MARKET_IDS_2_TOKENS,
-} = require("./src/helpers/utils");
+} = require("invisible-sdk/src/utils");
 
-const UserState = require("./src/users/Invisibl3User");
+const { UserState } = require("invisible-sdk/src/users");
 
 const {
   sendAmendOrder,
   sendCancelOrder,
   sendPerpOrder,
-} = require("./src/transactions/constructOrders");
+} = require("invisible-sdk/src/transactions");
 
 const { priceUpdate } = require("./mmPriceFeeds");
-const { trimHash } = require("./src/transactions//stateStructs/Notes");
-const { getSizeFromLeverage } = require("./src/helpers/tradePriceCalculations");
+const { trimHash } = require("./helpers");
+const { getSizeFromLeverage } = require("./helpers");
 
 let W3CWebSocket = require("websocket").w3cwebsocket;
 let client;
 
 const path = require("path");
-const { restoreUserState } = require("./src/helpers/keyRetrieval");
 
 let errorCounter = 0;
 
@@ -785,21 +783,7 @@ const listenToWebSocket = () => {
 
 const initAccountState = async () => {
   try {
-    let user_ = UserState.fromPrivKey(MM_CONFIG.privKey);
-    let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
-
-    let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
-      await getActiveOrders(user_.orderIds, user_.perpetualOrderIds);
-
-    await user_.handleActiveOrders(
-      badOrderIds,
-      orders,
-      badPerpOrderIds,
-      perpOrders,
-      pfrNotes,
-      emptyPrivKeys,
-      emptyPositionPrivKeys
-    );
+    let user_ = await UserState.loginUser(MM_CONFIG.privKey);
 
     marketMaker = user_;
 
@@ -853,6 +837,8 @@ const initPositions = async () => {
 
       margin = margin / 10 ** COLLATERAL_TOKEN_DECIMALS;
 
+      let baseOpenAmount = 100.0 / midPrice;
+
       await sendPerpOrder(
         marketMaker,
         "Long",
@@ -860,8 +846,7 @@ const initPositions = async () => {
         "Open",
         null,
         syntheticAsset,
-        (DUST_AMOUNT_PER_ASSET[syntheticAsset] * 5) /
-          10 ** DECIMALS_PER_ASSET[syntheticAsset],
+        baseOpenAmount,
         midPrice,
         margin,
         0.07,

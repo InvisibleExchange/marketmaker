@@ -1,14 +1,25 @@
 const {
-  getSizeFromLeverage,
-} = require("../../src/helpers/tradePriceCalculations");
-const {
   COLLATERAL_TOKEN,
   COLLATERAL_TOKEN_DECIMALS,
   DECIMALS_PER_ASSET,
   DUST_AMOUNT_PER_ASSET,
   PERP_MARKET_IDS_2_TOKENS,
-} = require("../../src/helpers/utils");
+} = require("invisible-sdk/src/utils");
 const { getPrice, isOrderFillable } = require("./helpers");
+const {
+  sendPerpOrder,
+  sendAmendOrder,
+} = require("invisible-sdk/src/transactions");
+
+function getSizeFromLeverage(indexPrice, leverage, margin) {
+  if (indexPrice == 0) {
+    return 0;
+  }
+
+  const size = (Number(margin) * Number(leverage)) / Number(indexPrice);
+
+  return size;
+}
 
 async function fillOpenOrders(
   marketId,
@@ -100,8 +111,7 @@ async function sendFillRequest(
   const baseQuantity =
     otherOrder.amount / 10 ** DECIMALS_PER_ASSET[syntheticAsset];
 
-  let userState = marketmaker.userSate;
-  let position = userState.positionData[syntheticAsset][0];
+  let position = marketmaker.positionData[syntheticAsset][0];
 
   const margin = position.margin;
 
@@ -151,25 +161,24 @@ async function sendFillRequest(
     addableValue * getPrice(syntheticAsset, MM_CONFIG, PRICE_FEEDS) >= 10 &&
     unfilledUsdAmount >= 10
   ) {
-    marketmaker
-      .sendPerpOrder(
-        otherSide == "s" ? "Long" : "Short",
-        MM_CONFIG.EXPIRATION_TIME,
-        "Modify",
-        position.position_header.position_address,
-        syntheticAsset,
-        addableValue,
-        otherOrder.price,
-        null,
-        0.07,
-        0.01,
-        true,
-        ACTIVE_ORDERS
-      )
-      .catch((err) => {
-        // console.log("Error sending perp order: ", err);
-        errorCounter++;
-      });
+    sendPerpOrder(
+      marketmaker,
+      otherSide == "s" ? "Long" : "Short",
+      MM_CONFIG.EXPIRATION_TIME,
+      "Modify",
+      position.position_header.position_address,
+      syntheticAsset,
+      addableValue,
+      otherOrder.price,
+      null,
+      0.07,
+      0.01,
+      true,
+      ACTIVE_ORDERS
+    ).catch((err) => {
+      // console.log("Error sending perp order: ", err);
+      errorCounter++;
+    });
 
     unfilledAmount -= addableValue;
   }
@@ -190,24 +199,23 @@ async function sendFillRequest(
         return;
 
       // Send amend order
-      marketmaker
-        .sendAmendOrder(
-          order.id,
-          otherSide === "s" ? "Buy" : "Sell",
-          true, // isPerp,
-          marketId,
-          otherSide === "s"
-            ? otherOrder.price * (1 + 0.0001)
-            : otherOrder.price * (1 - 0.0001),
-          MM_CONFIG.EXPIRATION_TIME,
-          null,
-          true, // match_only
-          ACTIVE_ORDERS
-        )
-        .catch((err) => {
-          // console.log("Error amending order: ", err);
-          errorCounter++;
-        });
+      sendAmendOrder(
+        marketmaker,
+        order.id,
+        otherSide === "s" ? "Buy" : "Sell",
+        true, // isPerp,
+        marketId,
+        otherSide === "s"
+          ? otherOrder.price * (1 + 0.0001)
+          : otherOrder.price * (1 - 0.0001),
+        MM_CONFIG.EXPIRATION_TIME,
+        null,
+        true, // match_only
+        ACTIVE_ORDERS
+      ).catch((err) => {
+        // console.log("Error amending order: ", err);
+        errorCounter++;
+      });
 
       unfilledAmount -=
         order.syntheticAmount / 10 ** DECIMALS_PER_ASSET[syntheticAsset];
@@ -231,12 +239,11 @@ async function indicateLiquidity(
   const midPrice = PRICE_FEEDS[mmConfig.symbol]?.price;
   if (!midPrice) return;
 
-  let userState = marketmaker.userSate;
-  if (!userState.positionData[syntheticAsset]) return;
+  if (!marketmaker.positionData[syntheticAsset]) return;
 
   const side = mmConfig.side || "d";
 
-  let position = userState.positionData[syntheticAsset][0];
+  let position = marketmaker.positionData[syntheticAsset][0];
 
   const margin = position.margin;
 
@@ -298,7 +305,8 @@ async function indicateLiquidity(
         (1 - mmConfig.minSpread - (mmConfig.slippageRate * i) / numSplits);
 
       let orderId = activeOrdersCopy[i].id;
-      marketmaker.sendAmendOrder(
+      sendAmendOrder(
+        marketmaker,
         orderId,
         "Long",
         true, // isPerp,
@@ -327,25 +335,24 @@ async function indicateLiquidity(
         midPrice *
         (1 - mmConfig.minSpread - (mmConfig.slippageRate * i) / numSplits);
 
-      marketmaker
-        .sendPerpOrder(
-          "Long",
-          MM_CONFIG.EXPIRATION_TIME,
-          "Modify",
-          position.position_header.position_address,
-          syntheticAsset,
-          addableBuyValue / (numSplits - activeOrdersCopy.length),
-          buyPrice,
-          null,
-          0.07,
-          0,
-          false,
-          ACTIVE_ORDERS
-        )
-        .catch((err) => {
-          // console.log("Error sending perp order: ", err);
-          errorCounter++;
-        });
+      sendPerpOrder(
+        marketmaker,
+        "Long",
+        MM_CONFIG.EXPIRATION_TIME,
+        "Modify",
+        position.position_header.position_address,
+        syntheticAsset,
+        addableBuyValue / (numSplits - activeOrdersCopy.length),
+        buyPrice,
+        null,
+        0.07,
+        0,
+        false,
+        ACTIVE_ORDERS
+      ).catch((err) => {
+        // console.log("Error sending perp order: ", err);
+        errorCounter++;
+      });
     }
   }
 
@@ -362,7 +369,8 @@ async function indicateLiquidity(
         (1 + mmConfig.minSpread + (mmConfig.slippageRate * i) / numSplits);
 
       let orderId = activeOrdersCopy[i].id;
-      marketmaker.sendAmendOrder(
+      sendAmendOrder(
+        marketmaker,
         orderId,
         "Sell",
         true, //isPerp,
@@ -373,10 +381,6 @@ async function indicateLiquidity(
         false, // match_only
         ACTIVE_ORDERS
       );
-      // .catch((err) => {
-      //   // console.log("Error amending order: ", err);
-      //   errorCounter++;
-      // });
     }
 
     for (let i = activeOrdersCopy.length; i < numSplits; i++) {
@@ -391,25 +395,24 @@ async function indicateLiquidity(
         midPrice *
         (1 + mmConfig.minSpread + (mmConfig.slippageRate * i) / numSplits);
 
-      marketmaker
-        .sendPerpOrder(
-          "Short",
-          MM_CONFIG.EXPIRATION_TIME,
-          "Modify",
-          position.position_header.position_address,
-          syntheticAsset,
-          addableSellValue / (numSplits - activeOrdersCopy.length),
-          sellPrice,
-          null,
-          0.07,
-          0,
-          false,
-          ACTIVE_ORDERS
-        )
-        .catch((err) => {
-          // console.log("Error sending perp order: ", err);
-          errorCounter++;
-        });
+      sendPerpOrder(
+        marketmaker,
+        "Short",
+        MM_CONFIG.EXPIRATION_TIME,
+        "Modify",
+        position.position_header.position_address,
+        syntheticAsset,
+        addableSellValue / (numSplits - activeOrdersCopy.length),
+        sellPrice,
+        null,
+        0.07,
+        0,
+        false,
+        ACTIVE_ORDERS
+      ).catch((err) => {
+        // console.log("Error sending perp order: ", err);
+        errorCounter++;
+      });
     }
   }
 
@@ -507,36 +510,34 @@ async function initPositions(
   const midPrice = PRICE_FEEDS[mmConfig.symbol]?.price;
   if (!midPrice) return;
 
-  let userState = marketmaker.userSate;
-  if (!userState.positionData[syntheticAsset]) {
+  if (!marketmaker.positionData[syntheticAsset]) {
     // OPEN POSITION
 
-    let margin = userState.getAvailableAmount(COLLATERAL_TOKEN);
-
-    if (margin < DUST_AMOUNT_PER_ASSET[syntheticAsset]) return;
+    let margin = marketmaker.getAvailableAmount(COLLATERAL_TOKEN);
 
     margin = margin / 10 ** COLLATERAL_TOKEN_DECIMALS;
 
-    await marketmaker
-      .sendPerpOrder(
-        "Long",
-        MM_CONFIG.EXPIRATION_TIME,
-        "Open",
-        null,
-        syntheticAsset,
-        (DUST_AMOUNT_PER_ASSET[syntheticAsset] * 5) /
-          10 ** DECIMALS_PER_ASSET[syntheticAsset],
-        midPrice,
-        margin,
-        0.07,
-        5,
-        true,
-        ACTIVE_ORDERS
-      )
-      .catch((err) => {
-        console.log("Error sending perp order: ", err);
-        errorCounter++;
-      });
+    if (margin < 100) return;
+    let baseOpenAmount = 100.0 / midPrice;
+
+    await sendPerpOrder(
+      marketmaker,
+      "Long",
+      MM_CONFIG.EXPIRATION_TIME,
+      "Open",
+      null,
+      syntheticAsset,
+      baseOpenAmount,
+      midPrice,
+      margin,
+      0.07,
+      5,
+      true,
+      ACTIVE_ORDERS
+    ).catch((err) => {
+      console.log("Error sending perp order: ", err);
+      errorCounter++;
+    });
   }
 }
 

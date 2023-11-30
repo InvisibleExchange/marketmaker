@@ -9,14 +9,14 @@ const {
   DECIMALS_PER_ASSET,
   CHAIN_IDS,
   COLLATERAL_TOKEN,
-} = require("../src/helpers/utils");
+} = require("invisible-sdk/src/utils");
 const {
   sendSpotOrder,
   sendDeposit,
   sendSplitOrder,
-} = require("../src/transactions/constructOrders");
-const UserState = require("../src/users/Invisibl3User");
-const { trimHash } = require("../src/transactions/stateStructs/Notes");
+} = require("invisible-sdk/src/transactions");
+const { UserState } = require("invisible-sdk/src/users");
+const { trimHash } = require("../src/helpers");
 
 //
 
