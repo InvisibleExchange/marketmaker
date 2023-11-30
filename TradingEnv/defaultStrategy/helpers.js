@@ -1,14 +1,9 @@
 //
 
 const {
-  COLLATERAL_TOKEN,
   DECIMALS_PER_ASSET,
-  PERP_MARKET_IDS,
-} = require("../../src/helpers/utils");
-
-//
-
-//
+  COLLATERAL_TOKEN,
+} = require("invisible-sdk/src/utils");
 
 function isOrderFillable(order, side, baseAsset, MM_CONFIG, PRICE_FEEDS) {
   const mmConfig = MM_CONFIG.config;

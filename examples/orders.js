@@ -1,16 +1,15 @@
-const { _loginUser } = require("../helpers");
 const {
   SPOT_MARKET_IDS,
   SYMBOLS_TO_IDS,
   COLLATERAL_TOKEN,
-} = require("../src/helpers/utils");
+} = require("invisible-sdk/src/utils");
 const {
   sendSpotOrder,
   sendPerpOrder,
   sendCancelOrder,
   sendAmendOrder,
-} = require("../src/transactions/constructOrders");
-const UserState = require("../src/users/Invisibl3User");
+} = require("invisible-sdk/src/transactions");
+const UserState = require("invisible-sdk/src/users");
 
 async function spotOrder() {
   let privKey = "0x1234";

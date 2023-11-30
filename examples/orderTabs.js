@@ -1,26 +1,21 @@
-const {
-  getActiveOrders,
-  DECIMALS_PER_ASSET,
-  CHAIN_IDS,
-} = require("./src/helpers/utils");
+const { DECIMALS_PER_ASSET, CHAIN_IDS } = require("invisible-sdk/src/utils");
 
-const fs = require("fs");
-const User = require("./src/users/Invisibl3User");
 const {
   sendDeposit,
   sendOpenOrderTab,
   sendCloseOrderTab,
   sendModifyOrderTab,
-} = require("./src/transactions/constructOrders");
-const { restoreUserState } = require("./src/helpers/keyRetrieval");
+} = require("invisible-sdk/src/transactions");
 
 const SPOT_MARKET_IDS_2_TOKENS = {
   11: { base: 12345, quote: 55555 },
   12: { base: 54321, quote: 55555 },
 };
 
-async function makeDeposits(tokens, amounts, config) {
-  let marketMaker = await _loginUser(config);
+async function makeDeposits(tokens, amounts, privKey) {
+  let marketMaker = await UserState.loginUser(privKey);
+
+  // ! These are dummy deposits that won't work on mainnet
 
   for (let i = 0; i < tokens.length; i++) {
     let token = tokens[i];
@@ -34,8 +29,8 @@ async function makeDeposits(tokens, amounts, config) {
 }
 
 // ? OPEN ORDER TAB ===========================================================
-async function openOrderTab(marketId, config) {
-  let marketMaker = await _loginUser(config);
+async function openOrderTab(marketId, privKey) {
+  let marketMaker = await UserState.loginUser(privKey);
 
   let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
   let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
@@ -55,8 +50,8 @@ async function openOrderTab(marketId, config) {
 }
 
 // ? CLOSE ORDER TAB ===========================================================
-async function closeOrderTab(marketId, config) {
-  let marketMaker = await _loginUser(config);
+async function closeOrderTab(marketId, privKey) {
+  let marketMaker = await UserState.loginUser(privKey);
 
   let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
   let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
@@ -81,8 +76,8 @@ async function closeOrderTab(marketId, config) {
 }
 
 // ? MODIFY ORDER TAB ===========================================================
-async function modifyOrderTab(marketId, config) {
-  let marketMaker = await _loginUser(config);
+async function modifyOrderTab(marketId, privKey) {
+  let marketMaker = await UserState.loginUser(privKey);
 
   let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
   let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;
@@ -119,52 +114,9 @@ async function modifyOrderTab(marketId, config) {
 
 // HELPERS  ===================================================================
 
-async function _loginUser(privKey) {
-  let marketMaker = User.fromPrivKey(privKey);
-
-  let { emptyPrivKeys, emptyPositionPrivKeys } = await marketMaker.login();
-
-  let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
-    await getActiveOrders(marketMaker.orderIds, marketMaker.perpetualOrderIds);
-
-  await marketMaker.handleActiveOrders(
-    badOrderIds,
-    orders,
-    badPerpOrderIds,
-    perpOrders,
-    pfrNotes,
-    emptyPrivKeys,
-    emptyPositionPrivKeys
-  );
-
-  return marketMaker;
-}
-
-const loadMMConfig = (configPath) => {
-  // Load MM config
-  let MM_CONFIG;
-  if (process.env.MM_CONFIG) {
-    MM_CONFIG = JSON.parse(process.env.MM_CONFIG);
-  } else {
-    const mmConfigFile = fs.readFileSync(configPath, "utf8");
-    MM_CONFIG = JSON.parse(mmConfigFile);
-  }
-
-  let activeMarkets = [];
-  for (let marketId of Object.keys(MM_CONFIG.pairs)) {
-    if (MM_CONFIG.pairs[marketId].active) {
-      activeMarkets.push(marketId);
-    }
-  }
-
-  return { MM_CONFIG, activeMarkets };
-};
-
 module.exports = {
-  loadMMConfig,
   makeDeposits,
   openOrderTab,
   closeOrderTab,
   modifyOrderTab,
-  _loginUser,
 };
