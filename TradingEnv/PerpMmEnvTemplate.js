@@ -7,7 +7,7 @@ const {
   fillOpenOrders,
   indicateLiquidity,
   initPositions,
-} = require("./defaultStrategy/order");
+} = require("./defaultStrategy/perpOrders");
 
 const { priceUpdate } = require("./defaultStrategy/mmPriceFeeds");
 
@@ -18,7 +18,7 @@ const { restoreUserState } = require("invisible-sdk/src/utils");
 module.exports = class TradingEnvironment {
   constructor(marketmaker, config) {
     this.marketmaker = marketmaker;
-    this.isPerp = true;
+    this.isPerp = config.isPerp;
     // ! config
     this.CONFIG_CODE = config.CONFIG_CODE ? Number(config.CONFIG_CODE) : null;
     this.SERVER_URL = config.SERVER_URL;
@@ -32,11 +32,8 @@ module.exports = class TradingEnvironment {
     this.shouldRestoreState = false;
     this.restartCount = 0;
     // ! order book liquidity
-    // this.liquidity = {};
-    // this.setLiquidity = (liquidity) => (this.liquidity = liquidity);
     this.perpLiquidity = {};
-    this.setPerpLiquidity = (perpLiquidity) =>
-      (this.perpLiquidity = perpLiquidity);
+    this.setPerpLiquidity = (liquidity) => (this.perpLiquidity = liquidity);
 
     // ! Functions
     this.listenToWebSocket();
@@ -195,6 +192,8 @@ module.exports = class TradingEnvironment {
 
   // * Websocket connection
   listenToWebSocket = () => {
+    console.log(this.isPerp);
+
     _listenToWebSocket(
       this.CONFIG_CODE,
       this.SERVER_URL,

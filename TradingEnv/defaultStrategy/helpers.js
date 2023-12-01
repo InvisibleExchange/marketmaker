@@ -5,6 +5,9 @@ const {
   COLLATERAL_TOKEN,
 } = require("invisible-sdk/src/utils");
 
+/**
+ * Checks if the provided order is fillable based on marketmaker configuration and market conditions.
+ */
 function isOrderFillable(order, side, baseAsset, MM_CONFIG, PRICE_FEEDS) {
   const mmConfig = MM_CONFIG.config;
   const mmSide = mmConfig.side ? mmConfig.side : "d";
@@ -38,6 +41,9 @@ function isOrderFillable(order, side, baseAsset, MM_CONFIG, PRICE_FEEDS) {
   return { fillable: true, reason: null };
 }
 
+/**
+ * Generates a quote price and quantity based on marketmaker configuration and market conditions.
+ */
 function genQuote(baseAsset, side, baseQuantity, MM_CONFIG, PRICE_FEEDS) {
   if (!baseAsset) throw new Error("badmarket");
   if (!["b", "s"].includes(side)) throw new Error("badside");
