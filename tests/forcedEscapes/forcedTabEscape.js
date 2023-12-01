@@ -1,27 +1,12 @@
-const { makeDeposits, _loginUser, openOrderTab } = require("../../helpers");
-const { restoreUserState } = require("../../src/helpers/keyRetrieval");
-const { Note } = require("../../src/transactions/stateStructs/Notes");
-const { sign, getKeyPair } = require("starknet").ec;
+const { makeDeposits, openOrderTab } = require("../../src/helpers");
+const { restoreUserState } = require("invisible-sdk/src/utils");
 
 //
 
 const grpc = require("@grpc/grpc-js");
 const protoLoader = require("@grpc/proto-loader");
-const {
-  OrderTab,
-  TabHeader,
-} = require("../../src/transactions/stateStructs/OrderTab");
-const {
-  COLLATERAL_TOKEN_DECIMALS,
-  DUST_AMOUNT_PER_ASSET,
-  DECIMALS_PER_ASSET,
-  COLLATERAL_TOKEN,
-} = require("../../src/helpers/utils");
-const { sendPerpOrder } = require("../../src/transactions/constructOrders");
-const {
-  PositionHeader,
-  PerpPosition,
-} = require("../../src/transactions/stateStructs/PerpPosition");
+const { OrderTab, TabHeader } = require("invisible-sdk/src/transactions");
+const { UserState } = require("invisible-sdk/src/users");
 
 const packageDefinition = protoLoader.loadSync("../engine.proto", {
   keepCase: true,
@@ -37,14 +22,14 @@ const SERVER_URL = "localhost:50052";
 let client = new engine.Engine(SERVER_URL, grpc.credentials.createInsecure());
 
 async function initMM() {
-  let privKey = 12124823957273895723878239580315125238950951n;
+  let privKey = 1212482395727389572111221320315125238950951n;
 
   //
   await makeDeposits([55555, 54321], [2_000, 1], privKey);
 }
 
 async function initOrderTab() {
-  let privKey = 12124823957273895723878239580315125238950951n;
+  let privKey = 1212482395727389572111221320315125238950951n;
 
   let marketId = "12";
 
@@ -72,7 +57,7 @@ async function tryInvalidTabEscape() {
     close_position_message: null,
   };
 
-  client.execute_escape(escapeMessage, function (err, response) {
+  await client.execute_escape(escapeMessage, function (err, response) {
     if (err) {
       console.log(err);
     } else {
@@ -84,11 +69,11 @@ async function tryInvalidTabEscape() {
 }
 
 async function tryValidTabEscape() {
-  let privKey = 12124823957273895723878239580315125238950951n;
+  let privKey = 1212482395727389572111221320315125238950951n;
 
-  let marketMaker = await _loginUser(privKey);
+  let marketMaker = await UserState.loginUser(privKey);
 
-  await restoreUserState(marketMaker, false, false, true);
+  // await restoreUserState(marketMaker, false, false, true);
 
   let orderTab = marketMaker.orderTabData[54321][0];
 
@@ -100,7 +85,7 @@ async function tryValidTabEscape() {
     close_position_message: null,
   };
 
-  client.execute_escape(escapeMessage, function (err, response) {
+  await client.execute_escape(escapeMessage, function (err, response) {
     if (err) {
       console.log(err);
     } else {
@@ -112,13 +97,17 @@ async function tryValidTabEscape() {
 }
 
 async function main() {
-  // await initMM();
+  await initMM();
+  console.log("initMM done");
 
   // await initOrderTab();
+  // console.log("initOrderTab done");
 
   // await tryInvalidTabEscape();
+  // console.log("tryInvalidTabEscape done");
 
-  await tryValidTabEscape();
+  // await tryValidTabEscape();
+  // console.log("tryValidTabEscape done");
 }
 
 main();

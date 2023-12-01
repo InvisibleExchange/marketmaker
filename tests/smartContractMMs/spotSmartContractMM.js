@@ -1,9 +1,9 @@
-const { makeDeposits, openOrderTab, _loginUser } = require("../../helpers");
+const { makeDeposits, openOrderTab } = require("../../helpers");
 const {
   SPOT_MARKET_IDS_2_TOKENS,
   DECIMALS_PER_ASSET,
   COLLATERAL_TOKEN_DECIMALS,
-} = require("../../src/helpers/utils");
+} = require("invisible-sdk/src/helpers/utils");
 const {
   sendRegisterMm,
   sendAddLiquidityUser,
@@ -11,33 +11,28 @@ const {
   sendOnChainRemoveLiquidityUser,
   sendOnChainRemoveLiquidityMM,
   sendPerpOrder,
-} = require("../../src/transactions/constructOrders");
+} = require("invisible-sdk/src/transactions/constructOrders");
+const { UserState } = require("invisible-sdk/src/users");
 
 //
 
 async function initMM() {
-  let config = {
-    MM_CONFIG: { privKey: 1111n },
-  };
+  let privKey = 1111n;
 
   //
-  await makeDeposits([55555, 54321], [100_000, 50], config);
+  await makeDeposits([55555, 54321], [100_000, 50], privKey);
 }
 
 async function initOrderTab() {
-  let config = {
-    MM_CONFIG: { privKey: 1111n },
-  };
+  let privKey = 1111n;
 
-  await openOrderTab(12, config);
+  await openOrderTab(12, privKey);
 }
 
 async function registerMM() {
-  let config = {
-    MM_CONFIG: { privKey: 1111n },
-  };
+  let privKey = 1111n;
 
-  let marketMaker = await _loginUser(config);
+  let marketMaker = await UserState.loginUser(privKey);
 
   let baseToken = SPOT_MARKET_IDS_2_TOKENS[12].base;
   let orderTab = marketMaker.orderTabData[baseToken][0];
@@ -59,28 +54,24 @@ async function registerMM() {
 
 async function addLiquidity() {
   // ? MARKET MAKER
-  let mmConfig = {
-    MM_CONFIG: { privKey: 1111n },
-  };
-  let marketMaker = await _loginUser(mmConfig);
+  let privKey = 1111n;
+  let marketMaker = await UserState.loginUser(privKey);
 
   let baseToken = SPOT_MARKET_IDS_2_TOKENS[12].base;
   let orderTab = marketMaker.orderTabData[baseToken][0];
   console.log("orderTab before", orderTab);
 
   // ? USER
-  let userConfig = {
-    MM_CONFIG: { privKey: 1204328589235690189326590324128569235023415n },
-  };
+  privKey = 125346348693467598134534758394543n;
 
-  let user = await _loginUser(userConfig);
+  let user = await UserState.loginUser(privKey);
   if (
     user.getAvailableAmount(baseToken) == 0 ||
     user.getAvailableAmount(55555) == 0
   ) {
-    await makeDeposits([55555, baseToken], [10_000, 5], userConfig);
+    await makeDeposits([55555, baseToken], [10_000, 5], privKey);
 
-    user = await _loginUser(userConfig);
+    user = await UserState.loginUser(privKey);
   }
 
   console.log("user base amount", user.getAvailableAmount(baseToken));
@@ -108,20 +99,16 @@ async function addLiquidity() {
 }
 
 async function removeLiquidity() {
-  let config = {
-    MM_CONFIG: { privKey: 1111n },
-  };
-  let marketMaker = await _loginUser(config);
+  let privKey = 1111n;
+  let marketMaker = await UserState.loginUser(privKey);
 
   let baseToken = SPOT_MARKET_IDS_2_TOKENS[12].base;
   let orderTab = marketMaker.orderTabData[baseToken][0];
   console.log("orderTab before", orderTab);
 
   // ? USER
-  let userConfig = {
-    MM_CONFIG: { privKey: 1204328589235690189326590324128569235023415n },
-  };
-  let user = await _loginUser(userConfig);
+  privKey = 125346348693467598134534758394543n;
+  let user = await UserState.loginUser(privKey);
 
   let vlpToken = 13579;
 

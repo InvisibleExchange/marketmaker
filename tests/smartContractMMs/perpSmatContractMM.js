@@ -1,10 +1,10 @@
-const { makeDeposits, openOrderTab, _loginUser } = require("../../helpers");
+const { makeDeposits } = require("../../helpers");
+
+const { UserState } = require("invisible-sdk/src/users");
 const {
-  SPOT_MARKET_IDS_2_TOKENS,
-  DECIMALS_PER_ASSET,
   COLLATERAL_TOKEN_DECIMALS,
   PERP_MARKET_IDS_2_TOKENS,
-} = require("../../src/helpers/utils");
+} = require("invisible-sdk/src/helpers/utils");
 const {
   sendRegisterMm,
   sendAddLiquidityUser,
@@ -12,24 +12,20 @@ const {
   sendOnChainRemoveLiquidityUser,
   sendOnChainRemoveLiquidityMM,
   sendPerpOrder,
-} = require("../../src/transactions/constructOrders");
+} = require("invisible-sdk/src/transactions");
 
 //
 
 async function initMM() {
-  let config = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950951n },
-  };
+  let privKey = 101248239572738957238572395803135238950951n;
 
   //
-  await makeDeposits([55555], [20_000], config);
+  await makeDeposits([55555], [20_000], privKey);
 }
 
 async function initPosition() {
-  let config = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950951n },
-  };
-  let marketMaker = await _loginUser(config);
+  let privKey = 101248239572738957238572395803135238950951n;
+  let marketMaker = await UserState.loginUser(privKey);
 
   await sendPerpOrder(
     marketMaker,
@@ -49,11 +45,8 @@ async function initPosition() {
 }
 
 async function registerMM() {
-  let config = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950951n },
-  };
-
-  let marketMaker = await _loginUser(config);
+  let privKey = 101248239572738957238572395803135238950951n;
+  let marketMaker = await UserState.loginUser(privKey);
 
   let baseToken = PERP_MARKET_IDS_2_TOKENS[22];
   let position = marketMaker.positionData[baseToken][0];
@@ -75,27 +68,23 @@ async function registerMM() {
 
 async function addLiquidity() {
   // ? MARKET MAKER
-  let mmConfig = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950951n },
-  };
-  let marketMaker = await _loginUser(mmConfig);
+  let privKey = 101248239572738957238572395803135238950951n;
+  let marketMaker = await UserState.loginUser(privKey);
 
   let baseToken = PERP_MARKET_IDS_2_TOKENS[22];
   let position = marketMaker.positionData[baseToken][0];
   console.log("position before", position);
 
   // ? USER
-  let userConfig = {
-    MM_CONFIG: { privKey: 22222n },
-  };
+  privKey = 22222n;
 
   // await makeDeposits([55555], [5_000], userConfig);
 
-  let user = await _loginUser(userConfig);
+  let user = await UserState.loginUser(privKey);
   if (user.getAvailableAmount(55555) == 0) {
-    await makeDeposits([55555], [5_000], userConfig);
+    await makeDeposits([55555], [5_000], privKey);
 
-    user = await _loginUser(userConfig);
+    user = await UserState.loginUser(privKey);
   }
 
   console.log("user quote amount", user.getAvailableAmount(55555));
@@ -121,20 +110,16 @@ async function addLiquidity() {
 
 async function removeLiquidity() {
   // ? MARKET MAKER
-  let mmConfig = {
-    MM_CONFIG: { privKey: 101248239572738957238572395803135238950951n },
-  };
-  let marketMaker = await _loginUser(mmConfig);
+  let privKey = 101248239572738957238572395803135238950951n;
+  let marketMaker = await UserState.loginUser(privKey);
 
   let baseToken = PERP_MARKET_IDS_2_TOKENS[22];
   let position = marketMaker.positionData[baseToken][0];
   console.log("position before", position);
 
   // ? USER
-  let userConfig = {
-    MM_CONFIG: { privKey: 22222n },
-  };
-  let user = await _loginUser(userConfig);
+  privKey = 22222n;
+  let user = await UserState.loginUser(privKey);
 
   let vlpToken = 13579;
 

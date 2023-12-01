@@ -1,6 +1,5 @@
-const { makeDeposits, _loginUser, openOrderTab } = require("../../helpers");
-const { restoreUserState } = require("../../src/helpers/keyRetrieval");
-const { Note } = require("../../src/transactions/stateStructs/Notes");
+const { makeDeposits } = require("../../src/helpers");
+
 const { sign, getKeyPair } = require("starknet").ec;
 
 //
@@ -9,20 +8,18 @@ const grpc = require("@grpc/grpc-js");
 const protoLoader = require("@grpc/proto-loader");
 const {
   COLLATERAL_TOKEN_DECIMALS,
-  DUST_AMOUNT_PER_ASSET,
-  DECIMALS_PER_ASSET,
   COLLATERAL_TOKEN,
   PRICE_DECIMALS_PER_ASSET,
-} = require("../../src/helpers/utils");
-const { sendPerpOrder } = require("../../src/transactions/constructOrders");
+  computeHashOnElements,
+} = require("invisible-sdk/src/helpers/utils");
 const {
+  Note,
   PositionHeader,
   PerpPosition,
-} = require("../../src/transactions/stateStructs/PerpPosition");
-const {
   OpenOrderFields,
-} = require("../../src/transactions/orderStructs/PerpOrder");
-const { computeHashOnElements } = require("../../src/helpers/pedersen");
+  sendPerpOrder,
+} = require("invisible-sdk/src/transactions");
+const { UserState } = require("invisible-sdk/src/users");
 
 const packageDefinition = protoLoader.loadSync("../engine.proto", {
   keepCase: true,
@@ -54,7 +51,7 @@ async function initCounterparty() {
 async function initPosition() {
   let privKey = 1212482395727389572387823958031512523895023551n;
 
-  let marketMaker = await _loginUser(privKey);
+  let marketMaker = await UserState.loginUser(privKey);
 
   let syntheticAsset = 54321;
 
@@ -85,7 +82,7 @@ async function initPosition() {
 async function initPosition_b() {
   let privKey = 72835623577775623958723942389532489273523025n;
 
-  let counterParty = await _loginUser(privKey);
+  let counterParty = await UserState.loginUser(privKey);
 
   let syntheticAsset = 54321;
 
@@ -114,10 +111,10 @@ async function initPosition_b() {
 
 async function tryPositionEscape1() {
   let privKey = 1212482395727389572387823958031512523895023551n;
-  let marketMaker = await _loginUser(privKey);
+  let marketMaker = await UserState.loginUser(privKey);
 
   privKey = 72835623577775623958723942389532489273523025n;
-  let counterParty = await _loginUser(privKey);
+  let counterParty = await UserState.loginUser(privKey);
 
   //
   // ! - Does position_a exist?
@@ -271,10 +268,10 @@ async function tryPositionEscape1() {
 
 async function tryPositionEscape2() {
   let privKey = 1212482395727389572387823958031512523895023551n;
-  let marketMaker = await _loginUser(privKey);
+  let marketMaker = await UserState.loginUser(privKey);
 
   let privKey2 = 72835623577775623958723942389532489273523025n;
-  let counterParty = await _loginUser(privKey2);
+  let counterParty = await UserState.loginUser(privKey2);
 
   // ! - Does position_a exist?
   let validPosition = marketMaker.positionData[54321][0];

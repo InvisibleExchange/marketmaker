@@ -1,12 +1,12 @@
-const { makeDeposits, _loginUser, openOrderTab } = require("../../helpers");
-const { restoreUserState } = require("../../src/helpers/keyRetrieval");
-const { Note } = require("../../src/transactions/stateStructs/Notes");
-const { sign, getKeyPair } = require("starknet").ec;
+const { makeDeposits } = require("../../src/helpers");
+const { Note } = require("invisible-sdk/src/transactions");
+const { getKeyPair } = require("starknet").ec;
 
 //
 
 const grpc = require("@grpc/grpc-js");
 const protoLoader = require("@grpc/proto-loader");
+const { UserState } = require("invisible-sdk/src/users");
 
 const packageDefinition = protoLoader.loadSync("../engine.proto", {
   keepCase: true,
@@ -31,7 +31,7 @@ async function initMM() {
 async function tryInvalidNoteEscape() {
   let privKey = 12124823957273895723878239580315125238950951n;
 
-  let marketMaker = await _loginUser(privKey);
+  let marketMaker = await UserState.loginUser(privKey);
 
   // await restoreUserState(marketMaker, true, false);
 
@@ -59,7 +59,7 @@ async function tryInvalidNoteEscape() {
     close_position_message: null,
   };
 
-  client.execute_escape(escapeMessage, function (err, response) {
+  await client.execute_escape(escapeMessage, function (err, response) {
     if (err) {
       console.log(err);
     } else {
@@ -73,7 +73,7 @@ async function tryInvalidNoteEscape() {
 async function tryValidNoteEscape() {
   let privKey = 12124823957273895723878239580315125238950951n;
 
-  let marketMaker = await _loginUser(privKey);
+  let marketMaker = await UserState.loginUser(privKey);
 
   // await restoreUserState(marketMaker, true, false);
 
@@ -90,7 +90,7 @@ async function tryValidNoteEscape() {
 
   console.log("escapeMessage", escapeMessage);
 
-  client.execute_escape(escapeMessage, function (err, response) {
+  await client.execute_escape(escapeMessage, function (err, response) {
     if (err) {
       console.log(err);
     } else {
@@ -105,10 +105,11 @@ async function tryValidNoteEscape() {
 
 async function main() {
   // await initMM();
-
+  // console.log("initMM done\n\n");
   // await tryInvalidNoteEscape();
-
-  await tryValidNoteEscape();
+  // console.log("tryInvalidNoteEscape done\n\n");
+  // await tryValidNoteEscape();
+  // console.log("tryValidNoteEscape done\n\n");
 }
 
 main();
