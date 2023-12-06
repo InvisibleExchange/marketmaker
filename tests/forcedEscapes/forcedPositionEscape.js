@@ -11,7 +11,7 @@ const {
   COLLATERAL_TOKEN,
   PRICE_DECIMALS_PER_ASSET,
   computeHashOnElements,
-} = require("invisible-sdk/src/helpers/utils");
+} = require("invisible-sdk/src/utils");
 const {
   Note,
   PositionHeader,
@@ -20,6 +20,7 @@ const {
   sendPerpOrder,
 } = require("invisible-sdk/src/transactions");
 const { UserState } = require("invisible-sdk/src/users");
+const { MISMATCH } = require("sqlite3");
 
 const packageDefinition = protoLoader.loadSync("../engine.proto", {
   keepCase: true,
@@ -35,21 +36,21 @@ const SERVER_URL = "localhost:50052";
 let client = new engine.Engine(SERVER_URL, grpc.credentials.createInsecure());
 
 async function initMM() {
-  let privKey = 1212482395727389572387823958031512523895023551n;
+  let privKey = 12124823957273895723878239580312523895023551n;
 
   //
   await makeDeposits([55555], [2_000], privKey);
 }
 
 async function initCounterparty() {
-  let privKey = 72835623577775623958723942389532489273523025n;
+  let privKey = 7283562357777562395872394289532489273523025n;
 
   //
   await makeDeposits([55555, 55555], [800, 1200], privKey);
 }
 
 async function initPosition() {
-  let privKey = 1212482395727389572387823958031512523895023551n;
+  let privKey = 12124823957273895723878239580312523895023551n;
 
   let marketMaker = await UserState.loginUser(privKey);
 
@@ -70,7 +71,7 @@ async function initPosition() {
     null,
     syntheticAsset,
     0.1,
-    2104.05,
+    2150,
     margin,
     0.07,
     5,
@@ -80,7 +81,7 @@ async function initPosition() {
 }
 
 async function initPosition_b() {
-  let privKey = 72835623577775623958723942389532489273523025n;
+  let privKey = 7283562357777562395872394289532489273523025n;
 
   let counterParty = await UserState.loginUser(privKey);
 
@@ -100,7 +101,7 @@ async function initPosition_b() {
     null,
     syntheticAsset,
     0.1,
-    2104.05,
+    2150,
     margin,
     0.07,
     5,
@@ -109,11 +110,11 @@ async function initPosition_b() {
   );
 }
 
-async function tryPositionEscape1() {
-  let privKey = 1212482395727389572387823958031512523895023551n;
+async function tryPositionEscape1(valid) {
+  let privKey = 12124823957273895723878239580312523895023551n;
   let marketMaker = await UserState.loginUser(privKey);
 
-  privKey = 72835623577775623958723942389532489273523025n;
+  privKey = 7283562357777562395872394289532489273523025n;
   let counterParty = await UserState.loginUser(privKey);
 
   //
@@ -208,7 +209,7 @@ async function tryPositionEscape1() {
   //
 
   // * ===============================================
-  let escape_id = 1;
+  let escape_id = 100 + Number.parseInt(Math.random() * 100);
 
   // & H = pedersen(escape_id, position_a.hash, close_price, (open_order_fields_b.hash or position_b.hash) )
 
@@ -238,8 +239,10 @@ async function tryPositionEscape1() {
   let forcePositionCloseMessage = {
     position_a: validPosition,
     close_price: 2050 * 10 ** PRICE_DECIMALS_PER_ASSET[54321],
-    // open_order_fields_b: validOpenOrderFields.toGrpcObject(),
-    open_order_fields_b: invalidOpenOrderFields.toGrpcObject(),
+    open_order_fields_b: valid
+      ? validOpenOrderFields.toGrpcObject()
+      : invalidOpenOrderFields.toGrpcObject(),
+    // open_order_fields_b: invalidOpenOrderFields.toGrpcObject(),
     position_b: null,
     signature_a: { r: sig_a[0], s: sig_a[1] },
     signature_b: { r: sig_b[0], s: sig_b[1] },
@@ -253,7 +256,10 @@ async function tryPositionEscape1() {
     close_position_message: forcePositionCloseMessage,
   };
 
-  console.log("escapeMessage", escapeMessage);
+  console.log(
+    "escapeMessage",
+    escapeMessage.close_position_message.open_order_fields_b.notes_in
+  );
 
   client.execute_escape(escapeMessage, function (err, response) {
     if (err) {
@@ -267,10 +273,10 @@ async function tryPositionEscape1() {
 // --------------------------------------------------------------------------------------
 
 async function tryPositionEscape2() {
-  let privKey = 1212482395727389572387823958031512523895023551n;
+  let privKey = 12124823957273895723878239580312523895023551n;
   let marketMaker = await UserState.loginUser(privKey);
 
-  let privKey2 = 72835623577775623958723942389532489273523025n;
+  let privKey2 = 7283562357777562395872394289532489273523025n;
   let counterParty = await UserState.loginUser(privKey2);
 
   // ! - Does position_a exist?
@@ -297,7 +303,7 @@ async function tryPositionEscape2() {
   //
 
   // * ===============================================
-  let escape_id = 2;
+  let escape_id = 200 + Number.parseInt(Math.random() * 100);
 
   // & H = pedersen(escape_id, position_a.hash, close_price, (open_order_fields_b.hash or position_b.hash) )
 
@@ -353,16 +359,29 @@ async function tryPositionEscape2() {
 }
 
 async function main() {
-  // await initMM();
+  await initMM();
+
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  await initPosition();
+
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  await initCounterparty();
   //
-  // await initPosition();
-  //
-  // await initCounterparty();
-  //
+
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
   // await initPosition_b();
+
+  // await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  await tryPositionEscape1(false);
   //
-  await tryPositionEscape1();
-  //
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  await tryPositionEscape1(true);
+
   // await tryPositionEscape2();
   //
 }

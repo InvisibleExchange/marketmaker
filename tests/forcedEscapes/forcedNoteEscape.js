@@ -1,12 +1,12 @@
 const { makeDeposits } = require("../../src/helpers");
 const { Note } = require("invisible-sdk/src/transactions");
-const { getKeyPair } = require("starknet").ec;
 
-//
+const { sign, getKeyPair } = require("starknet").ec;
 
 const grpc = require("@grpc/grpc-js");
 const protoLoader = require("@grpc/proto-loader");
 const { UserState } = require("invisible-sdk/src/users");
+const { computeHashOnElements } = require("invisible-sdk/src/utils");
 
 const packageDefinition = protoLoader.loadSync("../engine.proto", {
   keepCase: true,
@@ -77,13 +77,23 @@ async function tryValidNoteEscape() {
 
   // await restoreUserState(marketMaker, true, false);
 
+  let escape_id = 2;
   let ethNote = marketMaker.noteData[54321][0];
   let usdcNote = marketMaker.noteData[55555][0];
 
+  let hashInputs = [escape_id, ethNote.hash, usdcNote.hash];
+  let escapeHash = computeHashOnElements(hashInputs);
+
+  let keyPairSum = getKeyPair(
+    marketMaker.notePrivKeys[ethNote.address.getX().toString()] +
+      marketMaker.notePrivKeys[usdcNote.address.getX().toString()]
+  );
+  let sig = sign(keyPairSum, "0x" + escapeHash.toString(16));
+
   let escapeMessage = {
-    escape_id: 1,
+    escape_id,
     escape_notes: [ethNote.toGrpcObject(), usdcNote.toGrpcObject()],
-    signature: { r: "0", s: "0" },
+    signature: { r: sig[0], s: sig[1] },
     close_order_tab_req: null,
     close_position_message: null,
   };
@@ -104,12 +114,18 @@ async function tryValidNoteEscape() {
 //
 
 async function main() {
-  // await initMM();
-  // console.log("initMM done\n\n");
-  // await tryInvalidNoteEscape();
-  // console.log("tryInvalidNoteEscape done\n\n");
-  // await tryValidNoteEscape();
-  // console.log("tryValidNoteEscape done\n\n");
+  await initMM();
+  console.log("initMM done\n\n");
+
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  await tryInvalidNoteEscape();
+  console.log("tryInvalidNoteEscape done\n\n");
+
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  await tryValidNoteEscape();
+  console.log("tryValidNoteEscape done\n\n");
 }
 
 main();

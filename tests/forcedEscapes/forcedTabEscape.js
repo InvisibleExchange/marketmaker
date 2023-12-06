@@ -1,7 +1,7 @@
 const { makeDeposits, openOrderTab } = require("../../src/helpers");
-const { restoreUserState } = require("invisible-sdk/src/utils");
+const { restoreUserState, pedersen } = require("invisible-sdk/src/utils");
 
-//
+const { sign, getKeyPair } = require("starknet").ec;
 
 const grpc = require("@grpc/grpc-js");
 const protoLoader = require("@grpc/proto-loader");
@@ -22,14 +22,14 @@ const SERVER_URL = "localhost:50052";
 let client = new engine.Engine(SERVER_URL, grpc.credentials.createInsecure());
 
 async function initMM() {
-  let privKey = 1212482395727389572111221320315125238950951n;
+  let privKey = 1212482395727389572111221320318950951n;
 
   //
   await makeDeposits([55555, 54321], [2_000, 1], privKey);
 }
 
 async function initOrderTab() {
-  let privKey = 1212482395727389572111221320315125238950951n;
+  let privKey = 1212482395727389572111221320318950951n;
 
   let marketId = "12";
 
@@ -50,7 +50,7 @@ async function tryInvalidTabEscape() {
   let invalidTab = new OrderTab(1, tabHeader, 2, 2000, 0);
 
   let escapeMessage = {
-    escape_id: 1,
+    escape_id: 10,
     escape_notes: null,
     signature: { r: "0", s: "0" },
     close_order_tab_req: invalidTab.toGrpcObject(),
@@ -69,21 +69,28 @@ async function tryInvalidTabEscape() {
 }
 
 async function tryValidTabEscape() {
-  let privKey = 1212482395727389572111221320315125238950951n;
+  let privKey = 1212482395727389572111221320318950951n;
 
   let marketMaker = await UserState.loginUser(privKey);
 
-  // await restoreUserState(marketMaker, false, false, true);
-
   let orderTab = marketMaker.orderTabData[54321][0];
 
+  let escape_id = 11;
+  let tabPrivKey = marketMaker.tabPrivKeys[orderTab.tab_header.pub_key];
+  let keyPair = getKeyPair(tabPrivKey);
+
+  let messageHash = pedersen([orderTab.hash, BigInt(escape_id)]);
+  let sig = sign(keyPair, "0x" + messageHash.toString(16));
+
   let escapeMessage = {
-    escape_id: 1,
+    escape_id,
     escape_notes: null,
-    signature: { r: "0", s: "0" },
+    signature: { r: sig[0], s: sig[1] },
     close_order_tab_req: orderTab.toGrpcObject(),
     close_position_message: null,
   };
+
+  console.log("escapeMessage", escapeMessage);
 
   await client.execute_escape(escapeMessage, function (err, response) {
     if (err) {
@@ -92,22 +99,26 @@ async function tryValidTabEscape() {
       console.log("response", response);
     }
   });
-
-  //
 }
 
 async function main() {
   await initMM();
   console.log("initMM done");
 
-  // await initOrderTab();
-  // console.log("initOrderTab done");
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  // await tryInvalidTabEscape();
-  // console.log("tryInvalidTabEscape done");
+  await initOrderTab();
+  console.log("initOrderTab done");
 
-  // await tryValidTabEscape();
-  // console.log("tryValidTabEscape done");
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  await tryInvalidTabEscape();
+  console.log("tryInvalidTabEscape done");
+
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  await tryValidTabEscape();
+  console.log("tryValidTabEscape done");
 }
 
 main();
