@@ -2,7 +2,10 @@ const { makeDeposits } = require("../../src/helpers");
 
 const { sign, getKeyPair } = require("starknet").ec;
 
-const { PERP_MARKET_IDS_2_TOKENS } = require("invisible-sdk/src/utils");
+const {
+  PERP_MARKET_IDS_2_TOKENS,
+  COLLATERAL_TOKEN_DECIMALS,
+} = require("invisible-sdk/src/utils");
 const { sendPerpOrder } = require("invisible-sdk/src/transactions");
 
 const grpc = require("@grpc/grpc-js");
@@ -107,17 +110,41 @@ async function addLiquidity() {
   let position = marketMaker.positionData[syntheticToken][0];
   position.order_side = position.order_side === "Long";
 
+  console.log("position", position);
+
   let posPrivKey =
     marketMaker.positionPrivKeys[position.position_header.position_address];
 
-  // message OnChainAddLiqReq {
-  //   GrpcPerpPosition position = 1;
-  //   string depositor = 2;
-  //   uint64 initial_value = 3;
-  //   Signature signature = 4;
-  //   uint32 market_id = 5;
-  //   uint32 synthetic_token = 6;
-  // }
+  let depositor = 61872278164781256322784325782984327823785n;
+  let initial_value = 2000 * 10 ** COLLATERAL_TOKEN_DECIMALS;
+
+  // & header_hash = H({pos_hash, depositor, collateral_amount})
+  let messageHash = computeHashOnElements([
+    position.hash,
+    depositor,
+    initial_value,
+  ]);
+
+  let keyPair = getKeyPair(posPrivKey);
+  let sig = sign(keyPair, "0x" + messageHash.toString(16));
+  let marketId = 22;
+
+  let addLiqMessage = {
+    position,
+    depositor,
+    initial_value,
+    signature: { r: sig[0], s: sig[1] },
+    market_id: marketId,
+    synthetic_token: syntheticToken,
+  };
+
+  await client.add_liquidity_mm(addLiqMessage, function (err, response) {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log("response", response);
+    }
+  });
 }
 
 async function removeLiquidity() {
@@ -125,9 +152,94 @@ async function removeLiquidity() {
   let privKey = 101248239572738957238572395803135238950951n;
   let marketMaker = await UserState.loginUser(privKey);
 
-  let baseToken = PERP_MARKET_IDS_2_TOKENS[22];
-  let position = marketMaker.positionData[baseToken][0];
-  console.log("position before", position);
+  let syntheticToken = PERP_MARKET_IDS_2_TOKENS[22];
+  let position = marketMaker.positionData[syntheticToken][0];
+  position.order_side = position.order_side === "Long";
+
+  console.log("position", position);
+
+  let posPrivKey =
+    marketMaker.positionPrivKeys[position.position_header.position_address];
+
+  let depositor = 61872278164781256322784325782984327823785n;
+  let initial_value = 2000 * 10 ** COLLATERAL_TOKEN_DECIMALS;
+  let vlp_amount = initial_value;
+
+  // & hash = H({position.hash, depositor, intial_value, vlp_amount})
+  let messageHash = computeHashOnElements([
+    position.hash,
+    depositor,
+    initial_value,
+    vlp_amount,
+  ]);
+
+  let keyPair = getKeyPair(posPrivKey);
+  let sig = sign(keyPair, "0x" + messageHash.toString(16));
+  let marketId = 22;
+
+  let removeLiqMessage = {
+    position,
+    depositor,
+    initial_value,
+    vlp_amount,
+    signature: { r: sig[0], s: sig[1] },
+    market_id: marketId,
+    synthetic_token: syntheticToken,
+  };
+
+  await client.remove_liquidity_mm(removeLiqMessage, function (err, response) {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log("response", response);
+    }
+  });
+}
+
+async function closeMM() {
+  // ? MARKET MAKER
+  let privKey = 101248239572738957238572395803135238950951n;
+  let marketMaker = await UserState.loginUser(privKey);
+
+  let syntheticToken = PERP_MARKET_IDS_2_TOKENS[22];
+  let position = marketMaker.positionData[syntheticToken][0];
+  position.order_side = position.order_side === "Long";
+
+  console.log("position", position);
+
+  let posPrivKey =
+    marketMaker.positionPrivKeys[position.position_header.position_address];
+
+  let initial_value_sum = 2000 * 10 ** COLLATERAL_TOKEN_DECIMALS;
+  let vlp_amount_sum = initial_value_sum;
+
+  // & header_hash = H({pos_hash, initial_value_sum, vlp_amount_sum})
+  let messageHash = computeHashOnElements([
+    position.hash,
+    initial_value_sum,
+    vlp_amount_sum,
+  ]);
+
+  let keyPair = getKeyPair(posPrivKey);
+  let sig = sign(keyPair, "0x" + messageHash.toString(16));
+  let marketId = 22;
+
+  let closeMmMessage = {
+    position,
+    initial_value_sum,
+    vlp_amount_sum,
+    signature: { r: sig[0], s: sig[1] },
+    market_id: marketId,
+    synthetic_token: syntheticToken,
+  };
+
+  await client.close_onchain_mm(closeMmMessage, function (err, response) {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log("response", response);
+    }
+  });
 }
 
 async function main() {
@@ -143,41 +255,15 @@ async function main() {
 
   // await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  await addLiquidity();
+  // await addLiquidity();
 
   // await new Promise((resolve) => setTimeout(resolve, 1000));
 
   // await removeLiquidity();
+
+  // await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  await closeMM();
 }
 
 main();
-
-// Ok(PerpPosition {
-// index: 3, position_header:
-// PositionHeader { synthetic_token: 54321, position_address: 2515621936646526414291941246684465506968430707280856084433062674401974871214,
-// allow_partial_liquidations: true, vlp_token: 0, max_vlp_supply: 0,
-
-// hash: 1485521988648034206478844620559802264092962755549123833095291387531899750380 }, order_side: Short,
-// position_size: 5000000, margin: 19999941345, entry_price: 2320000000, liquidation_price: 0, bankruptcy_price: 0,
-// last_funding_idx: 0, vlp_supply: 0, hash: 3339438903260205812244036825303405518899419210941861089465262344458033609107 })
-
-// position before {
-//   hash: '619393722529871128088058264914784089171038657038758816997537177050323159895',
-//   bankruptcy_price: 0,
-//   last_funding_idx: 0,
-//   entry_price: 2320000000,
-//   order_side: 'Long',
-//   position_size: 5000000,
-//   index: 3,
-//   vlp_supply: 0,
-//   position_header: {
-//     allow_partial_liquidations: true,
-//     vlp_token: 0,
-//     synthetic_token: 54321,
-//     hash: '1485521988648034206478844620559802264092962755549123833095291387531899750380',
-//     position_address: '2515621936646526414291941246684465506968430707280856084433062674401974871214',
-//     max_vlp_supply: 0
-//   },
-//   liquidation_price: 0,
-//   margin: 19999941345
-// }

@@ -1,7 +1,6 @@
 //
 
 const {
-  getActiveOrders,
   handleLiquidityUpdate,
   handleSwapResult,
   handlePerpSwapResult,
@@ -173,7 +172,7 @@ class Environemnt {
         await this.executeOrders();
         count++;
       }
-    }, 30_000);
+    }, 5_000);
 
     //
   }
@@ -313,22 +312,7 @@ const listenToWebSocket = (user) => {
 // * ================================================================================================
 
 const initAccountState = async (privKey) => {
-  let user_ = UserState.fromPrivKey(privKey.toString(16));
-
-  let { emptyPrivKeys, emptyPositionPrivKeys } = await user_.login();
-
-  let { badOrderIds, orders, badPerpOrderIds, perpOrders, pfrNotes } =
-    await getActiveOrders(user_.orderIds, user_.perpetualOrderIds);
-
-  await user_.handleActiveOrders(
-    badOrderIds,
-    orders,
-    badPerpOrderIds,
-    perpOrders,
-    pfrNotes,
-    emptyPrivKeys,
-    emptyPositionPrivKeys
-  );
+  let user_ = await UserState.loginUser(privKey);
 
   return user_;
 };

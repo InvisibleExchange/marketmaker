@@ -100,9 +100,7 @@ async function fillOpenOrders() {
 }
 
 // order: {price, amount, timestamp}
-async function sendFillRequest(otherOrder, otherSide, marketId) {
-  
-}
+async function sendFillRequest(otherOrder, otherSide, marketId) {}
 
 async function indicateLiquidity(marketIds = activeMarkets) {
   if (!marketMaker) return;
@@ -716,6 +714,7 @@ async function run(config) {
 
     let baseToken = SYMBOLS_TO_IDS[config.baseToken];
 
+    console.log("baseToken: ", marketMaker.orderTabData);
     let orderTab = marketMaker.orderTabData[baseToken][0];
     console.log(
       "Starting market making: ",
