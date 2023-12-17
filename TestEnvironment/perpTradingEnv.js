@@ -18,9 +18,7 @@ const { trimHash } = require("../src/helpers");
 
 //
 
-//
-
-//
+const SEND_ORDERS_PERIOD = 45_000;
 
 //
 
@@ -172,7 +170,7 @@ class Environemnt {
         await this.executeOrders();
         count++;
       }
-    }, 5_000);
+    }, SEND_ORDERS_PERIOD);
 
     //
   }
