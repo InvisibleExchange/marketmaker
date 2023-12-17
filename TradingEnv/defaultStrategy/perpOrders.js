@@ -308,20 +308,16 @@ async function indicateLiquidity(
       activeOrdersCopy = [...ACTIVE_ORDERS[marketId + "Buy"]];
     }
 
-
-    // TODO: remove this after testing
-    let testExtraSpread = 0.005; // 0.5%
-
     for (let i = 0; i < activeOrdersCopy.length; i++) {
       const buyPrice =
         midPrice *
-        (1 - mmConfig.minSpread - testExtraSpread - (mmConfig.slippageRate * i) / numSplits);
+        (1 - mmConfig.minSpread - (mmConfig.slippageRate * i) / numSplits);
 
       let orderId = activeOrdersCopy[i].id;
       sendAmendOrder(
         marketmaker,
         orderId,
-        "Long",
+        "Buy",
         true, // isPerp,
         marketId,
         buyPrice,
@@ -370,8 +366,6 @@ async function indicateLiquidity(
   }
 
   if (["s", "d"].includes(side) && maxSize > 0) {
-    // make a clone of the  ACTIVE_ORDERS[marketId + "Sell"] array
-    // because we will be removing orders from it
     let activeOrdersCopy = [];
     if (ACTIVE_ORDERS[marketId + "Sell"]) {
       activeOrdersCopy = [...ACTIVE_ORDERS[marketId + "Sell"]];

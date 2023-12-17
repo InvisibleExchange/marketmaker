@@ -23,9 +23,9 @@ module.exports = class TradingEnvironment {
     this.CONFIG_CODE = config.CONFIG_CODE ? Number(config.CONFIG_CODE) : null;
     this.SERVER_URL = config.SERVER_URL;
     this.RELAY_WS_URL = config.RELAY_WS_URL;
-    this.marketId = Number(config.marketId);
     this.PERIODS = config.PERIODS;
     this.MM_CONFIG = config.MM_CONFIG;
+    this.marketId = Number(config.MM_CONFIG.config.market_id);
     // ! Globals
     this.PRICE_FEEDS = {};
     this.ACTIVE_ORDERS = {};
@@ -74,7 +74,6 @@ module.exports = class TradingEnvironment {
       await this.cancelLiquidity();
 
       let errorCounter = 0;
-
       await initPositions(
         this.marketId,
         this.marketmaker,
@@ -192,8 +191,6 @@ module.exports = class TradingEnvironment {
 
   // * Websocket connection
   listenToWebSocket = () => {
-    console.log(this.isPerp);
-
     _listenToWebSocket(
       this.CONFIG_CODE,
       this.SERVER_URL,
@@ -231,10 +228,16 @@ module.exports = class TradingEnvironment {
       this.ACTIVE_ORDERS,
       errorCounter
     );
-    brodcastInterval = setInterval(
-      indicateLiquidity,
-      this.PERIODS.LIQUIDITY_INDICATION_PERIOD
-    );
+    brodcastInterval = setInterval(async () => {
+      await indicateLiquidity(
+        this.marketId,
+        this.marketmaker,
+        this.MM_CONFIG,
+        this.PRICE_FEEDS,
+        this.ACTIVE_ORDERS,
+        errorCounter
+      );
+    }, this.PERIODS.LIQUIDITY_INDICATION_PERIOD);
 
     fillInterval = setInterval(async () => {
       await fillOpenOrders(

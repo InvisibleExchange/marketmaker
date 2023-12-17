@@ -326,8 +326,7 @@ async function indicateLiquidity(marketIds = activeMarkets) {
           MM_CONFIG.EXPIRATION_TIME,
           null,
           false, // match_only
-          ACTIVE_ORDERS,
-          errorCounter
+          ACTIVE_ORDERS
         ).catch((err) => {
           // console.log("Error amending order: ", err);
           errorCounter++;
