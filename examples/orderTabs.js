@@ -7,9 +7,10 @@ const {
   sendModifyOrderTab,
 } = require("invisible-sdk/src/transactions");
 
+
 const SPOT_MARKET_IDS_2_TOKENS = {
-  11: { base: 12345, quote: 55555 },
-  12: { base: 54321, quote: 55555 },
+  11: { base: 3592681469, quote: 2413654107 },
+  12: { base: 54321, quote: 2413654107 },
 };
 
 async function makeDeposits(tokens, amounts, privKey) {
@@ -21,8 +22,8 @@ async function makeDeposits(tokens, amounts, privKey) {
     let token = tokens[i];
     let amount = amounts[i];
 
-    let depositId = CHAIN_IDS["ETH Mainnet"] * 2 ** 32 + 12345;
-    await sendDeposit(marketMaker, depositId, amount, token, 123456789);
+    let depositId = CHAIN_IDS["ETH Mainnet"] * 2 ** 32 + 3592681469;
+    await sendDeposit(marketMaker, depositId, amount, token, 35926814696789);
 
     console.log(token, " amount: ", marketMaker.getAvailableAmount(token));
   }

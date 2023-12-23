@@ -9,7 +9,7 @@ async function main() {
   let config = JSON.parse(mmConfigFile);
 
   let privKey = config.PRIVATE_KEY;
-  await makeDeposits([55555], [100_000], privKey);
+  await makeDeposits([2413654107], [100_000], privKey);
 }
 
 main();

@@ -19,10 +19,7 @@ const { trimHash } = require("../src/helpers");
 
 //
 
-//
-
-//
-
+const SEND_ORDERS_PERIOD = 1_000;
 //
 
 // Generate a user and mint a large amount of funds with multiple deposits
@@ -120,7 +117,7 @@ class Environemnt {
         await this.executeOrders();
         count++;
       }
-    }, 5_000);
+    }, SEND_ORDERS_PERIOD);
 
     //
 
@@ -294,7 +291,7 @@ async function executeDeposits(user, baseAsset, quoteAsset) {
   // ? base deposits
   if (baseAmount < 0.05) {
     for (let i = 0; i < 3; i++) {
-      let amount = baseAsset == 12345 ? 0.55 : 7;
+      let amount = baseAsset == 3592681469 ? 0.55 : 7;
 
       let depositId = CHAIN_IDS["ETH Mainnet"] * 2 ** 32 + 1111111111;
       await sendDeposit(user, depositId, amount, baseAsset, 123456789);
@@ -341,7 +338,7 @@ let testPks = [
 async function main() {
   const startIdx = process.argv[2] ?? 0;
 
-  let baseAssets = [12345, 54321];
+  let baseAssets = [3592681469, 453755560];
 
   let nUsers = 1;
 

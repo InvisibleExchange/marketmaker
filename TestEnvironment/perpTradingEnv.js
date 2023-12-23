@@ -18,7 +18,7 @@ const { trimHash } = require("../src/helpers");
 
 //
 
-const SEND_ORDERS_PERIOD = 45_000;
+const SEND_ORDERS_PERIOD = 2_000;
 
 //
 
@@ -188,7 +188,7 @@ class Environemnt {
 }
 
 // * ================================================================================================
-const CONFIG_CODE = "1234567890";
+const CONFIG_CODE = "359268146967890";
 
 let liquidity = {};
 const setLiquidity = (liq) => {
@@ -324,9 +324,24 @@ async function openPosition(user, syntheticAsset) {
     let amount = 8000;
 
     let depositId = CHAIN_IDS["Starknet"] * 2 ** 32 + 222222222;
-    await sendDeposit(user, depositId, amount, COLLATERAL_TOKEN, 123456789);
+    await sendDeposit(
+      user,
+      depositId,
+      amount,
+      COLLATERAL_TOKEN,
+      35926814696789
+    );
 
-    let dummyPrice = 25_000;
+    let dummyPrices = {
+      3592681469: 40_000,
+      453755560: 2000,
+      277158171: 70,
+    };
+    let dummyAmounts = {
+      3592681469: 0.005,
+      453755560: 0.05,
+      277158171: 0.5,
+    };
 
     // ? open position
     await sendPerpOrder(
@@ -336,8 +351,8 @@ async function openPosition(user, syntheticAsset) {
       "Open",
       null,
       syntheticAsset,
-      0.001,
-      dummyPrice,
+      dummyAmounts[syntheticAsset],
+      dummyPrices[syntheticAsset],
       amount,
       0.07,
       99,
@@ -373,7 +388,7 @@ let testPks = [
 async function main() {
   const startIdx = process.argv[2] ?? 0;
 
-  let baseAssets = [12345, 54321];
+  let baseAssets = [3592681469, 453755560, 277158171];
 
   let nUsers = 2;
 

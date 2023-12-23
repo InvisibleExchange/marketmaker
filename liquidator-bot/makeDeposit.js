@@ -8,7 +8,7 @@ async function main() {
   let config = loadMMConfig(configPath);
   let privKey = config.MM_CONFIG.privKey;
 
-  await makeDeposits([55555], [100_000], privKey);
+  await makeDeposits([2413654107], [100_000], privKey);
 }
 
 main();

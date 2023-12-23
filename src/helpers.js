@@ -15,8 +15,8 @@ const {
 const bigInt = require("big-integer");
 
 const SPOT_MARKET_IDS_2_TOKENS = {
-  11: { base: 12345, quote: 55555 },
-  12: { base: 54321, quote: 55555 },
+  11: { base: 3592681469, quote: 2413654107 },
+  12: { base: 453755560, quote: 2413654107 },
 };
 
 async function makeDeposits(tokens, amounts, privKey) {

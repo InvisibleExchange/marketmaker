@@ -36,7 +36,7 @@ async function main() {
   }
 
   // console.log("available_amount: ", user.positionData);
-  // console.log("available_amount: ", user.getAvailableAmount(55555));
+  // console.log("available_amount: ", user.getAvailableAmount(2413654107));
 
   setInterval(async () => {
     for (let pair of Object.values(MM_CONFIG.pairs)) {
@@ -82,7 +82,7 @@ async function main() {
           true,
           {}
         ).then((res) => {
-          console.log("available_amount: ", user.getAvailableAmount(55555));
+          console.log("available_amount: ", user.getAvailableAmount(2413654107));
         });
       }
     }
