@@ -1,5 +1,5 @@
 const { UserState } = require("invisible-sdk/src/users");
-const TradingEnvironment = require("../TradingEnv/PerpMmEnvTemplate");
+const TradingEnvironment = require("../../TradingEnv/PerpMmEnvTemplate");
 
 const path = require("path");
 const fs = require("fs");
@@ -11,6 +11,8 @@ async function main() {
 
   let privKey = config.PRIVATE_KEY;
   let marketmaker = await UserState.loginUser(privKey);
+
+  console.log("marketmaker: ", marketmaker.getAvailableAmount(2413654107));
 
   let tradingEnv = new TradingEnvironment(marketmaker, config);
 

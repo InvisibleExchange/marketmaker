@@ -3,7 +3,7 @@ const {
   openOrderTab,
   modifyOrderTab,
   closeOrderTab,
-} = require("../src/helpers");
+} = require("../../src/helpers");
 
 const path = require("path");
 

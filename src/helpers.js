@@ -2,6 +2,7 @@ const {
   getActiveOrders,
   DECIMALS_PER_ASSET,
   CHAIN_IDS,
+  IDS_TO_SYMBOLS,
 } = require("invisible-sdk/src/utils");
 
 const fs = require("fs");
@@ -29,7 +30,11 @@ async function makeDeposits(tokens, amounts, privKey) {
     let depositId = CHAIN_IDS["ETH Mainnet"] * 2 ** 32 + 12345;
     await sendDeposit(marketMaker, depositId, amount, token, 123456789);
 
-    console.log(token, " amount: ", marketMaker.getAvailableAmount(token));
+    console.log(
+      IDS_TO_SYMBOLS[token],
+      " amount: ",
+      marketMaker.getAvailableAmount(token)
+    );
   }
 }
 
@@ -42,6 +47,8 @@ async function openOrderTab(marketId, privKey) {
 
   let baseAmount = marketMaker.getAvailableAmount(baseToken);
   let quoteAmount = marketMaker.getAvailableAmount(quoteToken);
+
+  console.log(" baseAmount: ", baseAmount, " quoteAmount: ", quoteAmount);
 
   await sendOpenOrderTab(
     marketMaker,

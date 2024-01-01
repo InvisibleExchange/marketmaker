@@ -1,0 +1,17 @@
+{
+    "privKey": "0x11111111111111111111111111111111111111111111111111111111115",
+    "SERVER_URL": "localhost",
+    "EXPIRATION_TIME": 10,
+    "pairs": {
+        "12": {
+            "symbol": "ETH",
+            "name": "ethereum",
+            "coinmarketcapId": 1027,
+            "slippageRate": 1e-5,
+            "maxSize": 100,
+            "minSize": 0.0003,
+            "minSpread": 0.0005,
+            "active": true
+        }
+    }
+}

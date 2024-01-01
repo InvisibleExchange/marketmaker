@@ -1,4 +1,4 @@
-const { makeDeposits, loadMMConfig } = require("../src/helpers");
+const { makeDeposits, loadMMConfig } = require("../../src/helpers");
 
 const path = require("path");
 
