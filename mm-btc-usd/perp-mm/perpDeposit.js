@@ -1,4 +1,4 @@
-const { makeDeposits, loadMMConfig } = require("../../src/helpers");
+const { makeDeposits } = require("../../src/helpers");
 
 const path = require("path");
 const fs = require("fs");
@@ -8,40 +8,36 @@ const { DECIMALS_PER_ASSET } = require("invisible-sdk/src/utils");
 const { executeDepositTx } = require("../../src/onchainInteractions");
 
 async function main() {
-  let configPath = path.join(__dirname, "spot_config.json");
+  let configPath = path.join(__dirname, "perp_config.json");
+  const mmConfigFile = fs.readFileSync(configPath, "utf8");
+  let config = JSON.parse(mmConfigFile);
 
-  let config = loadMMConfig(configPath).MM_CONFIG.privKey;
-
-  await makeDeposits([2413654107, 453755560], [100_000, 50], config);
+  let privKey = config.PRIVATE_KEY;
+  await makeDeposits([2413654107], [100_000], privKey);
 }
 
 async function makeOnchainDeposit() {
   // * Onchain deposits
 
-  let configPath = path.join(__dirname, "spot_config.json");
+  let configPath = path.join(__dirname, "perp_config.json");
   const mmConfigFile = fs.readFileSync(configPath, "utf8");
   let config = JSON.parse(mmConfigFile);
 
   let privKey = config.PRIVATE_KEY;
   let marketMaker = await UserState.loginUser(privKey);
 
-  let usdcId = 2413654107;
-  let usdcAmount = 10_000;
+  let token = 2413654107;
+  let amount = 10_000;
 
-  let ethId = 453755560;
-  let ethAmount = 0; // TODO
+  let deposit = await executeDepositTx(marketMaker, amount, token);
 
-  let deposit = await executeDepositTx(marketMaker, usdcAmount, usdcId);
-  console.log(deposit);
-
-  deposit = await executeDepositTx(marketMaker, ethAmount, ethId);
   console.log(deposit);
 }
 
 async function claimDeposit() {
   // * Claim deposits
 
-  let configPath = path.join(__dirname, "spot_config.json");
+  let configPath = path.join(__dirname, "perp_config.json");
   const mmConfigFile = fs.readFileSync(configPath, "utf8");
   let config = JSON.parse(mmConfigFile);
 
@@ -63,9 +59,7 @@ async function claimDeposit() {
   }
 
   console.log("usdc balance: ", marketMaker.getAvailableAmount(2413654107));
-  console.log("wbtc balance: ", marketMaker.getAvailableAmount(453755560));
 }
 
-// makeOnchainDeposit();
-
-claimDeposit();
+makeOnchainDeposit();
+// claimDeposit();

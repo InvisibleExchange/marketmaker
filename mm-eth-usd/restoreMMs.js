@@ -9,8 +9,9 @@ async function main() {
   let configPath = path.join(__dirname, "./spot-mm/spot_config.json");
   let spotConfig = loadMMConfig(configPath);
 
-  let user = UserState.fromPrivKey(spotConfig.MM_CONFIG.privKey.toString());
-  await user.login();
+  let user = await UserState.loginUser(
+    spotConfig.MM_CONFIG.PRIVATE_KEY.toString()
+  );
 
   await restoreUserState(user, true, false);
 

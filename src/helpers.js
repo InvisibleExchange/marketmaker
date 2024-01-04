@@ -40,7 +40,7 @@ async function makeDeposits(tokens, amounts, privKey) {
 
 // ? OPEN ORDER TAB ===========================================================
 async function openOrderTab(marketId, privKey) {
-  let marketMaker = await UserState.loginUser(privKey);
+  let marketMaker = await UserState.loginUser(privKey.toString());
 
   let baseToken = SPOT_MARKET_IDS_2_TOKENS[marketId].base;
   let quoteToken = SPOT_MARKET_IDS_2_TOKENS[marketId].quote;

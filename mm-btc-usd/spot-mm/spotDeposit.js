@@ -1,4 +1,4 @@
-const { makeDeposits, loadMMConfig } = require("../../src/helpers");
+const { loadMMConfig, makeDeposits } = require("../../src/helpers");
 
 const path = require("path");
 const fs = require("fs");
@@ -10,9 +10,10 @@ const { executeDepositTx } = require("../../src/onchainInteractions");
 async function main() {
   let configPath = path.join(__dirname, "spot_config.json");
 
-  let config = loadMMConfig(configPath).MM_CONFIG.privKey;
+  let config = loadMMConfig(configPath);
+  let privKey = config.MM_CONFIG.privKey;
 
-  await makeDeposits([2413654107, 453755560], [100_000, 50], config);
+  await makeDeposits([2413654107, 3592681469], [150_000, 6], privKey);
 }
 
 async function makeOnchainDeposit() {
@@ -28,13 +29,13 @@ async function makeOnchainDeposit() {
   let usdcId = 2413654107;
   let usdcAmount = 10_000;
 
-  let ethId = 453755560;
-  let ethAmount = 0; // TODO
+  let wbtcId = 3592681469;
+  let wbtcAmount = 5;
 
   let deposit = await executeDepositTx(marketMaker, usdcAmount, usdcId);
   console.log(deposit);
 
-  deposit = await executeDepositTx(marketMaker, ethAmount, ethId);
+  deposit = await executeDepositTx(marketMaker, wbtcAmount, wbtcId);
   console.log(deposit);
 }
 
@@ -63,7 +64,7 @@ async function claimDeposit() {
   }
 
   console.log("usdc balance: ", marketMaker.getAvailableAmount(2413654107));
-  console.log("wbtc balance: ", marketMaker.getAvailableAmount(453755560));
+  console.log("wbtc balance: ", marketMaker.getAvailableAmount(3592681469));
 }
 
 // makeOnchainDeposit();

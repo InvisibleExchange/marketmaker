@@ -1,4 +1,5 @@
-const { makeDeposits } = require("../src/helpers");
+const { UserState } = require("invisible-sdk/src/users");
+const TradingEnvironment = require("../../TradingEnv/PerpMmEnvTemplate");
 
 const path = require("path");
 const fs = require("fs");
@@ -9,7 +10,11 @@ async function main() {
   let config = JSON.parse(mmConfigFile);
 
   let privKey = config.PRIVATE_KEY;
-  await makeDeposits([2413654107], [100_000], privKey);
+  let marketmaker = await UserState.loginUser(privKey);
+
+  let tradingEnv = new TradingEnvironment(marketmaker, config);
+
+  await tradingEnv.runMarketmaker();
 }
 
 main();

@@ -662,7 +662,7 @@ const listenToWebSocket = () => {
 
 const initAccountState = async () => {
   try {
-    let user_ = await UserState.loginUser(MM_CONFIG.privKey);
+    let user_ = await UserState.loginUser(MM_CONFIG.PRIVATE_KEY);
 
     marketMaker = user_;
 
