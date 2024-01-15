@@ -12,7 +12,7 @@ async function main() {
   let privKey = config.PRIVATE_KEY;
   let marketmaker = await UserState.loginUser(privKey);
 
-  console.log("marketmaker: ", marketmaker.getAvailableAmount(2413654107));
+  // console.log("marketmaker: ", marketmaker.getAvailableAmount(2413654107));
 
   let tradingEnv = new TradingEnvironment(marketmaker, config);
 

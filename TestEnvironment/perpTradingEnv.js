@@ -18,7 +18,7 @@ const { trimHash } = require("../src/helpers");
 
 //
 
-const SEND_ORDERS_PERIOD = 2_000;
+const SEND_ORDERS_PERIOD = 5_000;
 
 //
 
@@ -114,6 +114,13 @@ class Environemnt {
 
         if (!position) return;
 
+        let posSize =
+          position.position_size /
+          10 ** DECIMALS_PER_ASSET[this.syntheticAsset];
+
+        let marketPrice = getMarketPrice(this.syntheticAsset);
+        if (!marketPrice) return;
+
         let side = position.order_side == "Long" ? "Short" : "Long";
 
         let prevPositionHash = position.hash;
@@ -126,17 +133,35 @@ class Environemnt {
           "Close",
           position.position_header.position_address,
           this.syntheticAsset,
-          position.position_size /
-            10 ** DECIMALS_PER_ASSET[this.syntheticAsset],
-          getMarketPrice(this.syntheticAsset),
+          posSize,
+          marketPrice,
           null,
           0.07,
           3,
           true,
           null
-        ).catch((e) => {
-          console.log("error sending order", e);
-        });
+        )
+          .catch((e) => {
+            console.log("error sending Close order", e);
+
+            console.log("\n");
+            console.log(
+              "position",
+              this.syntheticAsset,
+              posSize,
+              marketPrice,
+              "\n"
+            );
+          })
+          .then(() => {
+            console.log("sent close order");
+          });
+
+        let availableBalance =
+          this.user.getAvailableAmount(COLLATERAL_TOKEN) /
+          10 ** DECIMALS_PER_ASSET[COLLATERAL_TOKEN];
+
+        if (availableBalance < 10) return;
 
         // ? Open new Position
         await sendPerpOrder(
@@ -146,11 +171,9 @@ class Environemnt {
           "Open",
           null,
           this.syntheticAsset,
-          position.position_size /
-            10 ** DECIMALS_PER_ASSET[this.syntheticAsset],
-          getMarketPrice(this.syntheticAsset),
-          this.user.getAvailableAmount(COLLATERAL_TOKEN) /
-            10 ** DECIMALS_PER_ASSET[COLLATERAL_TOKEN],
+          posSize,
+          marketPrice,
+          availableBalance,
           0.07,
           3,
           true,

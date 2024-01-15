@@ -19,7 +19,7 @@ const { trimHash } = require("../src/helpers");
 
 //
 
-const SEND_ORDERS_PERIOD = 1_000;
+const SEND_ORDERS_PERIOD = 3_000;
 //
 
 // Generate a user and mint a large amount of funds with multiple deposits

@@ -7,13 +7,15 @@ const { sendDeposit } = require("invisible-sdk/src/transactions");
 const { DECIMALS_PER_ASSET } = require("invisible-sdk/src/utils");
 const { executeDepositTx } = require("../../src/onchainInteractions");
 
-async function main() {
+async function testDeposit() {
   let configPath = path.join(__dirname, "spot_config.json");
 
-  let config = loadMMConfig(configPath).MM_CONFIG.privKey;
+  let config = loadMMConfig(configPath).MM_CONFIG.PRIVATE_KEY;
 
   await makeDeposits([2413654107, 453755560], [100_000, 50], config);
 }
+
+testDeposit();
 
 async function makeOnchainDeposit() {
   // * Onchain deposits
@@ -68,4 +70,4 @@ async function claimDeposit() {
 
 // makeOnchainDeposit();
 
-claimDeposit();
+// claimDeposit();

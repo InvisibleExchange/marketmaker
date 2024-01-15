@@ -345,7 +345,6 @@ function hashPositionEscape(positionAHash, closePrice, hashB, recipient) {
 
   let hashInput = [positionAHash, closePrice, hashB, recipient];
 
-
   let escapeHash = ethers.utils.keccak256(
     ethers.utils.solidityPack(["uint256[]"], [hashInput])
   );

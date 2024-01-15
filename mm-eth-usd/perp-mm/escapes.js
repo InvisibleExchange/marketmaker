@@ -19,24 +19,24 @@ async function sendPositionEscapeTransaction() {
   let positionAddress =
     marketMaker.positionData[ethId][0].position_header.position_address;
 
-  // console.log(marketMaker.positionData[ethId][0]);
+  console.log(marketMaker.positionData[ethId][0]);
 
-  let closePrice = 2300;
-  let recipient = "0x2b2eA7eC7e366666772DaAf496817c14b8c0Ae74";
+  // let closePrice = 2300;
+  // let recipient = "0x2b2eA7eC7e366666772DaAf496817c14b8c0Ae74";
 
-  let initialMargin = 500;
+  // let initialMargin = 500;
 
-  let receipt = await executePositionEscape(
-    marketMaker,
-    ethId,
-    closePrice,
-    recipient,
-    positionAddress,
-    null,
-    initialMargin
-  );
+  // let receipt = await executePositionEscape(
+  //   marketMaker,
+  //   ethId,
+  //   closePrice,
+  //   recipient,
+  //   positionAddress,
+  //   null,
+  //   initialMargin
+  // );
 
-  console.log(receipt);
+  // console.log(receipt);
 }
 
 sendPositionEscapeTransaction();

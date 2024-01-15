@@ -7,7 +7,7 @@ const { sendDeposit } = require("invisible-sdk/src/transactions");
 const { DECIMALS_PER_ASSET } = require("invisible-sdk/src/utils");
 const { executeDepositTx } = require("../../src/onchainInteractions");
 
-async function main() {
+async function testDeposit() {
   let configPath = path.join(__dirname, "perp_config.json");
   const mmConfigFile = fs.readFileSync(configPath, "utf8");
   let config = JSON.parse(mmConfigFile);
@@ -15,6 +15,8 @@ async function main() {
   let privKey = config.PRIVATE_KEY;
   await makeDeposits([2413654107], [100_000], privKey);
 }
+
+testDeposit();
 
 async function makeOnchainDeposit() {
   // * Onchain deposits
@@ -61,5 +63,5 @@ async function claimDeposit() {
   console.log("usdc balance: ", marketMaker.getAvailableAmount(2413654107));
 }
 
-makeOnchainDeposit();
+// makeOnchainDeposit();
 // claimDeposit();
