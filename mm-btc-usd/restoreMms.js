@@ -6,17 +6,17 @@ const path = require("path");
 const fs = require("fs");
 
 async function main() {
-  let configPath = path.join(__dirname, "spot_config.json");
+  let configPath = path.join(__dirname, "./spot-mm/spot_config.json");
   let spotConfig = loadMMConfig(configPath);
 
-  let user = UserState.fromPrivKey(spotConfig.MM_CONFIG.privKey.toString());
+  let user = UserState.fromPrivKey(spotConfig.MM_CONFIG.PRIVATE_KEY.toString());
   await user.login();
 
   await restoreUserState(user, true, false);
 
   // ? ============= PERP =============
 
-  configPath = path.join(__dirname, "perp_config.json");
+  configPath = path.join(__dirname, "./perp-mm/perp_config.json");
   const mmConfigFile = fs.readFileSync(configPath, "utf8");
   let perpConfig = JSON.parse(mmConfigFile);
 

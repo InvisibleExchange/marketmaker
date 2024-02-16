@@ -18,7 +18,7 @@ const { trimHash } = require("../src/helpers");
 
 //
 
-const SEND_ORDERS_PERIOD = 5_000;
+const SEND_ORDERS_PERIOD = 2_000;
 
 //
 

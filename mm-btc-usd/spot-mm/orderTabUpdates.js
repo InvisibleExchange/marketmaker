@@ -16,6 +16,8 @@ async function runOpenOrderTab() {
   let marketId = "11";
 
   await openOrderTab(marketId, privKey);
+
+  process.exit(0);
 }
 
 async function runCloseOrderTab() {

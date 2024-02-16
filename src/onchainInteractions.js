@@ -146,15 +146,11 @@ async function executeDepositTx(user, amount, token) {
 // * ======================================================================
 // * Smart contract MM Actions
 
-async function executeMMRegistration(
-  syntheticAsset,
-  positionAddress,
-  maxVlpSupply
-) {
+async function executeMMRegistration(syntheticAsset, positionAddress) {
   positionAddress = positionAddress.toString(16);
 
   let txRes = await invisibleContract
-    .registerPerpMarketMaker(syntheticAsset, positionAddress, maxVlpSupply, {
+    .registerPerpMarketMaker(syntheticAsset, positionAddress, {
       gasLimit: 300_000,
     })
     .catch((err) => {

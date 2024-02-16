@@ -71,7 +71,6 @@ async function testSendPositionEscape(
       position_address: position_a.position_address.toString(),
       allow_partial_liquidations: position_a.allow_partial_liquidations,
       vlp_token: position_a.vlp_token.toString(),
-      max_vlp_supply: position_a.max_vlp_supply.toString(),
     },
     order_side: !!position_a.order_side,
     position_size: position_a.position_size.toString(),

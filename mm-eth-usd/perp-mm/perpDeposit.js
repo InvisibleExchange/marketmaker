@@ -14,6 +14,8 @@ async function testDeposit() {
 
   let privKey = config.PRIVATE_KEY;
   await makeDeposits([2413654107], [100_000], privKey);
+
+  process.exit(0);
 }
 
 testDeposit();

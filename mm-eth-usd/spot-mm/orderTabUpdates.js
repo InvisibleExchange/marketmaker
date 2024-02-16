@@ -14,6 +14,8 @@ async function runOpenOrderTab() {
   let marketId = "12";
 
   await openOrderTab(marketId, config);
+
+  process.exit(0);
 }
 
 async function runCloseOrderTab() {

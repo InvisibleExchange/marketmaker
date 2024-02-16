@@ -14,6 +14,8 @@ async function testDeposit() {
   let privKey = config.MM_CONFIG.PRIVATE_KEY;
 
   await makeDeposits([2413654107, 3592681469], [150_000, 6], privKey);
+
+  process.exit(0);
 }
 
 testDeposit();

@@ -10,7 +10,7 @@ const {
   sendLiquidationOrder,
   sendPerpOrder,
 } = require("invisible-sdk/src/transactions");
-const { setupPriceFeeds, priceUpdate } = require("../src/mmPriceFeeds");
+const { priceUpdate } = require("../src/mmPriceFeeds");
 
 const path = require("path");
 const { UserState } = require("invisible-sdk/src/users");
@@ -35,15 +35,15 @@ async function main() {
     console.log("Error setting up price feeds: ", error);
   }
 
-  // console.log("available_amount: ", user.positionData);
-  // console.log("available_amount: ", user.getAvailableAmount(2413654107));
-
   setInterval(async () => {
     for (let pair of Object.values(MM_CONFIG.pairs)) {
       let token = SYMBOLS_TO_IDS[pair.symbol.split("-")[0]];
 
-      const midPrice = PRICE_FEEDS[pair.symbol]?.price;
+      let midPrice = PRICE_FEEDS[pair.symbol]?.price;
       if (!midPrice) continue;
+
+      console.log("midPrice: ", midPrice);
+      console.log(user.getAvailableAmount(COLLATERAL_TOKEN));
 
       let positions;
       try {
@@ -53,6 +53,8 @@ async function main() {
       }
 
       for (let position of positions) {
+        console.log("position: ", position);
+
         let newPosition = await sendLiquidationOrder(
           user,
           position,
@@ -64,7 +66,7 @@ async function main() {
           0.1
         );
 
-        console.log("newPosition: ", newPosition);
+        console.log("\nnewPosition: ", newPosition);
 
         let orderSide = newPosition.position_size == "Long" ? "Short" : "Long";
         await sendPerpOrder(
@@ -78,11 +80,15 @@ async function main() {
           midPrice,
           null,
           0.07,
-          0.1,
+          1.5,
           true,
           {}
-        ).then((res) => {
-          console.log("available_amount: ", user.getAvailableAmount(2413654107));
+        ).then((_) => {
+          console.log("pos Data: ", user.positionData);
+          console.log(
+            "available_amount: ",
+            user.getAvailableAmount(COLLATERAL_TOKEN)
+          );
         });
       }
     }

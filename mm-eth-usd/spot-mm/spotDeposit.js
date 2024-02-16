@@ -13,9 +13,9 @@ async function testDeposit() {
   let config = loadMMConfig(configPath).MM_CONFIG.PRIVATE_KEY;
 
   await makeDeposits([2413654107, 453755560], [100_000, 50], config);
-}
 
-testDeposit();
+  process.exit(0);
+}
 
 async function makeOnchainDeposit() {
   // * Onchain deposits
@@ -71,3 +71,5 @@ async function claimDeposit() {
 // makeOnchainDeposit();
 
 // claimDeposit();
+
+testDeposit();

@@ -169,7 +169,6 @@ async function executePositionEscape(
     allow_partial_liquidations:
       position_a.position_header.allow_partial_liquidations,
     vlp_token: position_a.position_header.vlp_token,
-    max_vlp_supply: position_a.position_header.max_vlp_supply,
     order_side: position_a.order_side == "Long",
     position_size: position_a.position_size,
     margin: position_a.margin,
@@ -198,7 +197,6 @@ async function executePositionEscape(
       allow_partial_liquidations:
         position_b.position_header.allow_partial_liquidations,
       vlp_token: position_b.position_header.vlp_token,
-      max_vlp_supply: position_b.position_header.max_vlp_supply,
       order_side: position_b.order_side,
       position_size: position_b.position_size,
       margin: position_b.margin,
@@ -356,14 +354,13 @@ function hashPositionEscape(positionAHash, closePrice, hashB, recipient) {
 }
 
 function hashPositionKeccak(position) {
-  // & hash = H({allow_partial_liquidations, synthetic_token, position_address, vlp_token, max_vlp_supply, order_side, position_size, entry_price, liquidation_price, last_funding_idx, vlp_supply})
+  // & hash = H({allow_partial_liquidations, synthetic_token, position_address, vlp_token, order_side, position_size, entry_price, liquidation_price, last_funding_idx, vlp_supply})
 
   let hashInput = [
     position.allow_partial_liquidations ? 1 : 0,
     position.synthetic_token,
     position.position_address,
     position.vlp_token,
-    position.max_vlp_supply,
     position.order_side ? 1 : 0,
     position.position_size,
     position.entry_price,
