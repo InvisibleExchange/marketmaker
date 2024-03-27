@@ -4,7 +4,10 @@ const path = require("path");
 const fs = require("fs");
 const { UserState } = require("invisible-sdk/src/users");
 const { sendDeposit } = require("invisible-sdk/src/transactions");
-const { DECIMALS_PER_ASSET } = require("invisible-sdk/src/utils");
+const {
+  DECIMALS_PER_ASSET,
+  SYMBOLS_TO_IDS,
+} = require("invisible-sdk/src/utils");
 const { executeDepositTx } = require("../../src/onchainInteractions");
 
 async function testDeposit() {
@@ -17,8 +20,7 @@ async function testDeposit() {
 
   process.exit(0);
 }
-
-testDeposit();
+// testDeposit();
 
 async function makeOnchainDeposit() {
   // * Onchain deposits
@@ -30,7 +32,7 @@ async function makeOnchainDeposit() {
   let privKey = config.PRIVATE_KEY;
   let marketMaker = await UserState.loginUser(privKey);
 
-  let token = 2413654107;
+  let token = SYMBOLS_TO_IDS["USDC"];
   let amount = 10_000;
 
   let deposit = await executeDepositTx(marketMaker, amount, token);

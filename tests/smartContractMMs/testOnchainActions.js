@@ -17,7 +17,6 @@ async function testRegisterMM() {
   //  * mm_owner,
   //  * synthetic_asset,
   //  * position_address,
-  //  * max_vlp_supply,
   //  * vlp_token,
   //  * action_id,
   //  * action_type,
@@ -30,7 +29,6 @@ async function testRegisterMM() {
     mm_owner: "0xe0F30cb149fAADC7247E953746Be9BbBB6B5751f",
     synthetic_asset,
     position_address: position.position_header.position_address,
-    max_vlp_supply: 1000000,
     vlp_token: 13579,
     action_id: 1,
     action_type: "register_mm",
@@ -60,7 +58,6 @@ async function testAddLiquidity() {
     depositor: "0xe0F30cb149fAADC7247E953746Be9BbBB6B5751f",
     position_address: position.position_header.position_address,
     usdc_amount: 100 * 10 ** COLLATERAL_TOKEN_DECIMALS,
-    vlp_token: 13579,
     action_id: 2,
     action_type: "add_liquidity",
   };

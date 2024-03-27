@@ -12,6 +12,7 @@ const {
 const { priceUpdate } = require("./defaultStrategy/mmPriceFeeds");
 
 const { restoreUserState } = require("invisible-sdk/src/utils");
+const { runSCMM } = require("../src/scMMs/runSmartContractMm");
 
 // * =============================================================================================================
 
@@ -97,6 +98,12 @@ module.exports = class TradingEnvironment {
       }, this.PERIODS.FILL_ORDERS_PERIOD);
 
       console.log("Starting market making: ", this.marketmaker.positionData);
+
+      if (process.env.IS_SMART_CONTRACT_MM == "true") {
+        let mmEthAddress = process.env.ETH_ADDRESS;
+
+        runSCMM(this.marketmaker, mmEthAddress);
+      }
 
       // brodcast orders to provide liquidity
       await indicateLiquidity(

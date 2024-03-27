@@ -27,6 +27,7 @@ let W3CWebSocket = require("websocket").w3cwebsocket;
 let client;
 
 const path = require("path");
+const { runSCMM } = require("./scMMs/runSmartContractMm");
 
 let errorCounter = 0;
 
@@ -899,6 +900,12 @@ async function run(config) {
       indicateLiquidity,
       LIQUIDITY_INDICATION_PERIOD
     );
+
+    if (process.env.IS_SMART_CONTRACT_MM == "true") {
+      let mmEthAddress = process.env.ETH_ADDRESS;
+
+      runSCMM(marketMaker, mmEthAddress);
+    }
 
     let errorInterval = setInterval(() => {
       if (errorCounter > 10) {

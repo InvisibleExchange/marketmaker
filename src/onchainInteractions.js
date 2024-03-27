@@ -1,14 +1,17 @@
 const ethers = require("ethers");
 
-const EXCHANGE_CONFIG = require("../exchange-config.json");
-const ONCHAIN_DECIMALS_PER_ASSET =
-  EXCHANGE_CONFIG["ONCHAIN_DECIMALS_PER_ASSET"];
-const SYMBOLS_TO_IDS = EXCHANGE_CONFIG["SYMBOLS_TO_IDS"];
-const TOKEN_ID_2_ADDRESS = EXCHANGE_CONFIG["TOKEN_ID_2_ADDRESS"];
+const ADDRESS_CONFIG = require("../address-config.json");
+const ONCHAIN_DECIMALS_PER_ASSET = ADDRESS_CONFIG["ONCHAIN_DECIMALS_PER_ASSET"];
+// const TOKEN_ID_2_ADDRESS = ADDRESS_CONFIG  ["TOKEN_ID_2_ADDRESS"];
 
 const path = require("path");
 const dotenv = require("dotenv");
-const { storeUserState, COLLATERAL_TOKEN } = require("invisible-sdk/src/utils");
+const {
+  storeUserState,
+  COLLATERAL_TOKEN,
+  SYMBOLS_TO_IDS,
+  IDS_TO_SYMBOLS,
+} = require("invisible-sdk/src/utils");
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
 let privateKey = process.env.ETH_PRIVATE_KEY;
@@ -18,8 +21,8 @@ const provider = new ethers.providers.JsonRpcProvider(
 );
 const signer = new ethers.Wallet(privateKey, provider);
 
-const invisibleAddress = EXCHANGE_CONFIG["INVISIBL1_ETH_ADDRESS"];
-const invisibleL1Abi = require("./abis/Invisible.json").abi;
+const invisibleAddress = ADDRESS_CONFIG["L1"]["Invisible"];
+const invisibleL1Abi = require("./abis/InvisibleL1.json").abi;
 const invisibleContract = new ethers.Contract(
   invisibleAddress,
   invisibleL1Abi,
@@ -95,7 +98,7 @@ async function executeDepositTx(user, amount, token) {
 
     await approveERC20(token, depositAmount);
 
-    let tokenAddress = TOKEN_ID_2_ADDRESS[token];
+    let tokenAddress = ADDRESS_CONFIG["L1"][IDS_TO_SYMBOLS[token]];
     let txRes = await invisibleContract
       .makeDeposit(tokenAddress, depositAmount, depositStarkKey, {
         gasLimit: 3000000,
@@ -209,7 +212,7 @@ async function executeProvideLiquidity(
 
 async function approveERC20(tokenId, tokenAmount) {
   // ? Get the Token contract instance
-  let tokenAddress = TOKEN_ID_2_ADDRESS[tokenId];
+  let tokenAddress = ADDRESS_CONFIG["L1"][IDS_TO_SYMBOLS[tokenId]];
   const erc20Abi = require("./abis/Erc20.json").abi;
   const tokenContract = new ethers.Contract(
     tokenAddress,
